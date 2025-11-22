@@ -1,0 +1,142 @@
+"use client";
+
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { History, Download, Play } from "lucide-react";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+
+export default function CallHistoryPage() {
+  // Mock data - will be replaced with API call
+  const calls = [];
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-3xl font-bold tracking-tight">Call History</h1>
+        <p className="text-muted-foreground">
+          View and analyze your voice agent call logs
+        </p>
+      </div>
+
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle>Recent Calls</CardTitle>
+              <CardDescription>
+                {calls.length === 0 ? "No calls yet" : `${calls.length} calls found`}
+              </CardDescription>
+            </div>
+            <div className="flex gap-2">
+              <Input
+                placeholder="Search calls..."
+                className="w-[250px]"
+              />
+              <Select defaultValue="all">
+                <SelectTrigger className="w-[150px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Calls</SelectItem>
+                  <SelectItem value="completed">Completed</SelectItem>
+                  <SelectItem value="failed">Failed</SelectItem>
+                  <SelectItem value="inbound">Inbound</SelectItem>
+                  <SelectItem value="outbound">Outbound</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {calls.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-16">
+              <History className="h-16 w-16 text-muted-foreground/50 mb-4" />
+              <h3 className="text-lg font-semibold mb-2">No calls yet</h3>
+              <p className="text-sm text-muted-foreground text-center max-w-sm">
+                Call history will appear here once your voice agents start handling calls
+              </p>
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Date & Time</TableHead>
+                  <TableHead>Agent</TableHead>
+                  <TableHead>Direction</TableHead>
+                  <TableHead>From/To</TableHead>
+                  <TableHead>Duration</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead className="w-[100px]">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {calls.map((call: any) => (
+                  <TableRow key={call.id}>
+                    <TableCell className="text-sm">
+                      {new Date(call.timestamp).toLocaleString()}
+                    </TableCell>
+                    <TableCell className="font-medium">
+                      {call.agentName}
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={call.direction === "inbound" ? "default" : "secondary"}>
+                        {call.direction}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="font-mono text-xs">
+                      {call.phoneNumber}
+                    </TableCell>
+                    <TableCell>{call.duration}</TableCell>
+                    <TableCell>
+                      <Badge
+                        variant={
+                          call.status === "completed"
+                            ? "default"
+                            : call.status === "failed"
+                            ? "destructive"
+                            : "secondary"
+                        }
+                      >
+                        {call.status}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex gap-1">
+                        {call.recordingUrl && (
+                          <Button variant="ghost" size="icon" title="Play recording">
+                            <Play className="h-4 w-4" />
+                          </Button>
+                        )}
+                        {call.transcriptUrl && (
+                          <Button variant="ghost" size="icon" title="Download transcript">
+                            <Download className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
