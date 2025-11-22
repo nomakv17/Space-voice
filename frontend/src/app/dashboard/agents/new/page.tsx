@@ -435,7 +435,7 @@ export default function NewAgentPage() {
                           </FormControl>
                           <SelectContent>
                             <SelectItem value="gpt-realtime">
-                              gpt-realtime (Latest - Best for Voice)
+                              gpt-realtime (Best for Voice - Nov 2025)
                             </SelectItem>
                             <SelectItem value="gpt-4o">
                               GPT-4o (Multimodal - 232ms latency)
@@ -443,8 +443,14 @@ export default function NewAgentPage() {
                             <SelectItem value="gpt-4o-mini">
                               GPT-4o-mini (25x cheaper, fast)
                             </SelectItem>
-                            <SelectItem value="claude-3-7-sonnet">
-                              Claude 3.7 Sonnet (Best reasoning)
+                            <SelectItem value="claude-sonnet-4-5">
+                              Claude Sonnet 4.5 (Sep 2025 - Best coding/agents)
+                            </SelectItem>
+                            <SelectItem value="claude-opus-4-1">
+                              Claude Opus 4.1 (Aug 2025 - Most capable)
+                            </SelectItem>
+                            <SelectItem value="claude-haiku-4-5">
+                              Claude Haiku 4.5 (Oct 2025 - Fast & cheap)
                             </SelectItem>
                             <SelectItem value="gemini-2.5-flash">
                               Gemini 2.5 Flash (Multimodal voice)
@@ -452,7 +458,7 @@ export default function NewAgentPage() {
                           </SelectContent>
                         </Select>
                         <FormDescription>
-                          gpt-realtime: Production voice agents | GPT-4o: Complex tasks | GPT-4o-mini: Budget
+                          gpt-realtime: Voice | Claude Sonnet 4.5: Agents/Coding | Haiku 4.5: Budget
                         </FormDescription>
                         <FormMessage />
                       </FormItem>

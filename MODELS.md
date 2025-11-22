@@ -49,15 +49,28 @@ Complete guide to the latest and best models for voice agents.
 
 ### Anthropic Claude
 
-#### **Claude 3.7 Sonnet**
-- **Model ID**: `claude-3-7-sonnet-20250219`
+#### **Claude Sonnet 4.5** ⭐ RECOMMENDED (Sep 2025)
+- **Model ID**: `claude-sonnet-4-5`
+- **Released**: September 29, 2025
 - **Strengths**:
-  - Best-in-class instruction following
-  - Superior agentic capabilities (state-of-the-art TAU-bench)
-  - Complex multi-turn conversations
-  - Hybrid reasoning model
+  - Best coding model in the world
+  - State-of-the-art agentic capabilities (61.4% OSWorld)
+  - Can maintain focus for 30+ hours on complex tasks
+  - Superior reasoning and domain knowledge
+- **Pricing**: $3/$15 per million tokens (same as Sonnet 4)
 - **Note**: NOT native voice (needs separate STT/TTS)
-- **Use Case**: Complex business logic, customer service with nuance
+- **Use Case**: Complex agents, advanced customer service, coding assistance
+
+#### **Claude Opus 4.1** (Aug 2025)
+- **Released**: August 5, 2025
+- **Most capable** Claude model
+- 74.5% on SWE-bench Verified
+- **Use Case**: Most complex reasoning tasks
+
+#### **Claude Haiku 4.5** (Oct 2025)
+- **Released**: October 15, 2025
+- **Fastest** and cheapest ($1/$5 per million tokens)
+- **Use Case**: High-volume, simple interactions
 
 ### Google
 
@@ -176,7 +189,7 @@ Max Tokens: 2000
 
 ### For Sales/Outbound
 ```
-LLM: Claude 3.7 Sonnet
+LLM: Claude Sonnet 4.5 or GPT-4o
 STT: Deepgram Nova-3
 TTS: ElevenLabs Turbo v2.5
 Temperature: 0.9 (more creative)
@@ -231,7 +244,9 @@ Enable: Recording, Transcripts, PII Redaction
 - [Deepgram Nova-3 Announcement](https://deepgram.com/learn/introducing-nova-3-speech-to-text-api)
 - [ElevenLabs Models](https://elevenlabs.io/docs/models)
 - [ElevenLabs Turbo v2.5](https://elevenlabs.io/blog/introducing-turbo-v2-5)
-- [Claude 3.7 Sonnet](https://www.anthropic.com/news/claude-3-7-sonnet)
+- [Claude Sonnet 4.5](https://www.anthropic.com/news/claude-sonnet-4-5)
+- [Claude Opus 4.1](https://www.anthropic.com/news/claude-opus-4-1)
+- [Claude 4 Release](https://www.anthropic.com/news/claude-4)
 - [Gemini 2.5 Flash](https://blog.google/technology/google-deepmind/google-gemini-updates-io-2025/)
 - [GPT-4o Models](https://www.kommunicate.io/blog/chatgpt-models-explained/)
 
