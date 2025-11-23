@@ -6,9 +6,51 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Search, Check, Settings as SettingsIcon, Zap, Package } from "lucide-react";
+import {
+  Search,
+  Check,
+  Settings as SettingsIcon,
+  Zap,
+  Calendar,
+  Users,
+  Database,
+  MessageSquare,
+  Mail,
+  Table,
+  CreditCard,
+  LifeBuoy,
+  Code,
+  Briefcase,
+  FileText,
+  Send,
+  Clock
+} from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { AVAILABLE_INTEGRATIONS, type Integration } from "@/lib/integrations";
+
+const getIntegrationIcon = (integrationId: string) => {
+  const iconMap: Record<string, any> = {
+    "salesforce": Users,
+    "hubspot": Users,
+    "pipedrive": Users,
+    "zoho-crm": Users,
+    "google-calendar": Calendar,
+    "microsoft-calendar": Calendar,
+    "cal-com": Clock,
+    "airtable": Table,
+    "notion": FileText,
+    "google-sheets": Table,
+    "slack": MessageSquare,
+    "gmail": Mail,
+    "sendgrid": Send,
+    "intercom": MessageSquare,
+    "stripe": CreditCard,
+    "github": Code,
+    "jira": Briefcase,
+    "zendesk": LifeBuoy,
+  };
+  return iconMap[integrationId] || Database;
+};
 
 export default function IntegrationsPage() {
   const [searchQuery, setSearchQuery] = useState("");
@@ -112,14 +154,15 @@ function IntegrationCard({
   isConnected: boolean;
 }) {
   const [isConfigDialogOpen, setIsConfigDialogOpen] = useState(false);
+  const Icon = getIntegrationIcon(integration.id);
 
   return (
     <Card className="hover:shadow-md transition-shadow">
       <CardHeader>
         <div className="flex items-start justify-between">
           <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-lg bg-muted flex items-center justify-center">
-              <Package className="h-5 w-5" />
+            <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
+              <Icon className="h-5 w-5 text-primary" />
             </div>
             <div>
               <div className="flex items-center gap-2">
