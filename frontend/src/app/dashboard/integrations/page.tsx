@@ -23,33 +23,40 @@ import {
   Briefcase,
   FileText,
   Send,
-  Clock
+  Clock,
 } from "lucide-react";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { AVAILABLE_INTEGRATIONS, type Integration } from "@/lib/integrations";
 
 const getIntegrationIcon = (integrationId: string) => {
-  const iconMap: Record<string, any> = {
-    "salesforce": Users,
-    "hubspot": Users,
-    "pipedrive": Users,
+  const iconMap: Record<string, React.ComponentType> = {
+    salesforce: Users,
+    hubspot: Users,
+    pipedrive: Users,
     "zoho-crm": Users,
     "google-calendar": Calendar,
     "microsoft-calendar": Calendar,
     "cal-com": Clock,
-    "airtable": Table,
-    "notion": FileText,
+    airtable: Table,
+    notion: FileText,
     "google-sheets": Table,
-    "slack": MessageSquare,
-    "gmail": Mail,
-    "sendgrid": Send,
-    "intercom": MessageSquare,
-    "stripe": CreditCard,
-    "github": Code,
-    "jira": Briefcase,
-    "zendesk": LifeBuoy,
+    slack: MessageSquare,
+    gmail: Mail,
+    sendgrid: Send,
+    intercom: MessageSquare,
+    stripe: CreditCard,
+    github: Code,
+    jira: Briefcase,
+    zendesk: LifeBuoy,
   };
-  return iconMap[integrationId] || Database;
+  return iconMap[integrationId] ?? Database;
 };
 
 export default function IntegrationsPage() {
@@ -73,8 +80,7 @@ export default function IntegrationsPage() {
     const matchesSearch =
       integration.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       integration.description.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesCategory =
-      selectedCategory === "all" || integration.category === selectedCategory;
+    const matchesCategory = selectedCategory === "all" || integration.category === selectedCategory;
     return matchesSearch && matchesCategory;
   });
 
@@ -99,7 +105,7 @@ export default function IntegrationsPage() {
           </Badge>
         </div>
         <div className="relative w-[300px]">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             placeholder="Search integrations..."
             value={searchQuery}
@@ -122,8 +128,8 @@ export default function IntegrationsPage() {
           {filteredIntegrations.length === 0 ? (
             <Card>
               <CardContent className="flex flex-col items-center justify-center py-16">
-                <Zap className="h-16 w-16 text-muted-foreground/50 mb-4" />
-                <h3 className="text-lg font-semibold mb-2">No integrations found</h3>
+                <Zap className="mb-4 h-16 w-16 text-muted-foreground/50" />
+                <h3 className="mb-2 text-lg font-semibold">No integrations found</h3>
                 <p className="text-sm text-muted-foreground">
                   Try adjusting your search or category filter
                 </p>
@@ -157,11 +163,11 @@ function IntegrationCard({
   const Icon = getIntegrationIcon(integration.id);
 
   return (
-    <Card className="hover:shadow-md transition-shadow">
+    <Card className="transition-shadow hover:shadow-md">
       <CardHeader>
         <div className="flex items-start justify-between">
           <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
               <Icon className="h-5 w-5 text-primary" />
             </div>
             <div>
@@ -173,28 +179,20 @@ function IntegrationCard({
                   </Badge>
                 )}
               </div>
-              <CardDescription className="text-xs mt-1">
+              <CardDescription className="mt-1 text-xs">
                 {integration.category.toUpperCase()}
               </CardDescription>
             </div>
           </div>
-          {isConnected && (
-            <Check className="h-5 w-5 text-green-600 dark:text-green-400" />
-          )}
+          {isConnected && <Check className="h-5 w-5 text-green-600 dark:text-green-400" />}
         </div>
       </CardHeader>
       <CardContent>
-        <p className="text-sm text-muted-foreground mb-4 line-clamp-2">
-          {integration.description}
-        </p>
+        <p className="mb-4 line-clamp-2 text-sm text-muted-foreground">{integration.description}</p>
         <div className="flex gap-2">
           <Dialog open={isConfigDialogOpen} onOpenChange={setIsConfigDialogOpen}>
             <DialogTrigger asChild>
-              <Button
-                variant={isConnected ? "outline" : "default"}
-                className="flex-1"
-                size="sm"
-              >
+              <Button variant={isConnected ? "outline" : "default"} className="flex-1" size="sm">
                 {isConnected ? (
                   <>
                     <SettingsIcon className="mr-2 h-3 w-3" />
@@ -223,11 +221,7 @@ function IntegrationCard({
           </Dialog>
           {integration.documentationUrl && (
             <Button variant="ghost" size="sm" asChild>
-              <a
-                href={integration.documentationUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
+              <a href={integration.documentationUrl} target="_blank" rel="noopener noreferrer">
                 Docs
               </a>
             </Button>
@@ -247,9 +241,9 @@ function IntegrationConfigForm({
   isConnected: boolean;
   onClose: () => void;
 }) {
-  const handleOAuthConnect = async () => {
+  const handleOAuthConnect = () => {
     // TODO: Implement OAuth flow
-    console.log("Starting OAuth for", integration.id);
+    console.error("Starting OAuth for", integration.id);
     // window.location.href = `/api/integrations/${integration.id}/oauth`;
   };
 
@@ -257,13 +251,13 @@ function IntegrationConfigForm({
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
     const credentials = Object.fromEntries(formData.entries());
-    console.log("Saving credentials for", integration.id, credentials);
+    console.error("Saving credentials for", integration.id, credentials);
     // TODO: API call to save credentials
     onClose();
   };
 
   const handleDisconnect = () => {
-    console.log("Disconnecting", integration.id);
+    console.error("Disconnecting", integration.id);
     // TODO: API call to disconnect
     onClose();
   };
@@ -272,9 +266,9 @@ function IntegrationConfigForm({
     return (
       <div className="space-y-4">
         {integration.scopes && integration.scopes.length > 0 && (
-          <div className="rounded-lg border p-4 space-y-2">
+          <div className="space-y-2 rounded-lg border p-4">
             <p className="text-sm font-medium">This integration will access:</p>
-            <ul className="text-sm text-muted-foreground space-y-1">
+            <ul className="space-y-1 text-sm text-muted-foreground">
               {integration.scopes.map((scope) => (
                 <li key={scope} className="flex items-center gap-2">
                   <Check className="h-3 w-3" />
@@ -318,7 +312,7 @@ function IntegrationConfigForm({
         <div key={field.name} className="space-y-2">
           <label className="text-sm font-medium">
             {field.label}
-            {field.required && <span className="text-destructive ml-1">*</span>}
+            {field.required && <span className="ml-1 text-destructive">*</span>}
           </label>
           <Input
             name={field.name}

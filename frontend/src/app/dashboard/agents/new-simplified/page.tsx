@@ -18,10 +18,16 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
-import { TierSelector, TierComparison } from "@/components/tier-selector";
+import { TierSelector } from "@/components/tier-selector";
 import { PRICING_TIERS } from "@/lib/pricing-tiers";
 import { ChevronRight } from "lucide-react";
 
@@ -61,7 +67,7 @@ export default function NewAgentSimplifiedPage() {
   const selectedTier = PRICING_TIERS.find((t) => t.id === form.watch("pricingTier"));
 
   function onSubmit(data: AgentFormValues) {
-    console.log("Creating agent with tier config:", {
+    console.error("Creating agent with tier config:", {
       ...data,
       tierConfig: selectedTier?.config,
     });
@@ -86,15 +92,15 @@ export default function NewAgentSimplifiedPage() {
               { num: 2, label: "Tools" },
               { num: 3, label: "Review & Create" },
             ].map((s, idx) => (
-              <div key={s.num} className="flex items-center gap-2 flex-1">
-                <div className="flex items-center gap-3 flex-1">
+              <div key={s.num} className="flex flex-1 items-center gap-2">
+                <div className="flex flex-1 items-center gap-3">
                   <div
-                    className={`h-10 w-10 rounded-full flex items-center justify-center text-sm font-semibold transition-all ${
+                    className={`flex h-10 w-10 items-center justify-center rounded-full text-sm font-semibold transition-all ${
                       s.num === step
                         ? "bg-primary text-primary-foreground ring-4 ring-primary/20"
                         : s.num < step
-                        ? "bg-primary text-primary-foreground"
-                        : "bg-muted text-muted-foreground"
+                          ? "bg-primary text-primary-foreground"
+                          : "bg-muted text-muted-foreground"
                     }`}
                   >
                     {s.num < step ? "✓" : s.num}
@@ -130,7 +136,12 @@ export default function NewAgentSimplifiedPage() {
       </Card>
 
       <Form {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+        <form
+          onSubmit={(e) => {
+            void form.handleSubmit(onSubmit)(e);
+          }}
+          className="space-y-6"
+        >
           {/* Step 1: Pricing & Basic Info */}
           {step === 1 && (
             <div className="space-y-6">
@@ -177,10 +188,7 @@ export default function NewAgentSimplifiedPage() {
                       <FormItem>
                         <FormLabel>Description (optional)</FormLabel>
                         <FormControl>
-                          <Textarea
-                            placeholder="Handles customer inquiries..."
-                            {...field}
-                          />
+                          <Textarea placeholder="Handles customer inquiries..." {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -227,7 +235,7 @@ export default function NewAgentSimplifiedPage() {
                           />
                         </FormControl>
                         <FormDescription>
-                          Instructions that define your agent's personality
+                          Instructions that define your agent&apos;s personality
                         </FormDescription>
                         <FormMessage />
                       </FormItem>
@@ -250,9 +258,7 @@ export default function NewAgentSimplifiedPage() {
               <Card>
                 <CardHeader>
                   <CardTitle>Tools & Integrations</CardTitle>
-                  <CardDescription>
-                    Enable integrations for your agent (optional)
-                  </CardDescription>
+                  <CardDescription>Enable integrations for your agent (optional)</CardDescription>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
@@ -270,17 +276,67 @@ export default function NewAgentSimplifiedPage() {
 
                     <div className="grid gap-3 md:grid-cols-2">
                       {[
-                        { id: "google-calendar", name: "Google Calendar", desc: "Schedule meetings, check availability", connected: false },
-                        { id: "salesforce", name: "Salesforce", desc: "Access CRM data", connected: false },
-                        { id: "hubspot", name: "HubSpot", desc: "Manage contacts & deals", connected: false },
-                        { id: "notion", name: "Notion", desc: "Query & update databases", connected: false },
-                        { id: "slack", name: "Slack", desc: "Send messages & notifications", connected: false },
+                        {
+                          id: "google-calendar",
+                          name: "Google Calendar",
+                          desc: "Schedule meetings, check availability",
+                          connected: false,
+                        },
+                        {
+                          id: "salesforce",
+                          name: "Salesforce",
+                          desc: "Access CRM data",
+                          connected: false,
+                        },
+                        {
+                          id: "hubspot",
+                          name: "HubSpot",
+                          desc: "Manage contacts & deals",
+                          connected: false,
+                        },
+                        {
+                          id: "notion",
+                          name: "Notion",
+                          desc: "Query & update databases",
+                          connected: false,
+                        },
+                        {
+                          id: "slack",
+                          name: "Slack",
+                          desc: "Send messages & notifications",
+                          connected: false,
+                        },
                         { id: "gmail", name: "Gmail", desc: "Send emails", connected: false },
-                        { id: "google-sheets", name: "Google Sheets", desc: "Read & write spreadsheets", connected: false },
-                        { id: "airtable", name: "Airtable", desc: "Access database records", connected: false },
-                        { id: "stripe", name: "Stripe", desc: "Process payments", connected: false },
-                        { id: "zendesk", name: "Zendesk", desc: "Create support tickets", connected: false },
-                        { id: "github", name: "GitHub", desc: "Repository & issue management", connected: false },
+                        {
+                          id: "google-sheets",
+                          name: "Google Sheets",
+                          desc: "Read & write spreadsheets",
+                          connected: false,
+                        },
+                        {
+                          id: "airtable",
+                          name: "Airtable",
+                          desc: "Access database records",
+                          connected: false,
+                        },
+                        {
+                          id: "stripe",
+                          name: "Stripe",
+                          desc: "Process payments",
+                          connected: false,
+                        },
+                        {
+                          id: "zendesk",
+                          name: "Zendesk",
+                          desc: "Create support tickets",
+                          connected: false,
+                        },
+                        {
+                          id: "github",
+                          name: "GitHub",
+                          desc: "Repository & issue management",
+                          connected: false,
+                        },
                         { id: "jira", name: "Jira", desc: "Project management", connected: false },
                       ].map((tool) => (
                         <FormField
@@ -304,22 +360,24 @@ export default function NewAgentSimplifiedPage() {
                                 className={`flex flex-row items-start space-x-3 space-y-0 rounded-md border p-3 transition-all ${
                                   tool.connected
                                     ? "cursor-pointer hover:bg-accent hover:shadow-sm"
-                                    : "opacity-60 cursor-not-allowed"
-                                } ${isChecked ? "ring-2 ring-primary bg-primary/5" : ""}`}
+                                    : "cursor-not-allowed opacity-60"
+                                } ${isChecked ? "bg-primary/5 ring-2 ring-primary" : ""}`}
                                 onClick={handleToggle}
                               >
                                 <FormControl>
                                   <input
                                     type="checkbox"
-                                    className="h-4 w-4 mt-1 cursor-pointer"
+                                    className="mt-1 h-4 w-4 cursor-pointer"
                                     checked={isChecked}
                                     onChange={() => {}}
                                     disabled={!tool.connected}
                                   />
                                 </FormControl>
-                                <div className="space-y-1 leading-none flex-1 pointer-events-none">
+                                <div className="pointer-events-none flex-1 space-y-1 leading-none">
                                   <div className="flex items-center justify-between gap-2">
-                                    <FormLabel className={`font-medium ${!tool.connected ? "text-muted-foreground" : ""}`}>
+                                    <FormLabel
+                                      className={`font-medium ${!tool.connected ? "text-muted-foreground" : ""}`}
+                                    >
                                       {tool.name}
                                     </FormLabel>
                                     {tool.connected ? (
@@ -332,9 +390,7 @@ export default function NewAgentSimplifiedPage() {
                                       </Badge>
                                     )}
                                   </div>
-                                  <FormDescription className="text-xs">
-                                    {tool.desc}
-                                  </FormDescription>
+                                  <FormDescription className="text-xs">{tool.desc}</FormDescription>
                                 </div>
                               </FormItem>
                             );
@@ -412,9 +468,7 @@ export default function NewAgentSimplifiedPage() {
                       <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
                         <div className="space-y-0.5">
                           <FormLabel className="text-base">Enable Call Recording</FormLabel>
-                          <FormDescription>
-                            Record all calls for quality assurance
-                          </FormDescription>
+                          <FormDescription>Record all calls for quality assurance</FormDescription>
                         </div>
                         <FormControl>
                           <Switch checked={field.value} onCheckedChange={field.onChange} />
@@ -430,9 +484,7 @@ export default function NewAgentSimplifiedPage() {
                       <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
                         <div className="space-y-0.5">
                           <FormLabel className="text-base">Enable Transcripts</FormLabel>
-                          <FormDescription>
-                            Save conversation transcripts
-                          </FormDescription>
+                          <FormDescription>Save conversation transcripts</FormDescription>
                         </div>
                         <FormControl>
                           <Switch checked={field.value} onCheckedChange={field.onChange} />
@@ -462,9 +514,7 @@ export default function NewAgentSimplifiedPage() {
                     </div>
                     <div>
                       <span className="text-muted-foreground">LLM:</span>
-                      <div className="font-mono text-xs">
-                        {selectedTier?.config.llmModel}
-                      </div>
+                      <div className="font-mono text-xs">{selectedTier?.config.llmModel}</div>
                     </div>
                     <div>
                       <span className="text-muted-foreground">Performance:</span>
@@ -474,10 +524,8 @@ export default function NewAgentSimplifiedPage() {
 
                   {form.watch("enabledTools").length > 0 && (
                     <div>
-                      <span className="text-muted-foreground text-sm">
-                        Tools enabled:
-                      </span>
-                      <div className="font-medium text-sm">
+                      <span className="text-sm text-muted-foreground">Tools enabled:</span>
+                      <div className="text-sm font-medium">
                         {form.watch("enabledTools").length} integration(s)
                       </div>
                     </div>

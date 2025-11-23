@@ -10,18 +10,25 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
+type Agent = {
+  id: string;
+  name: string;
+  language: string;
+  isActive: boolean;
+  phoneNumber?: string;
+  totalCalls: number;
+};
+
 export default function AgentsPage() {
   // Mock data - will be replaced with API call
-  const agents = [];
+  const agents: Agent[] = [];
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Voice Agents</h1>
-          <p className="text-muted-foreground">
-            Manage and configure your AI voice agents
-          </p>
+          <p className="text-muted-foreground">Manage and configure your AI voice agents</p>
         </div>
         <Button asChild>
           <Link href="/dashboard/agents/new-simplified">
@@ -34,11 +41,10 @@ export default function AgentsPage() {
       {agents.length === 0 ? (
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-16">
-            <Bot className="h-16 w-16 text-muted-foreground/50 mb-4" />
-            <h3 className="text-lg font-semibold mb-2">No voice agents yet</h3>
-            <p className="text-sm text-muted-foreground mb-4 text-center max-w-sm">
-              Create your first voice agent to handle inbound and outbound calls
-              with AI
+            <Bot className="mb-4 h-16 w-16 text-muted-foreground/50" />
+            <h3 className="mb-2 text-lg font-semibold">No voice agents yet</h3>
+            <p className="mb-4 max-w-sm text-center text-sm text-muted-foreground">
+              Create your first voice agent to handle inbound and outbound calls with AI
             </p>
             <Button asChild>
               <Link href="/dashboard/agents/new-simplified">
@@ -50,19 +56,17 @@ export default function AgentsPage() {
         </Card>
       ) : (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {agents.map((agent: any) => (
-            <Card key={agent.id} className="hover:shadow-md transition-shadow">
+          {agents.map((agent) => (
+            <Card key={agent.id} className="transition-shadow hover:shadow-md">
               <CardHeader>
                 <div className="flex items-start justify-between">
                   <div className="flex items-center gap-2">
-                    <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
                       <Bot className="h-5 w-5 text-primary" />
                     </div>
                     <div>
                       <CardTitle className="text-lg">{agent.name}</CardTitle>
-                      <CardDescription className="text-xs">
-                        {agent.language}
-                      </CardDescription>
+                      <CardDescription className="text-xs">{agent.language}</CardDescription>
                     </div>
                   </div>
                   <DropdownMenu>
@@ -73,15 +77,11 @@ export default function AgentsPage() {
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
                       <DropdownMenuItem>
-                        <Link href={`/dashboard/agents/${agent.id}`}>
-                          Edit
-                        </Link>
+                        <Link href={`/dashboard/agents/${agent.id}`}>Edit</Link>
                       </DropdownMenuItem>
                       <DropdownMenuItem>Test</DropdownMenuItem>
                       <DropdownMenuItem>Duplicate</DropdownMenuItem>
-                      <DropdownMenuItem className="text-destructive">
-                        Delete
-                      </DropdownMenuItem>
+                      <DropdownMenuItem className="text-destructive">Delete</DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </div>
@@ -104,9 +104,7 @@ export default function AgentsPage() {
                   </div>
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-muted-foreground">Phone Number</span>
-                    <span className="font-mono text-xs">
-                      {agent.phoneNumber || "Not assigned"}
-                    </span>
+                    <span className="font-mono text-xs">{agent.phoneNumber ?? "Not assigned"}</span>
                   </div>
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-muted-foreground">Total Calls</span>

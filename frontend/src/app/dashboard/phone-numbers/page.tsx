@@ -17,18 +17,24 @@ import {
   TableRow,
 } from "@/components/ui/table";
 
+type PhoneNumber = {
+  id: string;
+  phoneNumber: string;
+  provider: string;
+  agentName?: string;
+  isActive: boolean;
+};
+
 export default function PhoneNumbersPage() {
   // Mock data - will be replaced with API call
-  const phoneNumbers = [];
+  const phoneNumbers: PhoneNumber[] = [];
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Phone Numbers</h1>
-          <p className="text-muted-foreground">
-            Manage phone numbers for your voice agents
-          </p>
+          <p className="text-muted-foreground">Manage phone numbers for your voice agents</p>
         </div>
         <Button>
           <Plus className="mr-2 h-4 w-4" />
@@ -39,9 +45,9 @@ export default function PhoneNumbersPage() {
       {phoneNumbers.length === 0 ? (
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-16">
-            <Phone className="h-16 w-16 text-muted-foreground/50 mb-4" />
-            <h3 className="text-lg font-semibold mb-2">No phone numbers yet</h3>
-            <p className="text-sm text-muted-foreground mb-4 text-center max-w-sm">
+            <Phone className="mb-4 h-16 w-16 text-muted-foreground/50" />
+            <h3 className="mb-2 text-lg font-semibold">No phone numbers yet</h3>
+            <p className="mb-4 max-w-sm text-center text-sm text-muted-foreground">
               Purchase a phone number from Telnyx or Twilio to start receiving calls
             </p>
             <Button>
@@ -54,9 +60,7 @@ export default function PhoneNumbersPage() {
         <Card>
           <CardHeader>
             <CardTitle>Your Phone Numbers</CardTitle>
-            <CardDescription>
-              {phoneNumbers.length} number(s) available
-            </CardDescription>
+            <CardDescription>{phoneNumbers.length} number(s) available</CardDescription>
           </CardHeader>
           <CardContent>
             <Table>
@@ -70,23 +74,19 @@ export default function PhoneNumbersPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {phoneNumbers.map((number: any) => (
+                {phoneNumbers.map((number) => (
                   <TableRow key={number.id}>
-                    <TableCell className="font-mono font-medium">
-                      {number.phoneNumber}
-                    </TableCell>
+                    <TableCell className="font-mono font-medium">{number.phoneNumber}</TableCell>
                     <TableCell>
                       <Badge variant="outline">{number.provider}</Badge>
                     </TableCell>
                     <TableCell>
-                      {number.agentName || (
+                      {number.agentName ?? (
                         <span className="text-muted-foreground">Unassigned</span>
                       )}
                     </TableCell>
                     <TableCell>
-                      <Badge
-                        variant={number.isActive ? "default" : "secondary"}
-                      >
+                      <Badge variant={number.isActive ? "default" : "secondary"}>
                         {number.isActive ? "Active" : "Inactive"}
                       </Badge>
                     </TableCell>

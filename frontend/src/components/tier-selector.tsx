@@ -3,7 +3,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Check, Zap, TrendingUp, Crown } from "lucide-react";
-import { PRICING_TIERS, type PricingTier } from "@/lib/pricing-tiers";
+import { PRICING_TIERS } from "@/lib/pricing-tiers";
 import { cn } from "@/lib/utils";
 
 interface TierSelectorProps {
@@ -29,7 +29,7 @@ export function TierSelector({ selectedTier, onTierChange }: TierSelectorProps) 
             key={tier.id}
             className={cn(
               "cursor-pointer transition-all hover:shadow-lg",
-              isSelected && "ring-2 ring-primary shadow-lg"
+              isSelected && "shadow-lg ring-2 ring-primary"
             )}
             onClick={() => onTierChange(tier.id)}
           >
@@ -38,7 +38,7 @@ export function TierSelector({ selectedTier, onTierChange }: TierSelectorProps) 
                 <div className="flex items-center gap-2">
                   <div
                     className={cn(
-                      "h-10 w-10 rounded-lg flex items-center justify-center",
+                      "flex h-10 w-10 items-center justify-center rounded-lg",
                       tier.id === "budget" && "bg-green-500/10 text-green-600",
                       tier.id === "balanced" && "bg-blue-500/10 text-blue-600",
                       tier.id === "premium" && "bg-purple-500/10 text-purple-600"
@@ -56,7 +56,7 @@ export function TierSelector({ selectedTier, onTierChange }: TierSelectorProps) 
                   </div>
                 </div>
                 {isSelected && (
-                  <div className="h-6 w-6 rounded-full bg-primary flex items-center justify-center">
+                  <div className="flex h-6 w-6 items-center justify-center rounded-full bg-primary">
                     <Check className="h-4 w-4 text-primary-foreground" />
                   </div>
                 )}
@@ -66,9 +66,7 @@ export function TierSelector({ selectedTier, onTierChange }: TierSelectorProps) 
             <CardContent className="space-y-4">
               <div className="space-y-2">
                 <div className="flex items-baseline gap-2">
-                  <span className="text-3xl font-bold">
-                    ${tier.costPerHour.toFixed(2)}
-                  </span>
+                  <span className="text-3xl font-bold">${tier.costPerHour.toFixed(2)}</span>
                   <span className="text-sm text-muted-foreground">/hour</span>
                 </div>
                 <div className="text-xs text-muted-foreground">
@@ -95,32 +93,26 @@ export function TierSelector({ selectedTier, onTierChange }: TierSelectorProps) 
                 <ul className="space-y-1">
                   {tier.features.slice(0, 3).map((feature, index) => (
                     <li key={index} className="flex items-start gap-2 text-xs">
-                      <Check className="h-3 w-3 text-green-600 mt-0.5 flex-shrink-0" />
+                      <Check className="mt-0.5 h-3 w-3 flex-shrink-0 text-green-600" />
                       <span className="text-muted-foreground">{feature}</span>
                     </li>
                   ))}
                 </ul>
               </div>
 
-              <div className="pt-2 border-t">
-                <div className="text-xs space-y-1">
+              <div className="border-t pt-2">
+                <div className="space-y-1 text-xs">
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">LLM:</span>
-                    <span className="font-mono font-medium">
-                      {tier.config.llmModel}
-                    </span>
+                    <span className="font-mono font-medium">{tier.config.llmModel}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">STT:</span>
-                    <span className="font-mono font-medium">
-                      {tier.config.sttModel}
-                    </span>
+                    <span className="font-mono font-medium">{tier.config.sttModel}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">TTS:</span>
-                    <span className="font-mono font-medium">
-                      {tier.config.ttsModel}
-                    </span>
+                    <span className="font-mono font-medium">{tier.config.ttsModel}</span>
                   </div>
                 </div>
               </div>
@@ -132,7 +124,13 @@ export function TierSelector({ selectedTier, onTierChange }: TierSelectorProps) 
   );
 }
 
-export function TierComparison({ callsPerMonth = 1000, avgMinutes = 5 }: { callsPerMonth?: number; avgMinutes?: number }) {
+export function TierComparison({
+  callsPerMonth = 1000,
+  avgMinutes = 5,
+}: {
+  callsPerMonth?: number;
+  avgMinutes?: number;
+}) {
   const totalMinutes = callsPerMonth * avgMinutes;
 
   return (
@@ -154,7 +152,7 @@ export function TierComparison({ callsPerMonth = 1000, avgMinutes = 5 }: { calls
             return (
               <div
                 key={tier.id}
-                className="flex items-center justify-between p-3 rounded-lg border"
+                className="flex items-center justify-between rounded-lg border p-3"
               >
                 <div className="flex items-center gap-3">
                   <div className="font-medium">{tier.name}</div>
@@ -179,8 +177,8 @@ export function TierComparison({ callsPerMonth = 1000, avgMinutes = 5 }: { calls
           })}
         </div>
 
-        <div className="mt-4 p-4 rounded-lg bg-muted/50 text-sm">
-          <div className="font-medium mb-2">Example Annual Savings:</div>
+        <div className="mt-4 rounded-lg bg-muted/50 p-4 text-sm">
+          <div className="mb-2 font-medium">Example Annual Savings:</div>
           <div className="space-y-1 text-xs text-muted-foreground">
             <div>• 10K calls/month: Save up to $15,000/year</div>
             <div>• 100K calls/month: Save up to $150,000/year</div>

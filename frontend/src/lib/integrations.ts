@@ -1,4 +1,10 @@
-export type IntegrationType = "crm" | "calendar" | "database" | "productivity" | "communication" | "other";
+export type IntegrationType =
+  | "crm"
+  | "calendar"
+  | "database"
+  | "productivity"
+  | "communication"
+  | "other";
 
 export type AuthType = "oauth" | "api_key" | "basic" | "none";
 
@@ -101,7 +107,10 @@ export const AVAILABLE_INTEGRATIONS: Integration[] = [
     icon: "https://cdn.simpleicons.org/googlecalendar",
     enabled: true,
     isPopular: true,
-    scopes: ["https://www.googleapis.com/auth/calendar", "https://www.googleapis.com/auth/calendar.events"],
+    scopes: [
+      "https://www.googleapis.com/auth/calendar",
+      "https://www.googleapis.com/auth/calendar.events",
+    ],
   },
   {
     id: "microsoft-calendar",
@@ -285,5 +294,5 @@ export interface UserIntegration {
   isConnected: boolean;
   connectedAt?: Date;
   credentials?: Record<string, string>;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }

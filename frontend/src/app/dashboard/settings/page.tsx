@@ -43,7 +43,7 @@ export default function SettingsPage() {
   });
 
   function onSubmit(data: ApiKeysFormValues) {
-    console.log(data);
+    console.error(data);
     // TODO: API call to save settings
   }
 
@@ -51,9 +51,7 @@ export default function SettingsPage() {
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold tracking-tight">Settings</h1>
-        <p className="text-muted-foreground">
-          Configure your platform settings and API keys
-        </p>
+        <p className="text-muted-foreground">Configure your platform settings and API keys</p>
       </div>
 
       <Tabs defaultValue="api-keys" className="w-full">
@@ -63,15 +61,18 @@ export default function SettingsPage() {
           <TabsTrigger value="billing">Billing</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="api-keys" className="space-y-4 mt-6">
+        <TabsContent value="api-keys" className="mt-6 space-y-4">
           <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+            <form
+              onSubmit={(e) => {
+                void form.handleSubmit(onSubmit)(e);
+              }}
+              className="space-y-6"
+            >
               <Card>
                 <CardHeader>
                   <CardTitle>Voice & AI Services</CardTitle>
-                  <CardDescription>
-                    Configure API keys for voice and AI providers
-                  </CardDescription>
+                  <CardDescription>Configure API keys for voice and AI providers</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <FormField
@@ -81,11 +82,7 @@ export default function SettingsPage() {
                       <FormItem>
                         <FormLabel>OpenAI API Key</FormLabel>
                         <FormControl>
-                          <Input
-                            type="password"
-                            placeholder="sk-..."
-                            {...field}
-                          />
+                          <Input type="password" placeholder="sk-..." {...field} />
                         </FormControl>
                         <FormDescription>
                           Required for GPT-4 and language understanding
@@ -104,9 +101,7 @@ export default function SettingsPage() {
                         <FormControl>
                           <Input type="password" placeholder="••••••••" {...field} />
                         </FormControl>
-                        <FormDescription>
-                          For speech-to-text transcription
-                        </FormDescription>
+                        <FormDescription>For speech-to-text transcription</FormDescription>
                         <FormMessage />
                       </FormItem>
                     )}
@@ -134,9 +129,7 @@ export default function SettingsPage() {
               <Card>
                 <CardHeader>
                   <CardTitle>Telephony Providers</CardTitle>
-                  <CardDescription>
-                    Configure phone number providers
-                  </CardDescription>
+                  <CardDescription>Configure phone number providers</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <FormField
@@ -148,9 +141,7 @@ export default function SettingsPage() {
                         <FormControl>
                           <Input type="password" placeholder="KEY..." {...field} />
                         </FormControl>
-                        <FormDescription>
-                          Primary telephony provider (recommended)
-                        </FormDescription>
+                        <FormDescription>Primary telephony provider (recommended)</FormDescription>
                         <FormMessage />
                       </FormItem>
                     )}
@@ -159,9 +150,7 @@ export default function SettingsPage() {
                   <Separator />
 
                   <div className="space-y-4">
-                    <div className="text-sm font-medium">
-                      Twilio (Optional)
-                    </div>
+                    <div className="text-sm font-medium">Twilio (Optional)</div>
                     <FormField
                       control={form.control}
                       name="twilioAccountSid"
@@ -200,34 +189,26 @@ export default function SettingsPage() {
           </Form>
         </TabsContent>
 
-        <TabsContent value="profile" className="space-y-4 mt-6">
+        <TabsContent value="profile" className="mt-6 space-y-4">
           <Card>
             <CardHeader>
               <CardTitle>Profile Settings</CardTitle>
-              <CardDescription>
-                Manage your account information
-              </CardDescription>
+              <CardDescription>Manage your account information</CardDescription>
             </CardHeader>
             <CardContent>
-              <p className="text-sm text-muted-foreground">
-                Profile settings coming soon...
-              </p>
+              <p className="text-sm text-muted-foreground">Profile settings coming soon...</p>
             </CardContent>
           </Card>
         </TabsContent>
 
-        <TabsContent value="billing" className="space-y-4 mt-6">
+        <TabsContent value="billing" className="mt-6 space-y-4">
           <Card>
             <CardHeader>
               <CardTitle>Billing & Usage</CardTitle>
-              <CardDescription>
-                View your usage and manage billing
-              </CardDescription>
+              <CardDescription>View your usage and manage billing</CardDescription>
             </CardHeader>
             <CardContent>
-              <p className="text-sm text-muted-foreground">
-                Billing information coming soon...
-              </p>
+              <p className="text-sm text-muted-foreground">Billing information coming soon...</p>
             </CardContent>
           </Card>
         </TabsContent>

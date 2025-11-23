@@ -19,7 +19,9 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 export default function TestAgentPage() {
   const [isConnected, setIsConnected] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
-  const [transcript, setTranscript] = useState<Array<{ speaker: string; text: string; timestamp: Date }>>([]);
+  const [transcript, setTranscript] = useState<
+    Array<{ speaker: string; text: string; timestamp: Date }>
+  >([]);
 
   const handleConnect = () => {
     setIsConnected(!isConnected);
@@ -48,9 +50,7 @@ export default function TestAgentPage() {
         <Card className="lg:col-span-2">
           <CardHeader>
             <CardTitle>Live Testing</CardTitle>
-            <CardDescription>
-              Connect to test your agent's conversation flow
-            </CardDescription>
+            <CardDescription>Connect to test your agent&apos;s conversation flow</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid gap-4 md:grid-cols-2">
@@ -68,11 +68,7 @@ export default function TestAgentPage() {
 
               <div className="space-y-2">
                 <Label>Test Phone Number</Label>
-                <Input
-                  type="tel"
-                  placeholder="+1 (555) 000-0000"
-                  disabled={isConnected}
-                />
+                <Input type="tel" placeholder="+1 (555) 000-0000" disabled={isConnected} />
               </div>
             </div>
 
@@ -99,11 +95,7 @@ export default function TestAgentPage() {
                 onClick={() => setIsMuted(!isMuted)}
                 disabled={!isConnected}
               >
-                {isMuted ? (
-                  <MicOff className="h-4 w-4" />
-                ) : (
-                  <Mic className="h-4 w-4" />
-                )}
+                {isMuted ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
               </Button>
             </div>
 
@@ -157,21 +149,15 @@ export default function TestAgentPage() {
             <CardContent className="space-y-3">
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Latency</span>
-                <span className="font-mono">
-                  {isConnected ? "~150ms" : "—"}
-                </span>
+                <span className="font-mono">{isConnected ? "~150ms" : "—"}</span>
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Duration</span>
-                <span className="font-mono">
-                  {isConnected ? "00:00" : "—"}
-                </span>
+                <span className="font-mono">{isConnected ? "00:00" : "—"}</span>
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Turns</span>
-                <span className="font-mono">
-                  {transcript.length}
-                </span>
+                <span className="font-mono">{transcript.length}</span>
               </div>
             </CardContent>
           </Card>
@@ -180,7 +166,7 @@ export default function TestAgentPage() {
             <CardHeader>
               <CardTitle>Debug Info</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-2 text-xs font-mono">
+            <CardContent className="space-y-2 font-mono text-xs">
               <div className="grid grid-cols-2 gap-1">
                 <span className="text-muted-foreground">STT:</span>
                 <span>{isConnected ? "Active" : "Idle"}</span>
@@ -206,8 +192,8 @@ export default function TestAgentPage() {
             </CardHeader>
             <CardContent>
               <p className="text-xs text-muted-foreground">
-                This is a testing interface. Calls made here will not be billed
-                and will not appear in call history.
+                This is a testing interface. Calls made here will not be billed and will not appear
+                in call history.
               </p>
             </CardContent>
           </Card>

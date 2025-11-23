@@ -5,13 +5,7 @@ import { useForm } from "react-hook-form";
 import * as z from "zod";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Form,
   FormControl,
@@ -96,7 +90,7 @@ export default function NewAgentPage() {
   });
 
   function onSubmit(data: AgentFormValues) {
-    console.log(data);
+    console.error(data);
     // TODO: API call to create agent
   }
 
@@ -110,7 +104,12 @@ export default function NewAgentPage() {
       </div>
 
       <Form {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+        <form
+          onSubmit={(e) => {
+            void form.handleSubmit(onSubmit)(e);
+          }}
+          className="space-y-6"
+        >
           <Tabs defaultValue="basic" className="w-full">
             <TabsList className="grid w-full grid-cols-5">
               <TabsTrigger value="basic">Basic</TabsTrigger>
@@ -120,13 +119,11 @@ export default function NewAgentPage() {
               <TabsTrigger value="advanced">Advanced</TabsTrigger>
             </TabsList>
 
-            <TabsContent value="basic" className="space-y-4 mt-6">
+            <TabsContent value="basic" className="mt-6 space-y-4">
               <Card>
                 <CardHeader>
                   <CardTitle>Basic Information</CardTitle>
-                  <CardDescription>
-                    General settings for your voice agent
-                  </CardDescription>
+                  <CardDescription>General settings for your voice agent</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <FormField
@@ -136,14 +133,9 @@ export default function NewAgentPage() {
                       <FormItem>
                         <FormLabel>Agent Name</FormLabel>
                         <FormControl>
-                          <Input
-                            placeholder="Customer Support Agent"
-                            {...field}
-                          />
+                          <Input placeholder="Customer Support Agent" {...field} />
                         </FormControl>
-                        <FormDescription>
-                          A friendly name to identify this agent
-                        </FormDescription>
+                        <FormDescription>A friendly name to identify this agent</FormDescription>
                         <FormMessage />
                       </FormItem>
                     )}
@@ -172,10 +164,7 @@ export default function NewAgentPage() {
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Language</FormLabel>
-                        <Select
-                          onValueChange={field.onChange}
-                          defaultValue={field.value}
-                        >
+                        <Select onValueChange={field.onChange} defaultValue={field.value}>
                           <FormControl>
                             <SelectTrigger>
                               <SelectValue placeholder="Select a language" />
@@ -198,13 +187,11 @@ export default function NewAgentPage() {
               </Card>
             </TabsContent>
 
-            <TabsContent value="voice" className="space-y-4 mt-6">
+            <TabsContent value="voice" className="mt-6 space-y-4">
               <Card>
                 <CardHeader>
                   <CardTitle>Text-to-Speech (TTS)</CardTitle>
-                  <CardDescription>
-                    Configure how your agent speaks
-                  </CardDescription>
+                  <CardDescription>Configure how your agent speaks</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <FormField
@@ -213,26 +200,19 @@ export default function NewAgentPage() {
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>TTS Provider</FormLabel>
-                        <Select
-                          onValueChange={field.onChange}
-                          defaultValue={field.value}
-                        >
+                        <Select onValueChange={field.onChange} defaultValue={field.value}>
                           <FormControl>
                             <SelectTrigger>
                               <SelectValue />
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                            <SelectItem value="elevenlabs">
-                              ElevenLabs (Recommended)
-                            </SelectItem>
+                            <SelectItem value="elevenlabs">ElevenLabs (Recommended)</SelectItem>
                             <SelectItem value="openai">OpenAI TTS</SelectItem>
                             <SelectItem value="google">Google Gemini TTS</SelectItem>
                           </SelectContent>
                         </Select>
-                        <FormDescription>
-                          Choose your text-to-speech provider
-                        </FormDescription>
+                        <FormDescription>Choose your text-to-speech provider</FormDescription>
                         <FormMessage />
                       </FormItem>
                     )}
@@ -244,10 +224,7 @@ export default function NewAgentPage() {
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>ElevenLabs Model</FormLabel>
-                        <Select
-                          onValueChange={field.onChange}
-                          defaultValue={field.value}
-                        >
+                        <Select onValueChange={field.onChange} defaultValue={field.value}>
                           <FormControl>
                             <SelectTrigger>
                               <SelectValue />
@@ -310,9 +287,7 @@ export default function NewAgentPage() {
               <Card>
                 <CardHeader>
                   <CardTitle>Speech-to-Text (STT)</CardTitle>
-                  <CardDescription>
-                    Configure how your agent listens
-                  </CardDescription>
+                  <CardDescription>Configure how your agent listens</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <FormField
@@ -321,19 +296,14 @@ export default function NewAgentPage() {
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>STT Provider</FormLabel>
-                        <Select
-                          onValueChange={field.onChange}
-                          defaultValue={field.value}
-                        >
+                        <Select onValueChange={field.onChange} defaultValue={field.value}>
                           <FormControl>
                             <SelectTrigger>
                               <SelectValue />
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                            <SelectItem value="deepgram">
-                              Deepgram (Recommended)
-                            </SelectItem>
+                            <SelectItem value="deepgram">Deepgram (Recommended)</SelectItem>
                             <SelectItem value="openai">OpenAI Whisper</SelectItem>
                             <SelectItem value="google">Google Gemini STT</SelectItem>
                           </SelectContent>
@@ -352,19 +322,14 @@ export default function NewAgentPage() {
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Deepgram Model</FormLabel>
-                        <Select
-                          onValueChange={field.onChange}
-                          defaultValue={field.value}
-                        >
+                        <Select onValueChange={field.onChange} defaultValue={field.value}>
                           <FormControl>
                             <SelectTrigger>
                               <SelectValue />
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                            <SelectItem value="nova-3">
-                              Nova-3 (Latest - 54% better WER)
-                            </SelectItem>
+                            <SelectItem value="nova-3">Nova-3 (Latest - 54% better WER)</SelectItem>
                             <SelectItem value="nova-2">
                               Nova-2 (25% cheaper, still excellent)
                             </SelectItem>
@@ -382,13 +347,11 @@ export default function NewAgentPage() {
               </Card>
             </TabsContent>
 
-            <TabsContent value="llm" className="space-y-4 mt-6">
+            <TabsContent value="llm" className="mt-6 space-y-4">
               <Card>
                 <CardHeader>
                   <CardTitle>Language Model Configuration</CardTitle>
-                  <CardDescription>
-                    Configure the AI brain of your voice agent
-                  </CardDescription>
+                  <CardDescription>Configure the AI brain of your voice agent</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <FormField
@@ -397,10 +360,7 @@ export default function NewAgentPage() {
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>LLM Provider</FormLabel>
-                        <Select
-                          onValueChange={field.onChange}
-                          defaultValue={field.value}
-                        >
+                        <Select onValueChange={field.onChange} defaultValue={field.value}>
                           <FormControl>
                             <SelectTrigger>
                               <SelectValue />
@@ -429,10 +389,7 @@ export default function NewAgentPage() {
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Model</FormLabel>
-                        <Select
-                          onValueChange={field.onChange}
-                          defaultValue={field.value}
-                        >
+                        <Select onValueChange={field.onChange} defaultValue={field.value}>
                           <FormControl>
                             <SelectTrigger>
                               <SelectValue />
@@ -484,7 +441,7 @@ export default function NewAgentPage() {
                           />
                         </FormControl>
                         <FormDescription>
-                          Instructions that define your agent's personality and behavior
+                          Instructions that define your agent&apos;s personality and behavior
                         </FormDescription>
                         <FormMessage />
                       </FormItem>
@@ -505,14 +462,10 @@ export default function NewAgentPage() {
                               min="0"
                               max="2"
                               {...field}
-                              onChange={(e) =>
-                                field.onChange(parseFloat(e.target.value))
-                              }
+                              onChange={(e) => field.onChange(parseFloat(e.target.value))}
                             />
                           </FormControl>
-                          <FormDescription>
-                            0 = focused, 2 = creative
-                          </FormDescription>
+                          <FormDescription>0 = focused, 2 = creative</FormDescription>
                           <FormMessage />
                         </FormItem>
                       )}
@@ -531,14 +484,10 @@ export default function NewAgentPage() {
                               min="100"
                               max="4000"
                               {...field}
-                              onChange={(e) =>
-                                field.onChange(parseInt(e.target.value))
-                              }
+                              onChange={(e) => field.onChange(parseInt(e.target.value))}
                             />
                           </FormControl>
-                          <FormDescription>
-                            Response length limit
-                          </FormDescription>
+                          <FormDescription>Response length limit</FormDescription>
                           <FormMessage />
                         </FormItem>
                       )}
@@ -548,7 +497,7 @@ export default function NewAgentPage() {
               </Card>
             </TabsContent>
 
-            <TabsContent value="tools" className="space-y-4 mt-6">
+            <TabsContent value="tools" className="mt-6 space-y-4">
               <Card>
                 <CardHeader>
                   <CardTitle>Tools & Integrations</CardTitle>
@@ -565,8 +514,8 @@ export default function NewAgentPage() {
                         <div className="mb-4">
                           <FormLabel className="text-base">Available Tools</FormLabel>
                           <FormDescription>
-                            Select which tools this agent can use during conversations.
-                            Connect integrations first on the{" "}
+                            Select which tools this agent can use during conversations. Connect
+                            integrations first on the{" "}
                             <a
                               href="/dashboard/integrations"
                               className="text-primary underline"
@@ -579,51 +528,54 @@ export default function NewAgentPage() {
                         </div>
                         <div className="space-y-2">
                           {/* Popular tools quick toggles */}
-                          {["google-calendar", "salesforce", "hubspot", "notion", "slack"].map((toolId) => (
-                            <FormField
-                              key={toolId}
-                              control={form.control}
-                              name="enabledTools"
-                              render={({ field }) => {
-                                const toolConfig = {
-                                  "google-calendar": { name: "Google Calendar", desc: "Schedule meetings" },
-                                  "salesforce": { name: "Salesforce", desc: "Access CRM data" },
-                                  "hubspot": { name: "HubSpot", desc: "Manage contacts" },
-                                  "notion": { name: "Notion", desc: "Query databases" },
-                                  "slack": { name: "Slack", desc: "Send messages" },
-                                }[toolId];
+                          {["google-calendar", "salesforce", "hubspot", "notion", "slack"].map(
+                            (toolId) => (
+                              <FormField
+                                key={toolId}
+                                control={form.control}
+                                name="enabledTools"
+                                render={({ field }) => {
+                                  const toolConfig = {
+                                    "google-calendar": {
+                                      name: "Google Calendar",
+                                      desc: "Schedule meetings",
+                                    },
+                                    salesforce: { name: "Salesforce", desc: "Access CRM data" },
+                                    hubspot: { name: "HubSpot", desc: "Manage contacts" },
+                                    notion: { name: "Notion", desc: "Query databases" },
+                                    slack: { name: "Slack", desc: "Send messages" },
+                                  }[toolId];
 
-                                return (
-                                  <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
-                                    <FormControl>
-                                      <input
-                                        type="checkbox"
-                                        className="h-4 w-4 mt-0.5"
-                                        checked={field.value?.includes(toolId)}
-                                        onChange={(e) => {
-                                          const checked = e.target.checked;
-                                          const current = field.value || [];
-                                          field.onChange(
-                                            checked
-                                              ? [...current, toolId]
-                                              : current.filter((v) => v !== toolId)
-                                          );
-                                        }}
-                                      />
-                                    </FormControl>
-                                    <div className="space-y-1 leading-none">
-                                      <FormLabel className="font-medium cursor-pointer">
-                                        {toolConfig?.name}
-                                      </FormLabel>
-                                      <FormDescription>
-                                        {toolConfig?.desc}
-                                      </FormDescription>
-                                    </div>
-                                  </FormItem>
-                                );
-                              }}
-                            />
-                          ))}
+                                  return (
+                                    <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
+                                      <FormControl>
+                                        <input
+                                          type="checkbox"
+                                          className="mt-0.5 h-4 w-4"
+                                          checked={field.value?.includes(toolId)}
+                                          onChange={(e) => {
+                                            const checked = e.target.checked;
+                                            const current = field.value || [];
+                                            field.onChange(
+                                              checked
+                                                ? [...current, toolId]
+                                                : current.filter((v) => v !== toolId)
+                                            );
+                                          }}
+                                        />
+                                      </FormControl>
+                                      <div className="space-y-1 leading-none">
+                                        <FormLabel className="cursor-pointer font-medium">
+                                          {toolConfig?.name}
+                                        </FormLabel>
+                                        <FormDescription>{toolConfig?.desc}</FormDescription>
+                                      </div>
+                                    </FormItem>
+                                  );
+                                }}
+                              />
+                            )
+                          )}
                           <div className="pt-4">
                             <Button type="button" variant="outline" size="sm" asChild>
                               <Link href="/dashboard/integrations">
@@ -640,13 +592,11 @@ export default function NewAgentPage() {
               </Card>
             </TabsContent>
 
-            <TabsContent value="advanced" className="space-y-4 mt-6">
+            <TabsContent value="advanced" className="mt-6 space-y-4">
               <Card>
                 <CardHeader>
                   <CardTitle>Telephony Settings</CardTitle>
-                  <CardDescription>
-                    Phone number and call settings
-                  </CardDescription>
+                  <CardDescription>Phone number and call settings</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <FormField
@@ -655,19 +605,14 @@ export default function NewAgentPage() {
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Telephony Provider</FormLabel>
-                        <Select
-                          onValueChange={field.onChange}
-                          defaultValue={field.value}
-                        >
+                        <Select onValueChange={field.onChange} defaultValue={field.value}>
                           <FormControl>
                             <SelectTrigger>
                               <SelectValue />
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                            <SelectItem value="telnyx">
-                              Telnyx (Recommended)
-                            </SelectItem>
+                            <SelectItem value="telnyx">Telnyx (Recommended)</SelectItem>
                             <SelectItem value="twilio">Twilio</SelectItem>
                           </SelectContent>
                         </Select>
@@ -689,14 +634,10 @@ export default function NewAgentPage() {
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                            <SelectItem value="none">
-                              No phone number assigned
-                            </SelectItem>
+                            <SelectItem value="none">No phone number assigned</SelectItem>
                           </SelectContent>
                         </Select>
-                        <FormDescription>
-                          Assign a phone number to this agent
-                        </FormDescription>
+                        <FormDescription>Assign a phone number to this agent</FormDescription>
                         <FormMessage />
                       </FormItem>
                     )}
@@ -710,18 +651,11 @@ export default function NewAgentPage() {
                     render={({ field }) => (
                       <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
                         <div className="space-y-0.5">
-                          <FormLabel className="text-base">
-                            Enable Call Recording
-                          </FormLabel>
-                          <FormDescription>
-                            Record all calls for quality assurance
-                          </FormDescription>
+                          <FormLabel className="text-base">Enable Call Recording</FormLabel>
+                          <FormDescription>Record all calls for quality assurance</FormDescription>
                         </div>
                         <FormControl>
-                          <Switch
-                            checked={field.value}
-                            onCheckedChange={field.onChange}
-                          />
+                          <Switch checked={field.value} onCheckedChange={field.onChange} />
                         </FormControl>
                       </FormItem>
                     )}
@@ -733,18 +667,11 @@ export default function NewAgentPage() {
                     render={({ field }) => (
                       <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
                         <div className="space-y-0.5">
-                          <FormLabel className="text-base">
-                            Enable Transcripts
-                          </FormLabel>
-                          <FormDescription>
-                            Save conversation transcripts
-                          </FormDescription>
+                          <FormLabel className="text-base">Enable Transcripts</FormLabel>
+                          <FormDescription>Save conversation transcripts</FormDescription>
                         </div>
                         <FormControl>
-                          <Switch
-                            checked={field.value}
-                            onCheckedChange={field.onChange}
-                          />
+                          <Switch checked={field.value} onCheckedChange={field.onChange} />
                         </FormControl>
                       </FormItem>
                     )}
@@ -756,22 +683,15 @@ export default function NewAgentPage() {
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Turn Detection</FormLabel>
-                        <Select
-                          onValueChange={field.onChange}
-                          defaultValue={field.value}
-                        >
+                        <Select onValueChange={field.onChange} defaultValue={field.value}>
                           <FormControl>
                             <SelectTrigger>
                               <SelectValue />
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                            <SelectItem value="server-vad">
-                              Server VAD (Recommended)
-                            </SelectItem>
-                            <SelectItem value="pushToTalk">
-                              Push to Talk
-                            </SelectItem>
+                            <SelectItem value="server-vad">Server VAD (Recommended)</SelectItem>
+                            <SelectItem value="pushToTalk">Push to Talk</SelectItem>
                           </SelectContent>
                         </Select>
                         <FormDescription>

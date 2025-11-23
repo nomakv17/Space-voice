@@ -1,15 +1,7 @@
 "use client";
 
 import * as React from "react";
-import {
-  Bot,
-  Phone,
-  History,
-  Settings,
-  LayoutDashboard,
-  Mic,
-  Zap,
-} from "lucide-react";
+import { Bot, Phone, History, Settings, LayoutDashboard, Mic, Zap } from "lucide-react";
 
 import {
   Sidebar,
@@ -85,7 +77,7 @@ export function AppSidebar() {
             <Bot className="h-5 w-5" />
           </div>
           <div className="flex flex-col">
-            <span className="font-semibold text-sm">Voice Agent</span>
+            <span className="text-sm font-semibold">Voice Agent</span>
             <span className="text-xs text-muted-foreground">Platform</span>
           </div>
         </div>
@@ -118,9 +110,7 @@ export function AppSidebar() {
               </Avatar>
               <div className="flex flex-col text-left text-sm">
                 <span className="font-medium">User</span>
-                <span className="text-xs text-muted-foreground">
-                  user@example.com
-                </span>
+                <span className="text-xs text-muted-foreground">user@example.com</span>
               </div>
             </button>
           </DropdownMenuTrigger>

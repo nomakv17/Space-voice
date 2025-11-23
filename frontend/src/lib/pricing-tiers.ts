@@ -152,7 +152,8 @@ export function compareTiers(
   cost: ReturnType<typeof calculateMonthlyCost>;
   savingsVsPremium: number;
 }> {
-  const premiumTier = PRICING_TIERS.find((t) => t.id === "premium")!;
+  const premiumTier = PRICING_TIERS.find((t) => t.id === "premium");
+  if (!premiumTier) throw new Error("Premium tier not found");
   const premiumCost = calculateMonthlyCost(premiumTier, callsPerMonth, avgDurationMinutes);
 
   return PRICING_TIERS.map((tier) => {

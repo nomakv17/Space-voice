@@ -21,17 +21,27 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
+type Call = {
+  id: string;
+  timestamp: string;
+  agentName: string;
+  direction: string;
+  phoneNumber: string;
+  duration: string;
+  status: string;
+  recordingUrl?: string;
+  transcriptUrl?: string;
+};
+
 export default function CallHistoryPage() {
   // Mock data - will be replaced with API call
-  const calls = [];
+  const calls: Call[] = [];
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold tracking-tight">Call History</h1>
-        <p className="text-muted-foreground">
-          View and analyze your voice agent call logs
-        </p>
+        <p className="text-muted-foreground">View and analyze your voice agent call logs</p>
       </div>
 
       <Card>
@@ -44,10 +54,7 @@ export default function CallHistoryPage() {
               </CardDescription>
             </div>
             <div className="flex gap-2">
-              <Input
-                placeholder="Search calls..."
-                className="w-[250px]"
-              />
+              <Input placeholder="Search calls..." className="w-[250px]" />
               <Select defaultValue="all">
                 <SelectTrigger className="w-[150px]">
                   <SelectValue />
@@ -66,9 +73,9 @@ export default function CallHistoryPage() {
         <CardContent>
           {calls.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16">
-              <History className="h-16 w-16 text-muted-foreground/50 mb-4" />
-              <h3 className="text-lg font-semibold mb-2">No calls yet</h3>
-              <p className="text-sm text-muted-foreground text-center max-w-sm">
+              <History className="mb-4 h-16 w-16 text-muted-foreground/50" />
+              <h3 className="mb-2 text-lg font-semibold">No calls yet</h3>
+              <p className="max-w-sm text-center text-sm text-muted-foreground">
                 Call history will appear here once your voice agents start handling calls
               </p>
             </div>
@@ -86,22 +93,18 @@ export default function CallHistoryPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {calls.map((call: any) => (
+                {calls.map((call) => (
                   <TableRow key={call.id}>
                     <TableCell className="text-sm">
                       {new Date(call.timestamp).toLocaleString()}
                     </TableCell>
-                    <TableCell className="font-medium">
-                      {call.agentName}
-                    </TableCell>
+                    <TableCell className="font-medium">{call.agentName}</TableCell>
                     <TableCell>
                       <Badge variant={call.direction === "inbound" ? "default" : "secondary"}>
                         {call.direction}
                       </Badge>
                     </TableCell>
-                    <TableCell className="font-mono text-xs">
-                      {call.phoneNumber}
-                    </TableCell>
+                    <TableCell className="font-mono text-xs">{call.phoneNumber}</TableCell>
                     <TableCell>{call.duration}</TableCell>
                     <TableCell>
                       <Badge
@@ -109,8 +112,8 @@ export default function CallHistoryPage() {
                           call.status === "completed"
                             ? "default"
                             : call.status === "failed"
-                            ? "destructive"
-                            : "secondary"
+                              ? "destructive"
+                              : "secondary"
                         }
                       >
                         {call.status}
