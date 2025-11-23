@@ -77,24 +77,56 @@ export default function NewAgentSimplifiedPage() {
       </div>
 
       {/* Progress Indicator */}
-      <div className="flex items-center gap-2">
-        {[1, 2, 3].map((s) => (
-          <div key={s} className="flex items-center gap-2">
-            <div
-              className={`h-8 w-8 rounded-full flex items-center justify-center text-sm font-medium ${
-                s === step
-                  ? "bg-primary text-primary-foreground"
-                  : s < step
-                  ? "bg-primary/20 text-primary"
-                  : "bg-muted text-muted-foreground"
-              }`}
-            >
-              {s}
-            </div>
-            {s < 3 && <ChevronRight className="h-4 w-4 text-muted-foreground" />}
+      <Card>
+        <CardContent className="pt-6">
+          <div className="flex items-center justify-between">
+            {[
+              { num: 1, label: "Pricing & Setup" },
+              { num: 2, label: "Tools" },
+              { num: 3, label: "Review & Create" },
+            ].map((s, idx) => (
+              <div key={s.num} className="flex items-center gap-2 flex-1">
+                <div className="flex items-center gap-3 flex-1">
+                  <div
+                    className={`h-10 w-10 rounded-full flex items-center justify-center text-sm font-semibold transition-all ${
+                      s.num === step
+                        ? "bg-primary text-primary-foreground ring-4 ring-primary/20"
+                        : s.num < step
+                        ? "bg-primary text-primary-foreground"
+                        : "bg-muted text-muted-foreground"
+                    }`}
+                  >
+                    {s.num < step ? "✓" : s.num}
+                  </div>
+                  <div className="flex flex-col">
+                    <span
+                      className={`text-sm font-medium ${
+                        s.num === step ? "text-foreground" : "text-muted-foreground"
+                      }`}
+                    >
+                      Step {s.num}
+                    </span>
+                    <span
+                      className={`text-xs ${
+                        s.num === step ? "text-foreground" : "text-muted-foreground"
+                      }`}
+                    >
+                      {s.label}
+                    </span>
+                  </div>
+                </div>
+                {idx < 2 && (
+                  <ChevronRight
+                    className={`h-5 w-5 flex-shrink-0 ${
+                      s.num < step ? "text-primary" : "text-muted-foreground"
+                    }`}
+                  />
+                )}
+              </div>
+            ))}
           </div>
-        ))}
-      </div>
+        </CardContent>
+      </Card>
 
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
