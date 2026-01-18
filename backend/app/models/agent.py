@@ -45,6 +45,22 @@ class Agent(Base):
         comment="Pricing tier: budget, balanced, premium-mini, or premium",
     )
 
+    # Voice provider selection (for Retell + Claude integration)
+    voice_provider: Mapped[str] = mapped_column(
+        String(50),
+        nullable=False,
+        default="openai_realtime",
+        comment="Voice provider: openai_realtime (GPT-4o) or retell_claude (Retell + Claude)",
+    )
+
+    # Retell-specific configuration
+    retell_agent_id: Mapped[str | None] = mapped_column(
+        String(100),
+        nullable=True,
+        index=True,
+        comment="Retell AI agent ID (if using retell_claude voice provider)",
+    )
+
     # Agent configuration
     system_prompt: Mapped[str] = mapped_column(
         Text, nullable=False, comment="System prompt/instructions for agent"

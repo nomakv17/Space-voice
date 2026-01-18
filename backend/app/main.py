@@ -33,8 +33,11 @@ from app.api import (
     integrations,
     phone_numbers,
     realtime,
+    retell_webhooks,
+    retell_ws,
     telephony,
     telephony_ws,
+    telnyx_webhooks,
     tools,
     workspaces,
 )
@@ -202,6 +205,9 @@ app.include_router(tools.router)  # Tool execution endpoint
 app.include_router(telephony.router)  # Telephony API (phone numbers, calls)
 app.include_router(telephony.webhook_router)  # Twilio/Telnyx webhooks
 app.include_router(telephony_ws.router)  # Telephony WebSocket for media streams
+app.include_router(retell_ws.router)  # Retell Custom LLM WebSocket
+app.include_router(retell_webhooks.router)  # Retell call event webhooks
+app.include_router(telnyx_webhooks.router)  # Telnyx Call Control webhooks (SIP bridge to Retell)
 app.include_router(calls.router)  # Call history API
 app.include_router(campaigns.router, prefix=settings.API_V1_PREFIX)  # Campaigns API
 app.include_router(phone_numbers.router)  # Phone numbers API

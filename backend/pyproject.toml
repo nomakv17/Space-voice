@@ -1,7 +1,7 @@
 [project]
 name = "voicenoob-api"
 version = "0.1.0"
-description = "Voice Noob API - FastAPI backend for voice agent platform"
+description = "SpaceVoice API - FastAPI backend for HVAC voice agent platform"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
@@ -49,6 +49,8 @@ dependencies = [
     # Utilities
     "python-dotenv>=1.0.1",
     "pytz>=2025.2",
+    "retell-sdk>=5.9.0",
+    "anthropic>=0.76.0",
 ]
 
 [project.optional-dependencies]

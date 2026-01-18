@@ -1,5 +1,5 @@
 version = 1
-revision = 2
+revision = 3
 requires-python = ">=3.12"
 resolution-markers = [
     "python_full_version >= '3.13'",
@@ -176,6 +176,25 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/ee/67/531ea369ba64dcff5ec9c3402f9f51bf748cec26dde048a2f973a4eea7f5/annotated_types-0.7.0.tar.gz", hash = "sha256:aff07c09a53a08bc8cfccb9c85b05f1aa9a2a6f23728d790723543408344ce89", size = 16081, upload-time = "2024-05-20T21:33:25.928Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/78/b6/6307fbef88d9b5ee7421e68d78a9f162e0da4900bc5f5793f6d3d0e34fb8/annotated_types-0.7.0-py3-none-any.whl", hash = "sha256:1f02e8b43a8fbbc3f3e0d4f0f4bfc8131bcb4eebe8849b8e5c773f3a1c582a53", size = 13643, upload-time = "2024-05-20T21:33:24.1Z" },
+]
+
+[[package]]
+name = "anthropic"
+version = "0.76.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "anyio" },
+    { name = "distro" },
+    { name = "docstring-parser" },
+    { name = "httpx" },
+    { name = "jiter" },
+    { name = "pydantic" },
+    { name = "sniffio" },
+    { name = "typing-extensions" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/6e/be/d11abafaa15d6304826438170f7574d750218f49a106c54424a40cef4494/anthropic-0.76.0.tar.gz", hash = "sha256:e0cae6a368986d5cf6df743dfbb1b9519e6a9eee9c6c942ad8121c0b34416ffe", size = 495483, upload-time = "2026-01-13T18:41:14.908Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/e5/70/7b0fd9c1a738f59d3babe2b4212031c34ab7d0fda4ffef15b58a55c5bcea/anthropic-0.76.0-py3-none-any.whl", hash = "sha256:81efa3113901192af2f0fe977d3ec73fdadb1e691586306c4256cd6d5ccc331c", size = 390309, upload-time = "2026-01-13T18:41:13.483Z" },
 ]
 
 [[package]]
@@ -2592,6 +2611,24 @@ wheels = [
 ]
 
 [[package]]
+name = "retell-sdk"
+version = "5.9.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "anyio" },
+    { name = "cryptography" },
+    { name = "distro" },
+    { name = "httpx" },
+    { name = "pydantic" },
+    { name = "sniffio" },
+    { name = "typing-extensions" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/50/15/a3f8e4a33dbee2d7ddec3481c04f6a27e3e0f89e354354007877c13e0ba4/retell_sdk-5.9.0.tar.gz", hash = "sha256:906fc23e4f29fbfc473ae7e21cb9259c87f9480f6cd08640504efd8cdf83355b", size = 348895, upload-time = "2026-01-15T20:01:18.511Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/fe/90/3054a0da0bd815050d7c6ee276ae48ee6bdcc41a31df081cc7fa4a650719/retell_sdk-5.9.0-py3-none-any.whl", hash = "sha256:514283039ba11f84c14571e6aeb836112eb5c187420b070789baa613de2704bd", size = 348033, upload-time = "2026-01-15T20:01:17.053Z" },
+]
+
+[[package]]
 name = "rich"
 version = "14.2.0"
 source = { registry = "https://pypi.org/simple" }
@@ -3174,6 +3211,7 @@ version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "alembic" },
+    { name = "anthropic" },
     { name = "asyncpg" },
     { name = "bcrypt" },
     { name = "deepgram-sdk" },
@@ -3197,6 +3235,7 @@ dependencies = [
     { name = "python-multipart" },
     { name = "pytz" },
     { name = "redis", extra = ["hiredis"] },
+    { name = "retell-sdk" },
     { name = "sentry-sdk", extra = ["fastapi"] },
     { name = "slowapi" },
     { name = "sqlalchemy", extra = ["asyncio"] },
@@ -3237,6 +3276,7 @@ dev = [
 requires-dist = [
     { name = "aiosqlite", marker = "extra == 'dev'", specifier = ">=0.20.0" },
     { name = "alembic", specifier = ">=1.13.3" },
+    { name = "anthropic", specifier = ">=0.76.0" },
     { name = "asyncpg", specifier = ">=0.30.0" },
     { name = "bcrypt", specifier = ">=4.0.0,<5.0.0" },
     { name = "deepgram-sdk", specifier = ">=3.8.3" },
@@ -3268,6 +3308,7 @@ requires-dist = [
     { name = "python-multipart", specifier = ">=0.0.18" },
     { name = "pytz", specifier = ">=2025.2" },
     { name = "redis", extras = ["hiredis"], specifier = ">=5.2.0" },
+    { name = "retell-sdk", specifier = ">=5.9.0" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.8.4" },
     { name = "sentry-sdk", extras = ["fastapi"], specifier = ">=2.18.0" },
     { name = "slowapi", specifier = ">=0.1.9" },

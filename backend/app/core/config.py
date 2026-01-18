@@ -17,7 +17,7 @@ class Settings(BaseSettings):
     )
 
     # Application
-    APP_NAME: str = "Voice Noob API"
+    APP_NAME: str = "SpaceVoice API"
     APP_VERSION: str = "0.1.0"
     DEBUG: bool = False
     API_V1_PREFIX: str = "/api/v1"
@@ -93,7 +93,7 @@ class Settings(BaseSettings):
     RATE_LIMIT_PER_MINUTE: int = 60
 
     # Default Admin User (created on first startup if no users exist)
-    ADMIN_EMAIL: str = "admin@voicenoob.com"
+    ADMIN_EMAIL: str = "admin@spacevoice.com"
     ADMIN_PASSWORD: str = "admin"
     ADMIN_NAME: str = "Admin"
 
@@ -101,6 +101,12 @@ class Settings(BaseSettings):
     OPENAI_API_KEY: str | None = None
     DEEPGRAM_API_KEY: str | None = None
     ELEVENLABS_API_KEY: str | None = None
+
+    # Retell AI (Voice Orchestration)
+    RETELL_API_KEY: str | None = None
+
+    # Anthropic Claude (LLM Backend for Retell)
+    ANTHROPIC_API_KEY: str | None = None
 
     # Telephony
     TELNYX_API_KEY: str | None = None
@@ -116,6 +122,8 @@ class Settings(BaseSettings):
     TELNYX_TIMEOUT: float = 10.0  # Telephony API calls
     TWILIO_TIMEOUT: float = 10.0  # Telephony API calls
     GOOGLE_API_TIMEOUT: float = 15.0  # Calendar, Drive, etc.
+    RETELL_TIMEOUT: float = 10.0  # Retell API calls
+    ANTHROPIC_TIMEOUT: float = 60.0  # Claude inference (streaming)
     DEFAULT_EXTERNAL_TIMEOUT: float = 30.0  # Fallback for other APIs
 
     # Retry Configuration

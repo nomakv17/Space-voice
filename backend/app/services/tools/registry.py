@@ -8,6 +8,7 @@ from app.services.tools.calendly_tools import CalendlyTools
 from app.services.tools.call_control_tools import CallControlTools
 from app.services.tools.crm_tools import CRMTools
 from app.services.tools.gohighlevel_tools import GoHighLevelTools
+from app.services.tools.hvac_triage_tools import HVACTriageTools
 from app.services.tools.shopify_tools import ShopifyTools
 from app.services.tools.sms_tools import TelnyxSMSTools, TwilioSMSTools
 
@@ -202,6 +203,11 @@ class ToolRegistry:
             telnyx_tools = TelnyxSMSTools.get_tool_definitions()
             tools.extend(filter_tools("telnyx-sms", telnyx_tools))
 
+        # HVAC Triage tools - no external credentials required
+        if "hvac_triage" in enabled_tools:
+            hvac_tools = HVACTriageTools.get_tool_definitions()
+            tools.extend(filter_tools("hvac_triage", hvac_tools))
+
         return tools
 
     async def execute_tool(  # noqa: PLR0911
@@ -333,6 +339,17 @@ class ToolRegistry:
                     "error": "Telnyx SMS integration not configured. Please add your API credentials.",
                 }
             return await telnyx_tools.execute_tool(tool_name, arguments)
+
+        # HVAC Triage tools
+        hvac_tool_names = {
+            "classify_hvac_emergency",
+            "get_emergency_dispatch_info",
+            "estimate_job_value",
+            "schedule_hvac_service",
+        }
+
+        if tool_name in hvac_tool_names:
+            return await HVACTriageTools.execute_tool(tool_name, arguments)
 
         # Unknown tool
         return {"success": False, "error": f"Unknown tool: {tool_name}"}

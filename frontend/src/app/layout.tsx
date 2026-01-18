@@ -30,8 +30,8 @@ export default function RootLayout({
   return (
     <html lang="en" className="dark" suppressHydrationWarning>
       <head>
-        <title>Voice Noob</title>
-        <meta name="description" content="AI-powered voice agent platform" />
+        <title>SpaceVoice</title>
+        <meta name="description" content="SpaceVoice - AI-powered HVAC voice agent platform" />
         <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
       </head>
       <body className="antialiased">
