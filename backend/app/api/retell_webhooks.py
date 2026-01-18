@@ -29,6 +29,7 @@ from app.core.config import settings
 from app.db.session import get_db
 from app.models.agent import Agent
 from app.models.call_record import CallDirection, CallRecord, CallStatus
+from app.models.contact import Contact
 from app.models.phone_number import PhoneNumber
 
 router = APIRouter(prefix="/webhooks/retell", tags=["retell-webhooks"])
@@ -185,6 +186,68 @@ def format_transcript(transcript_object: list[dict[str, Any]] | None) -> str:
     return "\n".join(lines)
 
 
+async def get_or_create_contact(
+    db: AsyncSession,
+    phone_number: str,
+    user_id: int,
+    log: structlog.BoundLogger,
+) -> Contact | None:
+    """Find or create a CRM contact from a phone number.
+
+    When someone calls, we automatically create a contact record if one
+    doesn't exist. This enables call history tracking per contact.
+
+    Args:
+        db: Database session
+        phone_number: Caller's phone number (E.164 format)
+        user_id: Owner user ID
+        log: Logger instance
+
+    Returns:
+        Contact instance or None if creation fails
+    """
+    if not phone_number or not user_id:
+        return None
+
+    # Normalize phone number (remove spaces, ensure + prefix)
+    normalized = phone_number.strip().replace(" ", "")
+    if not normalized.startswith("+"):
+        normalized = f"+{normalized}"
+
+    # Check if contact already exists
+    result = await db.execute(
+        select(Contact).where(
+            Contact.phone_number == normalized,
+            Contact.user_id == user_id,
+        )
+    )
+    existing = result.scalar_one_or_none()
+
+    if existing:
+        log.info("contact_found", contact_id=existing.id, phone=normalized)
+        return existing
+
+    # Create new contact from caller ID
+    # Extract area code for a basic first name (E.164 format: +1AAANNNNNNN)
+    min_phone_length = 5  # Minimum length to extract area code
+    area_code = normalized[2:5] if len(normalized) > min_phone_length else "Unknown"
+    contact = Contact(
+        user_id=user_id,
+        first_name=f"Caller ({area_code})",
+        last_name=None,
+        phone_number=normalized,
+        status="new",
+        tags="auto-created,inbound-call",
+        notes=f"Auto-created from inbound call on {datetime.now(UTC).strftime('%Y-%m-%d %H:%M')} UTC",
+    )
+
+    db.add(contact)
+    await db.flush()  # Get the ID without committing
+
+    log.info("contact_created", contact_id=contact.id, phone=normalized)
+    return contact
+
+
 # =============================================================================
 # Webhook Endpoints
 # =============================================================================
@@ -247,6 +310,16 @@ async def retell_call_started(
             if agent:
                 user_id = agent.user_id
 
+        # Auto-create contact from caller ID for inbound calls
+        contact = None
+        if user_id and call.from_number and call.direction == "inbound":
+            contact = await get_or_create_contact(
+                db=db,
+                phone_number=call.from_number,
+                user_id=user_id,
+                log=log,
+            )
+
         # Create call record
         # Use user_id_to_uuid to convert integer user_id to UUID consistently
         call_record = CallRecord(
@@ -254,6 +327,7 @@ async def retell_call_started(
             provider="retell",
             provider_call_id=call.call_id,
             agent_id=agent.id if agent else None,
+            contact_id=contact.id if contact else None,  # Link to CRM contact
             from_number=call.from_number or "",
             to_number=call.to_number or "",
             direction=convert_retell_direction(call.direction),
@@ -266,7 +340,11 @@ async def retell_call_started(
         db.add(call_record)
         await db.commit()
 
-        log.info("call_record_created", record_id=str(call_record.id))
+        log.info(
+            "call_record_created",
+            record_id=str(call_record.id),
+            contact_id=contact.id if contact else None,
+        )
         return {"status": "received", "call_record_id": str(call_record.id)}
 
     except Exception as e:
