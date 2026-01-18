@@ -39,31 +39,39 @@ def openai_tools_to_claude(tools: list[dict[str, Any]]) -> list[dict[str, Any]]:
         # Handle nested "function" format (some OpenAI tools use this)
         if tool.get("type") == "function" and "function" in tool:
             func = tool["function"]
-            claude_tools.append({
-                "name": func.get("name"),
-                "description": func.get("description", ""),
-                "input_schema": func.get("parameters", {"type": "object", "properties": {}}),
-            })
+            claude_tools.append(
+                {
+                    "name": func.get("name"),
+                    "description": func.get("description", ""),
+                    "input_schema": func.get("parameters", {"type": "object", "properties": {}}),
+                }
+            )
         # Handle flat format (name, description, parameters at top level)
         elif tool.get("type") == "function":
-            claude_tools.append({
-                "name": tool.get("name"),
-                "description": tool.get("description", ""),
-                "input_schema": tool.get("parameters", {"type": "object", "properties": {}}),
-            })
+            claude_tools.append(
+                {
+                    "name": tool.get("name"),
+                    "description": tool.get("description", ""),
+                    "input_schema": tool.get("parameters", {"type": "object", "properties": {}}),
+                }
+            )
         # Handle already-Claude-format tools
         elif "input_schema" in tool:
             claude_tools.append(tool)
         # Fallback for any other format
         else:
-            claude_tools.append({
-                "name": tool.get("name", "unknown"),
-                "description": tool.get("description", ""),
-                "input_schema": tool.get("parameters") or tool.get("input_schema") or {
-                    "type": "object",
-                    "properties": {},
-                },
-            })
+            claude_tools.append(
+                {
+                    "name": tool.get("name", "unknown"),
+                    "description": tool.get("description", ""),
+                    "input_schema": tool.get("parameters")
+                    or tool.get("input_schema")
+                    or {
+                        "type": "object",
+                        "properties": {},
+                    },
+                }
+            )
 
     return claude_tools
 
@@ -80,12 +88,14 @@ def claude_tools_to_openai(tools: list[dict[str, Any]]) -> list[dict[str, Any]]:
     openai_tools: list[dict[str, Any]] = []
 
     for tool in tools:
-        openai_tools.append({
-            "type": "function",
-            "name": tool.get("name"),
-            "description": tool.get("description", ""),
-            "parameters": tool.get("input_schema", {"type": "object", "properties": {}}),
-        })
+        openai_tools.append(
+            {
+                "type": "function",
+                "name": tool.get("name"),
+                "description": tool.get("description", ""),
+                "parameters": tool.get("input_schema", {"type": "object", "properties": {}}),
+            }
+        )
 
     return openai_tools
 

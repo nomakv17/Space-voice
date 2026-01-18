@@ -210,7 +210,7 @@ class ToolRegistry:
 
         return tools
 
-    async def execute_tool(  # noqa: PLR0911
+    async def execute_tool(  # noqa: PLR0911, PLR0912
         self, tool_name: str, arguments: dict[str, Any]
     ) -> dict[str, Any]:
         """Execute a tool by routing to appropriate handler.

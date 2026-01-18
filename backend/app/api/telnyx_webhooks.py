@@ -13,6 +13,9 @@ Call Flow:
 6. Retell handles the AI conversation
 """
 
+from http import HTTPStatus
+from typing import Any
+
 import structlog
 from fastapi import APIRouter, Request
 from pydantic import BaseModel
@@ -45,12 +48,12 @@ class TelnyxCallPayload(BaseModel):
 class TelnyxWebhookEvent(BaseModel):
     """Telnyx webhook event wrapper."""
 
-    data: dict
-    meta: dict | None = None
+    data: dict[str, Any]
+    meta: dict[str, Any] | None = None
 
 
 @router.post("/call")
-async def telnyx_call_webhook(request: Request) -> dict:
+async def telnyx_call_webhook(request: Request) -> dict[str, str]:  # noqa: PLR0911
     """Handle Telnyx Call Control webhooks.
 
     This endpoint receives all call events and dispatches based on event type.
@@ -94,7 +97,7 @@ async def telnyx_call_webhook(request: Request) -> dict:
             await answer_call(call_control_id, log)
             return {"status": "answering"}
 
-        elif event_type == "call.answered":
+        if event_type == "call.answered":
             # Only transfer if this is the original inbound call, not the transfer leg
             # The transfer leg has a SIP URI as the to_number
             if to_number.startswith("sip:"):
@@ -105,21 +108,20 @@ async def telnyx_call_webhook(request: Request) -> dict:
             await transfer_to_retell(call_control_id, to_number, log)
             return {"status": "transferring_to_retell"}
 
-        elif event_type == "call.hangup":
+        if event_type == "call.hangup":
             log.info("call_ended")
             return {"status": "call_ended"}
 
-        elif event_type == "call.transfer.completed":
+        if event_type == "call.transfer.completed":
             log.info("transfer_completed")
             return {"status": "transfer_completed"}
 
-        elif event_type == "call.transfer.failed":
+        if event_type == "call.transfer.failed":
             log.error("transfer_failed", reason=payload.get("reason"))
             return {"status": "transfer_failed"}
 
-        else:
-            log.debug("unhandled_event_type")
-            return {"status": "ignored"}
+        log.debug("unhandled_event_type")
+        return {"status": "ignored"}
 
     except Exception as e:
         log.exception("telnyx_webhook_error", error=str(e))
@@ -149,7 +151,7 @@ async def answer_call(call_control_id: str, log: structlog.BoundLogger) -> None:
             json={},
         )
 
-        if response.status_code == 200:
+        if response.status_code == HTTPStatus.OK:
             log.info("call_answered_successfully")
         else:
             log.error("answer_failed", status=response.status_code, body=response.text)
@@ -190,7 +192,7 @@ async def transfer_to_retell(
             },
         )
 
-        if response.status_code == 200:
+        if response.status_code == HTTPStatus.OK:
             log.info("transfer_initiated_successfully")
         else:
             log.error("transfer_failed", status=response.status_code, body=response.text)

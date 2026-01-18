@@ -148,7 +148,9 @@ class RetellLLMServer:
 
         elif interaction_type == "update_only":
             # Transcript update, no response needed
-            self.logger.debug("transcript_update", transcript_length=len(data.get("transcript", [])))
+            self.logger.debug(
+                "transcript_update", transcript_length=len(data.get("transcript", []))
+            )
 
         elif interaction_type == "response_required":
             await self._handle_response_required(data)
@@ -166,10 +168,12 @@ class RetellLLMServer:
         Args:
             data: Ping message with timestamp
         """
-        await self._send({
-            "response_type": "ping_pong",
-            "timestamp": data.get("timestamp"),
-        })
+        await self._send(
+            {
+                "response_type": "ping_pong",
+                "timestamp": data.get("timestamp"),
+            }
+        )
 
     async def _handle_call_details(self, data: dict[str, Any]) -> None:
         """Process call details when call starts.
@@ -328,11 +332,13 @@ class RetellLLMServer:
             )
 
             # Notify Retell about tool invocation
-            await self._send(format_tool_call_for_retell(
-                tool_use_id=tool_use_id,
-                tool_name=tool_name,
-                arguments=arguments,
-            ))
+            await self._send(
+                format_tool_call_for_retell(
+                    tool_use_id=tool_use_id,
+                    tool_name=tool_name,
+                    arguments=arguments,
+                )
+            )
 
             # Execute the tool
             try:
@@ -344,17 +350,21 @@ class RetellLLMServer:
                 is_error = True
 
             # Send tool result to Retell
-            await self._send(format_tool_result_for_retell(
-                tool_call_id=tool_use_id,
-                result=result,
-            ))
+            await self._send(
+                format_tool_result_for_retell(
+                    tool_call_id=tool_use_id,
+                    result=result,
+                )
+            )
 
             # Collect result for Claude
-            tool_results.append(format_tool_result_for_claude(
-                tool_use_id=tool_use_id,
-                result=result,
-                is_error=is_error,
-            ))
+            tool_results.append(
+                format_tool_result_for_claude(
+                    tool_use_id=tool_use_id,
+                    result=result,
+                    is_error=is_error,
+                )
+            )
 
             # Check for special actions
             if isinstance(result, dict):

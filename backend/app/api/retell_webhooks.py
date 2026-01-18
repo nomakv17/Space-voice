@@ -24,6 +24,7 @@ from pydantic import BaseModel
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.auth import user_id_to_uuid
 from app.core.config import settings
 from app.db.session import get_db
 from app.models.agent import Agent
@@ -229,9 +230,7 @@ async def retell_call_started(
 
         if call.agent_id:
             # Find agent by Retell agent ID
-            result = await db.execute(
-                select(Agent).where(Agent.retell_agent_id == call.agent_id)
-            )
+            result = await db.execute(select(Agent).where(Agent.retell_agent_id == call.agent_id))
             agent = result.scalar_one_or_none()
 
             # Fallback: check metadata for internal agent ID
@@ -249,8 +248,9 @@ async def retell_call_started(
                 user_id = agent.user_id
 
         # Create call record
+        # Use user_id_to_uuid to convert integer user_id to UUID consistently
         call_record = CallRecord(
-            user_id=uuid.UUID(int=user_id) if user_id else uuid.uuid4(),  # Fallback for now
+            user_id=user_id_to_uuid(user_id) if user_id else uuid.uuid4(),  # Fallback for now
             provider="retell",
             provider_call_id=call.call_id,
             agent_id=agent.id if agent else None,
@@ -316,7 +316,11 @@ async def retell_call_ended(
         if call_record:
             # Update call record
             call_record.status = CallStatus.COMPLETED
-            call_record.ended_at = datetime.fromtimestamp(call.end_timestamp / 1000, tz=UTC) if call.end_timestamp else datetime.now(UTC)
+            call_record.ended_at = (
+                datetime.fromtimestamp(call.end_timestamp / 1000, tz=UTC)
+                if call.end_timestamp
+                else datetime.now(UTC)
+            )
             call_record.duration_seconds = (call.duration_ms or 0) // 1000
 
             # Save transcript
@@ -338,7 +342,8 @@ async def retell_call_ended(
                     .where(Agent.id == call_record.agent_id)
                     .values(
                         total_calls=Agent.total_calls + 1,
-                        total_duration_seconds=Agent.total_duration_seconds + (call_record.duration_seconds or 0),
+                        total_duration_seconds=Agent.total_duration_seconds
+                        + (call_record.duration_seconds or 0),
                         last_call_at=datetime.now(UTC),
                     )
                 )

@@ -55,6 +55,9 @@ export interface Agent {
   enabled_tools: string[];
   enabled_tool_ids: Record<string, string[]>; // {integration_id: [tool_id1, tool_id2]}
   phone_number_id: string | null;
+  phone_number: string | null; // Actual E.164 phone number for display
+  retell_agent_id: string | null; // Retell AI agent ID
+  voice_provider: string; // Voice provider: openai_realtime or retell_claude
   enable_recording: boolean;
   enable_transcript: boolean;
   // Turn detection settings

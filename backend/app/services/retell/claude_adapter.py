@@ -127,8 +127,11 @@ class ClaudeAdapter:
                         if current_tool_use:
                             # Parse the accumulated tool input
                             import json
+
                             try:
-                                tool_input = json.loads(current_tool_input) if current_tool_input else {}
+                                tool_input = (
+                                    json.loads(current_tool_input) if current_tool_input else {}
+                                )
                             except json.JSONDecodeError:
                                 tool_input = {}
 
@@ -184,10 +187,12 @@ class ClaudeAdapter:
 
         # Add tool results to messages
         if tool_results:
-            messages.append({
-                "role": "user",
-                "content": tool_results,
-            })
+            messages.append(
+                {
+                    "role": "user",
+                    "content": tool_results,
+                }
+            )
 
         claude_tools = openai_tools_to_claude(tools) if tools else None
 
@@ -277,18 +282,23 @@ class ClaudeAdapter:
             if messages and messages[-1]["role"] == claude_role:
                 messages[-1]["content"] += f"\n{content}"
             else:
-                messages.append({
-                    "role": claude_role,
-                    "content": content,
-                })
+                messages.append(
+                    {
+                        "role": claude_role,
+                        "content": content,
+                    }
+                )
 
         # Ensure conversation starts with user message (Claude requirement)
         if messages and messages[0]["role"] == "assistant":
             # Prepend a placeholder user message
-            messages.insert(0, {
-                "role": "user",
-                "content": "[Call connected]",
-            })
+            messages.insert(
+                0,
+                {
+                    "role": "user",
+                    "content": "[Call connected]",
+                },
+            )
 
         return messages
 
@@ -313,8 +323,10 @@ class ClaudeAdapter:
             Complete system prompt for voice conversations
         """
         from datetime import datetime
+
         try:
             from zoneinfo import ZoneInfo
+
             tz = ZoneInfo(timezone)
             now = datetime.now(tz)
             current_time = now.strftime("%A, %B %d, %Y at %I:%M %p")

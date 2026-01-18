@@ -43,9 +43,7 @@ async def get_agent_workspace_id(agent_id: uuid.UUID, db: AsyncSession) -> uuid.
         Workspace UUID or None if no workspace assigned
     """
     result = await db.execute(
-        select(AgentWorkspace.workspace_id)
-        .where(AgentWorkspace.agent_id == agent_id)
-        .limit(1)
+        select(AgentWorkspace.workspace_id).where(AgentWorkspace.agent_id == agent_id).limit(1)
     )
     return result.scalar_one_or_none()
 
@@ -67,6 +65,7 @@ def build_retell_system_prompt(agent: Agent, timezone: str = "UTC") -> str:
 
     try:
         from zoneinfo import ZoneInfo
+
         tz = ZoneInfo(timezone)
         now = datetime.now(tz)
         current_time = now.strftime("%A, %B %d, %Y at %I:%M %p")
@@ -88,7 +87,7 @@ CRITICAL VOICE CONVERSATION RULES:
 
 CONTEXT:
 - Current time: {current_time} ({timezone})
-- Language: {agent.language or 'en-US'}
+- Language: {agent.language or "en-US"}
 
 YOUR ROLE AND INSTRUCTIONS:
 {base_prompt}
@@ -141,9 +140,7 @@ async def retell_llm_websocket(
             return
 
         # Load agent from database
-        result = await db.execute(
-            select(Agent).where(Agent.id == agent_uuid)
-        )
+        result = await db.execute(select(Agent).where(Agent.id == agent_uuid))
         agent = result.scalar_one_or_none()
 
         if not agent:
@@ -255,39 +252,56 @@ async def retell_llm_test_websocket(
     try:
         # Send config
         import json
-        await websocket.send_text(json.dumps({
-            "response_type": "config",
-            "config": {
-                "auto_reconnect": True,
-                "call_details": True,
-            },
-        }))
+
+        await websocket.send_text(
+            json.dumps(
+                {
+                    "response_type": "config",
+                    "config": {
+                        "auto_reconnect": True,
+                        "call_details": True,
+                    },
+                }
+            )
+        )
 
         async for message in websocket.iter_text():
             data = json.loads(message)
             interaction_type = data.get("interaction_type")
 
             if interaction_type == "ping_pong":
-                await websocket.send_text(json.dumps({
-                    "response_type": "ping_pong",
-                    "timestamp": data.get("timestamp"),
-                }))
+                await websocket.send_text(
+                    json.dumps(
+                        {
+                            "response_type": "ping_pong",
+                            "timestamp": data.get("timestamp"),
+                        }
+                    )
+                )
 
             elif interaction_type == "response_required":
                 response_id = data.get("response_id", 0)
                 # Send a test response
-                await websocket.send_text(json.dumps({
-                    "response_type": "response",
-                    "response_id": response_id,
-                    "content": "This is a test response from the SpaceVoice Custom LLM endpoint. ",
-                    "content_complete": False,
-                }))
-                await websocket.send_text(json.dumps({
-                    "response_type": "response",
-                    "response_id": response_id,
-                    "content": "The connection is working correctly.",
-                    "content_complete": True,
-                }))
+                await websocket.send_text(
+                    json.dumps(
+                        {
+                            "response_type": "response",
+                            "response_id": response_id,
+                            "content": "This is a test response from the SpaceVoice Custom LLM endpoint. ",
+                            "content_complete": False,
+                        }
+                    )
+                )
+                await websocket.send_text(
+                    json.dumps(
+                        {
+                            "response_type": "response",
+                            "response_id": response_id,
+                            "content": "The connection is working correctly.",
+                            "content_complete": True,
+                        }
+                    )
+                )
 
             log.debug("test_message_handled", type=interaction_type)
 

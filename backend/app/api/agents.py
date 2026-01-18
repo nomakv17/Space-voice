@@ -13,6 +13,7 @@ from app.core.limiter import limiter
 from app.core.public_id import generate_public_id
 from app.db.session import get_db
 from app.models.agent import Agent
+from app.models.phone_number import PhoneNumber
 
 router = APIRouter(prefix="/api/v1/agents", tags=["agents"])
 
@@ -99,6 +100,9 @@ class AgentResponse(BaseModel):
     enabled_tools: list[str]
     enabled_tool_ids: dict[str, list[str]]
     phone_number_id: str | None
+    phone_number: str | None  # Actual E.164 phone number for display
+    retell_agent_id: str | None  # Retell AI agent ID
+    voice_provider: str  # Voice provider: openai_realtime or retell_claude
     enable_recording: bool
     enable_transcript: bool
     # Turn detection settings
@@ -169,7 +173,8 @@ async def create_agent(
     await db.commit()
     await db.refresh(agent)
 
-    return _agent_to_response(agent)
+    phone_number = await _get_phone_number_for_agent(agent, db)
+    return _agent_to_response(agent, phone_number)
 
 
 @router.get("", response_model=list[AgentResponse])
@@ -210,7 +215,13 @@ async def list_agents(
     )
     agents = result.scalars().all()
 
-    return [_agent_to_response(agent) for agent in agents]
+    # Fetch phone numbers for all agents
+    responses = []
+    for agent in agents:
+        phone_number = await _get_phone_number_for_agent(agent, db)
+        responses.append(_agent_to_response(agent, phone_number))
+
+    return responses
 
 
 @router.get("/{agent_id}", response_model=AgentResponse)
@@ -246,7 +257,8 @@ async def get_agent(
             detail="Agent not found",
         )
 
-    return _agent_to_response(agent)
+    phone_number = await _get_phone_number_for_agent(agent, db)
+    return _agent_to_response(agent, phone_number)
 
 
 @router.delete("/{agent_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -330,7 +342,8 @@ async def update_agent(
     await db.commit()
     await db.refresh(agent)
 
-    return _agent_to_response(agent)
+    phone_number = await _get_phone_number_for_agent(agent, db)
+    return _agent_to_response(agent, phone_number)
 
 
 def _apply_agent_updates(agent: Agent, request: UpdateAgentRequest) -> None:
@@ -425,11 +438,45 @@ def _get_provider_config(tier: str) -> dict[str, Any]:
     return configs.get(tier, configs["balanced"])
 
 
-def _agent_to_response(agent: Agent) -> AgentResponse:
+async def _get_phone_number_for_agent(agent: Agent, db: AsyncSession) -> str | None:
+    """Fetch the actual phone number for an agent.
+
+    Looks up the phone number either by:
+    1. The agent's phone_number_id (if it's a valid UUID)
+    2. The PhoneNumber's assigned_agent_id
+
+    Args:
+        agent: Agent model
+        db: Database session
+
+    Returns:
+        E.164 formatted phone number or None
+    """
+    if not agent.phone_number_id:
+        return None
+
+    # Try to find by phone_number_id as UUID
+    try:
+        phone_uuid = uuid.UUID(agent.phone_number_id)
+        result = await db.execute(select(PhoneNumber).where(PhoneNumber.id == phone_uuid))
+        phone = result.scalar_one_or_none()
+        if phone:
+            return phone.phone_number
+    except (ValueError, TypeError):
+        pass
+
+    # Fallback: find by assigned_agent_id
+    result = await db.execute(select(PhoneNumber).where(PhoneNumber.assigned_agent_id == agent.id))
+    phone = result.scalar_one_or_none()
+    return phone.phone_number if phone else None
+
+
+def _agent_to_response(agent: Agent, phone_number: str | None = None) -> AgentResponse:
     """Convert Agent model to response schema.
 
     Args:
         agent: Agent model
+        phone_number: Actual E.164 phone number (fetched from PhoneNumber table)
 
     Returns:
         AgentResponse
@@ -445,6 +492,9 @@ def _agent_to_response(agent: Agent) -> AgentResponse:
         enabled_tools=agent.enabled_tools,
         enabled_tool_ids=agent.enabled_tool_ids,
         phone_number_id=agent.phone_number_id,
+        phone_number=phone_number,
+        retell_agent_id=agent.retell_agent_id,
+        voice_provider=agent.voice_provider,
         enable_recording=agent.enable_recording,
         enable_transcript=agent.enable_transcript,
         turn_detection_mode=agent.turn_detection_mode,

@@ -44,31 +44,71 @@ class HVACTriageTools:
 
     # Emergency keywords that indicate immediate danger
     CRITICAL_KEYWORDS: ClassVar[set[str]] = {
-        "gas leak", "smell gas", "gas smell", "natural gas",
-        "carbon monoxide", "co detector", "co alarm", "monoxide alarm",
-        "smoke", "fire", "burning", "sparking", "electrical fire",
-        "flames", "on fire",
+        "gas leak",
+        "smell gas",
+        "gas smell",
+        "natural gas",
+        "carbon monoxide",
+        "co detector",
+        "co alarm",
+        "monoxide alarm",
+        "smoke",
+        "fire",
+        "burning",
+        "sparking",
+        "electrical fire",
+        "flames",
+        "on fire",
     }
 
     # Keywords indicating heating/cooling failure
     NO_HEAT_KEYWORDS: ClassVar[set[str]] = {
-        "no heat", "not heating", "won't heat", "furnace not working",
-        "heater broken", "no warm air", "cold air only", "freezing",
-        "furnace won't start", "boiler not working", "heat pump not heating",
+        "no heat",
+        "not heating",
+        "won't heat",
+        "furnace not working",
+        "heater broken",
+        "no warm air",
+        "cold air only",
+        "freezing",
+        "furnace won't start",
+        "boiler not working",
+        "heat pump not heating",
     }
 
     NO_AC_KEYWORDS: ClassVar[set[str]] = {
-        "no ac", "no air conditioning", "ac not working", "not cooling",
-        "won't cool", "ac broken", "hot air only", "air conditioner broken",
-        "ac won't start", "heat pump not cooling",
+        "no ac",
+        "no air conditioning",
+        "ac not working",
+        "not cooling",
+        "won't cool",
+        "ac broken",
+        "hot air only",
+        "air conditioner broken",
+        "ac won't start",
+        "heat pump not cooling",
     }
 
     # Vulnerable occupant indicators
     VULNERABLE_KEYWORDS: ClassVar[set[str]] = {
-        "elderly", "senior", "old", "baby", "infant", "newborn", "child",
-        "medical condition", "oxygen", "on oxygen", "heart condition",
-        "diabetes", "immunocompromised", "sick", "ill", "disabled",
-        "wheelchair", "bedridden",
+        "elderly",
+        "senior",
+        "old",
+        "baby",
+        "infant",
+        "newborn",
+        "child",
+        "medical condition",
+        "oxygen",
+        "on oxygen",
+        "heart condition",
+        "diabetes",
+        "immunocompromised",
+        "sick",
+        "ill",
+        "disabled",
+        "wheelchair",
+        "bedridden",
     }
 
     @staticmethod
@@ -96,7 +136,16 @@ class HVACTriageTools:
                         },
                         "equipment_type": {
                             "type": "string",
-                            "enum": ["furnace", "ac", "heat_pump", "boiler", "water_heater", "thermostat", "ductwork", "unknown"],
+                            "enum": [
+                                "furnace",
+                                "ac",
+                                "heat_pump",
+                                "boiler",
+                                "water_heater",
+                                "thermostat",
+                                "ductwork",
+                                "unknown",
+                            ],
                             "description": "Type of HVAC equipment affected",
                         },
                         "has_vulnerable_occupants": {
@@ -133,7 +182,14 @@ class HVACTriageTools:
                     "properties": {
                         "emergency_type": {
                             "type": "string",
-                            "enum": ["gas_leak", "carbon_monoxide", "electrical", "no_heat_critical", "no_ac_critical", "other_urgent"],
+                            "enum": [
+                                "gas_leak",
+                                "carbon_monoxide",
+                                "electrical",
+                                "no_heat_critical",
+                                "no_ac_critical",
+                                "other_urgent",
+                            ],
                             "description": "Type of emergency from classification",
                         },
                         "address": {
@@ -161,7 +217,14 @@ class HVACTriageTools:
                     "properties": {
                         "service_type": {
                             "type": "string",
-                            "enum": ["repair", "maintenance", "installation", "replacement", "inspection", "estimate"],
+                            "enum": [
+                                "repair",
+                                "maintenance",
+                                "installation",
+                                "replacement",
+                                "inspection",
+                                "estimate",
+                            ],
                             "description": "Type of service needed",
                         },
                         "equipment_type": {
@@ -198,7 +261,14 @@ class HVACTriageTools:
                     "properties": {
                         "service_type": {
                             "type": "string",
-                            "enum": ["maintenance", "repair", "installation", "inspection", "estimate", "tune_up"],
+                            "enum": [
+                                "maintenance",
+                                "repair",
+                                "installation",
+                                "inspection",
+                                "estimate",
+                                "tune_up",
+                            ],
                             "description": "Type of service needed",
                         },
                         "equipment_type": {
@@ -248,12 +318,19 @@ class HVACTriageTools:
         concerns = set(safety_concerns or [])
 
         # Check for gas leak / CO (ALWAYS CRITICAL)
-        if any(kw in issue_lower for kw in cls.CRITICAL_KEYWORDS) or "gas_smell" in concerns or "co_detector" in concerns:
+        if (
+            any(kw in issue_lower for kw in cls.CRITICAL_KEYWORDS)
+            or "gas_smell" in concerns
+            or "co_detector" in concerns
+        ):
             if "gas" in issue_lower or "gas_smell" in concerns:
                 return "gas_leak", "Potential gas leak detected - evacuate immediately"
             if "carbon monoxide" in issue_lower or "co" in issue_lower or "co_detector" in concerns:
                 return "carbon_monoxide", "Carbon monoxide alert - evacuate immediately"
-            if any(kw in issue_lower for kw in ["spark", "fire", "smoke", "burning"]) or "sparking" in concerns:
+            if (
+                any(kw in issue_lower for kw in ["spark", "fire", "smoke", "burning"])
+                or "sparking" in concerns
+            ):
                 return "electrical", "Electrical hazard detected - disconnect power if safe"
 
         return None, ""
@@ -554,10 +631,18 @@ class HVACTriageTools:
         replacement_reason = None
         if equipment_age and equipment_age > EQUIPMENT_AGE_RECOMMEND_REPLACEMENT:
             recommend_replacement = True
-            replacement_reason = f"Equipment is {equipment_age} years old - replacement may be more cost-effective"
-        elif equipment_age and equipment_age > EQUIPMENT_AGE_CONSIDER_REPLACEMENT and severity == "major":
+            replacement_reason = (
+                f"Equipment is {equipment_age} years old - replacement may be more cost-effective"
+            )
+        elif (
+            equipment_age
+            and equipment_age > EQUIPMENT_AGE_CONSIDER_REPLACEMENT
+            and severity == "major"
+        ):
             recommend_replacement = True
-            replacement_reason = "Significant repair on aging equipment - consider replacement options"
+            replacement_reason = (
+                "Significant repair on aging equipment - consider replacement options"
+            )
 
         return {
             "success": True,
@@ -613,7 +698,7 @@ class HVACTriageTools:
             "issue_summary": issue_description[:200] if issue_description else None,
             "next_step": "Use book_appointment to finalize with customer contact info",
             "message": f"I can schedule a {service_type} appointment for your {equipment_type}. "
-                      f"Let me get your contact information to confirm the booking.",
+            f"Let me get your contact information to confirm the booking.",
         }
 
     @staticmethod
