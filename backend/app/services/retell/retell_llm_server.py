@@ -300,6 +300,16 @@ class RetellLLMServer:
 
         # Execute any pending tool calls
         if pending_tool_calls:
+            # CRITICAL: Mark the text response complete BEFORE executing tools
+            # Retell has a short timeout - if we don't send content_complete=True,
+            # Retell will disconnect and reconnect thinking we've stalled
+            if accumulated_content:
+                await self._send_response(
+                    response_id=response_id,
+                    content="",
+                    content_complete=True,
+                )
+
             # Pass the accumulated text that Claude said BEFORE the tool calls
             # This is critical - Claude's API needs both text and tool_use in the same message
             await self._execute_tool_calls(
