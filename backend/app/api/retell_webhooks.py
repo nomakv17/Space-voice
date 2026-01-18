@@ -253,6 +253,283 @@ async def get_or_create_contact(
 # =============================================================================
 
 
+@router.post("")
+@router.post("/")
+async def retell_unified_webhook(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, Any]:
+    """Unified webhook endpoint for all Retell events.
+
+    Retell sends all webhook events to a SINGLE URL. This endpoint
+    receives all events and routes them to the appropriate handler
+    based on the 'event' field in the payload.
+
+    Configure this URL in Retell Dashboard:
+    https://your-domain.com/webhooks/retell
+
+    Args:
+        request: FastAPI request
+        db: Database session
+
+    Returns:
+        Acknowledgment response
+    """
+    await verify_retell_signature(request)
+
+    body = await request.json()
+    log = logger.bind(endpoint="retell_unified_webhook")
+
+    event_type = body.get("event", "unknown")
+    log.info("retell_webhook_received", event_type=event_type)
+
+    # Route to appropriate handler based on event type
+    if event_type == "call_started":
+        return await _handle_call_started(body, db, log)
+    if event_type == "call_ended":
+        return await _handle_call_ended(body, db, log)
+    if event_type == "call_analyzed":
+        return await _handle_call_analyzed(body, db, log)
+    log.warning("unknown_event_type", event_type=event_type)
+    return {"status": "ignored", "event": event_type}
+
+
+async def _handle_call_started(
+    body: dict[str, Any],
+    db: AsyncSession,
+    log: structlog.BoundLogger,
+) -> dict[str, str]:
+    """Internal handler for call_started events."""
+    try:
+        payload = RetellWebhookPayload(**body)
+        call = payload.call
+
+        log = log.bind(
+            call_id=call.call_id,
+            agent_id=call.agent_id,
+            direction=call.direction,
+        )
+        log.info("processing_call_started")
+
+        # Look up our internal agent by Retell agent_id
+        agent = None
+        user_id = None
+
+        if call.agent_id:
+            result = await db.execute(select(Agent).where(Agent.retell_agent_id == call.agent_id))
+            agent = result.scalar_one_or_none()
+
+            if not agent and call.metadata and call.metadata.get("internal_agent_id"):
+                agent_id_str = call.metadata.get("internal_agent_id")
+                try:
+                    result = await db.execute(
+                        select(Agent).where(Agent.id == uuid.UUID(agent_id_str))
+                    )
+                    agent = result.scalar_one_or_none()
+                except (ValueError, TypeError):
+                    pass
+
+            if agent:
+                user_id = agent.user_id
+
+        # Auto-create contact from caller ID for inbound calls
+        contact = None
+        if user_id and call.from_number and call.direction == "inbound":
+            contact = await get_or_create_contact(
+                db=db,
+                phone_number=call.from_number,
+                user_id=user_id,
+                log=log,
+            )
+
+        # Create call record
+        call_record = CallRecord(
+            user_id=user_id_to_uuid(user_id) if user_id else uuid.uuid4(),
+            provider="retell",
+            provider_call_id=call.call_id,
+            agent_id=agent.id if agent else None,
+            contact_id=contact.id if contact else None,
+            from_number=call.from_number or "",
+            to_number=call.to_number or "",
+            direction=convert_retell_direction(call.direction),
+            status=CallStatus.IN_PROGRESS,
+            started_at=datetime.fromtimestamp(call.start_timestamp / 1000, tz=UTC)
+            if call.start_timestamp
+            else datetime.now(UTC),
+        )
+
+        db.add(call_record)
+        await db.commit()
+
+        log.info(
+            "call_record_created",
+            record_id=str(call_record.id),
+            contact_id=contact.id if contact else None,
+        )
+        return {"status": "received", "call_record_id": str(call_record.id)}
+
+    except Exception as e:
+        log.exception("call_started_error", error=str(e))
+        return {"status": "error", "message": str(e)}
+
+
+async def _handle_call_ended(
+    body: dict[str, Any],
+    db: AsyncSession,
+    log: structlog.BoundLogger,
+) -> dict[str, str]:
+    """Internal handler for call_ended events."""
+    try:
+        payload = RetellWebhookPayload(**body)
+        call = payload.call
+
+        log = log.bind(
+            call_id=call.call_id,
+            duration_ms=call.duration_ms,
+            disconnection_reason=call.disconnection_reason,
+        )
+        log.info("processing_call_ended")
+
+        # Find existing call record
+        result = await db.execute(
+            select(CallRecord).where(CallRecord.provider_call_id == call.call_id)
+        )
+        call_record = result.scalar_one_or_none()
+
+        # If no call record exists (call_started wasn't received), create one now
+        if not call_record:
+            log.warning("call_record_not_found_creating", call_id=call.call_id)
+
+            # Look up agent
+            agent: Agent | None = None
+            user_id: int | None = None
+            if call.agent_id:
+                agent_result = await db.execute(
+                    select(Agent).where(Agent.retell_agent_id == call.agent_id)
+                )
+                agent = agent_result.scalar_one_or_none()
+                if agent:
+                    user_id = agent.user_id
+
+            # Auto-create contact
+            contact = None
+            if user_id and call.from_number and call.direction == "inbound":
+                contact = await get_or_create_contact(
+                    db=db,
+                    phone_number=call.from_number,
+                    user_id=user_id,
+                    log=log,
+                )
+
+            call_record = CallRecord(
+                user_id=user_id_to_uuid(user_id) if user_id else uuid.uuid4(),
+                provider="retell",
+                provider_call_id=call.call_id,
+                agent_id=agent.id if agent else None,
+                contact_id=contact.id if contact else None,
+                from_number=call.from_number or "",
+                to_number=call.to_number or "",
+                direction=convert_retell_direction(call.direction),
+                status=CallStatus.COMPLETED,
+                started_at=datetime.fromtimestamp(call.start_timestamp / 1000, tz=UTC)
+                if call.start_timestamp
+                else datetime.now(UTC),
+            )
+            db.add(call_record)
+
+        # Update call record with end data
+        call_record.status = CallStatus.COMPLETED
+        call_record.ended_at = (
+            datetime.fromtimestamp(call.end_timestamp / 1000, tz=UTC)
+            if call.end_timestamp
+            else datetime.now(UTC)
+        )
+        call_record.duration_seconds = (call.duration_ms or 0) // 1000
+
+        # Save transcript
+        if call.transcript:
+            call_record.transcript = call.transcript
+        elif call.transcript_object:
+            call_record.transcript = format_transcript(call.transcript_object)
+
+        # Save recording URL if available
+        if call.recording_url:
+            call_record.recording_url = call.recording_url
+
+        await db.commit()
+
+        # Update agent metrics
+        if call_record.agent_id:
+            await db.execute(
+                update(Agent)
+                .where(Agent.id == call_record.agent_id)
+                .values(
+                    total_calls=Agent.total_calls + 1,
+                    total_duration_seconds=Agent.total_duration_seconds
+                    + (call_record.duration_seconds or 0),
+                    last_call_at=datetime.now(UTC),
+                )
+            )
+            await db.commit()
+
+        log.info(
+            "call_record_updated",
+            record_id=str(call_record.id),
+            duration=call_record.duration_seconds,
+            has_transcript=bool(call_record.transcript),
+        )
+        return {"status": "received"}
+
+    except Exception as e:
+        log.exception("call_ended_error", error=str(e))
+        return {"status": "error", "message": str(e)}
+
+
+async def _handle_call_analyzed(
+    body: dict[str, Any],
+    db: AsyncSession,
+    log: structlog.BoundLogger,
+) -> dict[str, Any]:
+    """Internal handler for call_analyzed events."""
+    try:
+        payload = RetellWebhookPayload(**body)
+        call = payload.call
+
+        log = log.bind(call_id=call.call_id)
+        log.info("processing_call_analyzed")
+
+        if not call.call_analysis:
+            log.info("no_analysis_data")
+            return {"status": "received", "message": "No analysis data"}
+
+        # Find call record
+        result = await db.execute(
+            select(CallRecord).where(CallRecord.provider_call_id == call.call_id)
+        )
+        call_record = result.scalar_one_or_none()
+
+        if call_record:
+            analysis = call.call_analysis
+            log.info(
+                "call_analysis_received",
+                record_id=str(call_record.id),
+                sentiment=analysis.get("user_sentiment"),
+                has_summary=bool(analysis.get("call_summary")),
+            )
+            return {
+                "status": "received",
+                "sentiment": analysis.get("user_sentiment"),
+                "has_summary": bool(analysis.get("call_summary")),
+            }
+
+        log.warning("call_record_not_found_for_analysis", call_id=call.call_id)
+        return {"status": "received", "message": "Call record not found"}
+
+    except Exception as e:
+        log.exception("call_analyzed_error", error=str(e))
+        return {"status": "error", "message": str(e)}
+
+
 @router.post("/call-started")
 async def retell_call_started(
     request: Request,
