@@ -4,6 +4,7 @@ from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import settings
 from app.services.tools.calendly_tools import CalendlyTools
 from app.services.tools.call_control_tools import CallControlTools
 from app.services.tools.crm_tools import CRMTools
@@ -89,9 +90,14 @@ class ToolRegistry:
 
         creds = self.integrations.get("google-calendar")
         if creds and creds.get("access_token"):
+            # Pass app-level client_id/client_secret from settings for token refresh
+            # User credentials (access_token, refresh_token) come from the integration
+            # but client credentials are app-wide OAuth settings
             self._google_calendar_tools = GoogleCalendarTools(
                 access_token=creds["access_token"],
                 refresh_token=creds.get("refresh_token"),
+                client_id=settings.GOOGLE_CLIENT_ID,
+                client_secret=settings.GOOGLE_CLIENT_SECRET,
             )
             return self._google_calendar_tools
 
