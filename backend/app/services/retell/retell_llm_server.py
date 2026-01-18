@@ -94,6 +94,8 @@ class RetellLLMServer:
         Processes incoming messages and routes them to appropriate handlers.
         Runs until the connection is closed.
         """
+        from starlette.websockets import WebSocketDisconnect
+
         self.logger.info("retell_llm_connection_started")
 
         try:
@@ -107,11 +109,26 @@ class RetellLLMServer:
                     await self._handle_message(data)
                 except json.JSONDecodeError as e:
                     self.logger.warning("invalid_json", error=str(e))
+                except WebSocketDisconnect:
+                    # Normal disconnection during message handling - don't log as error
+                    self.logger.info("websocket_disconnected_during_handling")
+                    break
                 except Exception as e:
-                    self.logger.exception("message_handler_error", error=str(e))
+                    # Only log as error if it's not a normal disconnect
+                    if "WebSocket" in str(e) or "disconnect" in str(e).lower():
+                        self.logger.info("websocket_closed", reason=str(e))
+                    else:
+                        self.logger.exception("message_handler_error", error=str(e))
 
+        except WebSocketDisconnect:
+            # Normal disconnection - Retell closed the connection
+            self.logger.info("retell_closed_connection")
         except Exception as e:
-            self.logger.exception("connection_error", error=str(e))
+            # Only log unexpected errors
+            if "WebSocket" in str(e) or "disconnect" in str(e).lower():
+                self.logger.info("connection_closed", reason=str(e))
+            else:
+                self.logger.exception("connection_error", error=str(e))
         finally:
             self.logger.info("retell_llm_connection_closed")
 
@@ -178,6 +195,10 @@ class RetellLLMServer:
     async def _handle_call_details(self, data: dict[str, Any]) -> None:
         """Process call details when call starts.
 
+        After receiving call details, we proactively send an initial greeting.
+        This is required because Retell's Custom LLM protocol expects the agent
+        to speak first - Retell won't send response_required until after we greet.
+
         Args:
             data: Call details including call_id, metadata, etc.
         """
@@ -191,6 +212,33 @@ class RetellLLMServer:
             to_number=call.get("to_number"),
             metadata=call.get("metadata"),
         )
+
+        # Send initial greeting - the agent must speak first in Custom LLM mode
+        await self._send_initial_greeting()
+
+    async def _send_initial_greeting(self) -> None:
+        """Send initial greeting when call starts.
+
+        Custom LLM agents must proactively greet the caller. We use a static
+        greeting for minimal latency - voice conversations are very sensitive
+        to delays, and generating with Claude would add 1-3 seconds.
+
+        Uses the agent's configured initial_greeting if set, otherwise a default.
+        """
+        self.logger.info("sending_initial_greeting")
+
+        # Use custom greeting from agent config (initial_greeting field)
+        greeting = self.agent_config.get("greeting")
+        if not greeting:
+            # Default greeting if none configured
+            greeting = "Hello, thanks for calling! How can I help you today?"
+
+        await self._send_response(
+            response_id=0,
+            content=greeting,
+            content_complete=True,
+        )
+        self.logger.info("initial_greeting_sent", greeting_length=len(greeting))
 
     async def _handle_response_required(self, data: dict[str, Any]) -> None:
         """Generate and stream response when Retell needs one.
@@ -252,7 +300,11 @@ class RetellLLMServer:
 
         # Execute any pending tool calls
         if pending_tool_calls:
-            await self._execute_tool_calls(response_id, transcript, pending_tool_calls)
+            # Pass the accumulated text that Claude said BEFORE the tool calls
+            # This is critical - Claude's API needs both text and tool_use in the same message
+            await self._execute_tool_calls(
+                response_id, transcript, pending_tool_calls, accumulated_content
+            )
         else:
             # No tools - mark response complete
             await self._send_response(
@@ -310,6 +362,7 @@ class RetellLLMServer:
         response_id: int,
         transcript: list[dict[str, Any]],
         tool_calls: list[dict[str, Any]],
+        assistant_text: str = "",
     ) -> None:
         """Execute tool calls and continue the conversation.
 
@@ -317,6 +370,7 @@ class RetellLLMServer:
             response_id: Retell response ID
             transcript: Current conversation transcript
             tool_calls: List of tool calls to execute
+            assistant_text: Text Claude said BEFORE the tool calls (e.g., "Let me check...")
         """
         tool_results: list[dict[str, Any]] = []
 
@@ -387,21 +441,52 @@ class RetellLLMServer:
                     return
 
         # Continue conversation with tool results
+        # Pass tool_calls, tool_results, AND the assistant's text before tool calls
+        # Claude's API requires the assistant message to have BOTH text and tool_use blocks
+        self.logger.info(
+            "continuing_after_tools",
+            tool_call_count=len(tool_calls),
+            tool_result_count=len(tool_results),
+            has_assistant_text=bool(assistant_text),
+        )
+
+        has_response = False
         async for event in self.claude.generate_with_tool_results(
             transcript=transcript,
             system_prompt=self.system_prompt,
             tools=self.openai_tools,
+            tool_calls=tool_calls,
             tool_results=tool_results,
+            assistant_text_before_tools=assistant_text,
             temperature=self.agent_config.get("temperature", 0.7),
         ):
-            if event.get("type") == "text_delta":
+            event_type = event.get("type")
+
+            if event_type == "text_delta":
+                has_response = True
                 await self._send_response(
                     response_id=response_id,
                     content=event.get("delta", ""),
                     content_complete=False,
                 )
 
+            elif event_type == "error":
+                # Claude API error - send fallback response
+                self.logger.error(
+                    "claude_error_after_tools",
+                    error=event.get("error"),
+                )
+                await self._send_response(
+                    response_id=response_id,
+                    content="I apologize, I'm having trouble processing that. Could you repeat?",
+                    content_complete=True,
+                )
+                return
+
         # Mark response complete
+        if not has_response:
+            self.logger.warning("no_response_after_tools")
+
         await self._send_response(
             response_id=response_id,
             content="",

@@ -20,6 +20,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.integrations import get_workspace_integrations
+from app.core.auth import user_id_to_uuid
 from app.core.config import settings
 from app.db.session import get_db
 from app.models.agent import Agent
@@ -96,15 +97,19 @@ IMPORTANT: You are in a voice conversation. Keep all responses brief and natural
 
 
 @router.websocket("/llm/{agent_id}")
+@router.websocket("/llm/{agent_id}/{call_id}")
 async def retell_llm_websocket(
     websocket: WebSocket,
     agent_id: str,
+    call_id: str | None = None,
     db: AsyncSession = Depends(get_db),
 ) -> None:
     """WebSocket endpoint for Retell Custom LLM integration.
 
     This endpoint receives conversation requests from Retell and generates
     responses using Claude 4.5 Sonnet with tool calling support.
+
+    Retell appends /{call_id} to the WebSocket URL, so we accept both formats.
 
     The flow:
     1. Retell connects when a call starts
@@ -168,13 +173,34 @@ async def retell_llm_websocket(
         workspace_id = await get_agent_workspace_id(agent.id, db)
         log = log.bind(workspace_id=str(workspace_id) if workspace_id else None)
 
-        # Load workspace integrations for tools
-        # Note: Agent.user_id is int, but UserIntegration uses UUID format
-        # Convert int user_id to UUID for compatibility
-        user_id_uuid = uuid.UUID(int=agent.user_id)
+        # Load integrations for tools
+        # Convert int user_id to UUID using the same function used when storing integrations
+        user_id_uuid = user_id_to_uuid(agent.user_id)
         integrations: dict[str, dict[str, Any]] = {}
+
+        # Load user-level integrations (workspace_id is NULL)
+        from sqlalchemy import and_
+        from app.models.user_integration import UserIntegration
+
+        user_integrations_result = await db.execute(
+            select(UserIntegration).where(
+                and_(
+                    UserIntegration.user_id == user_id_uuid,
+                    UserIntegration.workspace_id.is_(None),
+                    UserIntegration.is_active.is_(True),
+                )
+            )
+        )
+        for integration in user_integrations_result.scalars().all():
+            if integration.credentials:
+                integrations[integration.integration_id] = integration.credentials
+
+        # Load workspace-level integrations (if workspace exists)
         if workspace_id:
-            integrations = await get_workspace_integrations(user_id_uuid, workspace_id, db)
+            workspace_integrations = await get_workspace_integrations(user_id_uuid, workspace_id, db)
+            integrations.update(workspace_integrations)
+
+        log.info("loaded_integrations", integration_ids=list(integrations.keys()))
 
         # Initialize Claude adapter
         claude_adapter = ClaudeAdapter(
@@ -215,6 +241,9 @@ async def retell_llm_websocket(
                 "temperature": agent.temperature or 0.7,
                 "max_tokens": agent.max_tokens or 1024,
                 "language": agent.language or "en-US",
+                "agent_name": agent.name,
+                # Use initial_greeting from agent config if set
+                "greeting": agent.initial_greeting if agent.initial_greeting else None,
             },
         )
 

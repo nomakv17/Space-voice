@@ -24,7 +24,7 @@ logger = structlog.get_logger()
 
 # Claude model for voice conversations
 # Using Claude 4.5 Sonnet for best balance of speed and capability
-CLAUDE_MODEL = "claude-sonnet-4-5-20250514"
+CLAUDE_MODEL = "claude-sonnet-4-20250514"
 
 
 class ClaudeAdapter:
@@ -163,7 +163,9 @@ class ClaudeAdapter:
         transcript: list[dict[str, Any]],
         system_prompt: str,
         tools: list[dict[str, Any]],
+        tool_calls: list[dict[str, Any]],
         tool_results: list[dict[str, Any]],
+        assistant_text_before_tools: str = "",
         temperature: float = 0.7,
         max_tokens: int = 1024,
     ) -> AsyncGenerator[dict[str, Any], None]:
@@ -172,11 +174,20 @@ class ClaudeAdapter:
         After a tool is executed, this method continues the conversation
         with the tool results included.
 
+        Claude's API requires:
+        1. Assistant message with BOTH text (if any) AND tool_use content blocks
+        2. User message with tool_result content blocks
+
+        The assistant message must contain ALL content from Claude's response,
+        including any text said before tool calls (e.g., "Let me check...").
+
         Args:
             transcript: Retell conversation transcript
             system_prompt: Agent system prompt
             tools: Tool definitions (OpenAI format)
+            tool_calls: The original tool calls made by Claude
             tool_results: Results from executed tools
+            assistant_text_before_tools: Text Claude said before making tool calls
             temperature: Response creativity
             max_tokens: Maximum response tokens
 
@@ -185,23 +196,69 @@ class ClaudeAdapter:
         """
         messages = self._convert_transcript_to_messages(transcript)
 
-        # Add tool results to messages
-        if tool_results:
-            messages.append(
-                {
-                    "role": "user",
-                    "content": tool_results,
-                }
-            )
+        # Add tool calls and results to messages
+        # Claude requires: assistant message with content, then user message with tool_result
+        if tool_calls and tool_results:
+            # Build assistant message content blocks
+            # CRITICAL: Must include BOTH text (if any) AND tool_use blocks
+            assistant_content: list[dict[str, Any]] = []
+
+            # Add text block if Claude said something before tool calls
+            # CRITICAL: Must strip whitespace - Claude API rejects trailing whitespace
+            if assistant_text_before_tools and assistant_text_before_tools.strip():
+                assistant_content.append({
+                    "type": "text",
+                    "text": assistant_text_before_tools.strip(),
+                })
+
+            # Add tool_use blocks
+            for tc in tool_calls:
+                assistant_content.append({
+                    "type": "tool_use",
+                    "id": tc.get("tool_use_id"),
+                    "name": tc.get("name"),
+                    "input": tc.get("arguments", {}),
+                })
+
+            messages.append({
+                "role": "assistant",
+                "content": assistant_content,
+            })
+
+            # Add user message with tool_result blocks
+            messages.append({
+                "role": "user",
+                "content": tool_results,
+            })
 
         claude_tools = openai_tools_to_claude(tools) if tools else None
 
         self.logger.debug(
             "continuing_with_tool_results",
             tool_result_count=len(tool_results),
+            message_count=len(messages),
         )
 
+        # Log the last two messages (assistant with tool_use, user with tool_result)
+        min_messages_for_tool_continuation = 2
+        if len(messages) >= min_messages_for_tool_continuation:
+            self.logger.debug(
+                "tool_continuation_messages",
+                assistant_msg_content_types=[
+                    c.get("type") for c in messages[-2].get("content", [])
+                ]
+                if isinstance(messages[-2].get("content"), list)
+                else "string",
+                user_msg_content_types=[
+                    c.get("type") for c in messages[-1].get("content", [])
+                ]
+                if isinstance(messages[-1].get("content"), list)
+                else "string",
+            )
+
         try:
+            self.logger.debug("starting_claude_stream_for_tool_results")
+
             # Note: type ignores are needed because we dynamically construct messages/tools
             async with self.client.messages.stream(
                 model=CLAUDE_MODEL,
@@ -211,7 +268,17 @@ class ClaudeAdapter:
                 tools=claude_tools,  # type: ignore[arg-type]
                 temperature=temperature,
             ) as stream:
+                self.logger.debug("claude_stream_opened")
+                event_count = 0
+
                 async for event in stream:
+                    event_count += 1
+                    self.logger.debug(
+                        "claude_stream_event",
+                        event_type=event.type,
+                        event_count=event_count,
+                    )
+
                     if event.type == "content_block_delta":
                         delta = event.delta
                         if delta.type == "text_delta":
@@ -221,7 +288,12 @@ class ClaudeAdapter:
                             }
 
                     elif event.type == "message_stop":
+                        self.logger.debug("claude_stream_complete", total_events=event_count)
                         yield {"type": "message_end"}
+
+                # If we exit the loop without message_stop
+                if event_count == 0:
+                    self.logger.warning("claude_stream_no_events")
 
         except Exception as e:
             self.logger.exception("claude_continuation_error", error=str(e))
@@ -290,8 +362,8 @@ class ClaudeAdapter:
                 )
 
         # Ensure conversation starts with user message (Claude requirement)
-        if messages and messages[0]["role"] == "assistant":
-            # Prepend a placeholder user message
+        # If empty transcript or starts with assistant, prepend a placeholder
+        if not messages or messages[0]["role"] == "assistant":
             messages.insert(
                 0,
                 {
