@@ -18,8 +18,11 @@ Protocol flow:
 Reference: https://docs.retellai.com/api-references/llm-websocket
 """
 
+import asyncio
+import contextlib
 import json
 import uuid
+from dataclasses import dataclass
 from typing import Any
 
 import structlog
@@ -32,6 +35,17 @@ from app.services.retell.tool_converter import (
 from app.services.tools.registry import ToolRegistry
 
 logger = structlog.get_logger()
+
+
+@dataclass
+class PendingToolExecution:
+    """Tracks a background tool execution task."""
+
+    response_id: int
+    transcript: list[dict[str, Any]]
+    tool_calls: list[dict[str, Any]]
+    assistant_text: str
+    task: asyncio.Task[None]
 
 
 class RetellLLMServer:
@@ -87,11 +101,20 @@ class RetellLLMServer:
             enabled_tool_ids=enabled_tool_ids,
         )
 
+        # State for concurrent handling - allows tool execution without blocking WebSocket
+        self._pending_tool_execution: PendingToolExecution | None = None
+        self._response_queue: asyncio.Queue[dict[str, Any]] = asyncio.Queue()
+        self._shutdown: asyncio.Event = asyncio.Event()
+        self._current_response_id: int = 0
+
     async def handle_connection(self) -> None:
         """Main WebSocket handler for Retell LLM communication.
 
-        Processes incoming messages and routes them to appropriate handlers.
-        Runs until the connection is closed.
+        Uses concurrent architecture to prevent tool execution from blocking:
+        - _message_receiver: Reads WebSocket messages, always responds to ping_pong
+        - _response_sender: Sends queued responses from background tool execution
+
+        This ensures ping_pong is always answered even during slow tool execution.
         """
         from starlette.websockets import WebSocketDisconnect
 
@@ -101,35 +124,90 @@ class RetellLLMServer:
             # Send initial configuration
             await self._send_config()
 
-            # Process incoming messages
+            # Run message receiver and response sender concurrently
+            # This allows us to respond to ping_pong while tools execute in background
+            await asyncio.gather(
+                self._message_receiver(),
+                self._response_sender(),
+                return_exceptions=True,
+            )
+
+        except WebSocketDisconnect:
+            self.logger.info("retell_closed_connection")
+        except Exception as e:
+            if "WebSocket" in str(e) or "disconnect" in str(e).lower():
+                self.logger.info("connection_closed", reason=str(e))
+            else:
+                self.logger.exception("connection_error", error=str(e))
+        finally:
+            # Clean shutdown
+            self._shutdown.set()
+            await self._cancel_pending_tool_execution()
+            self.logger.info("retell_llm_connection_closed")
+
+    async def _message_receiver(self) -> None:
+        """Read WebSocket messages and route to handlers.
+
+        CRITICAL: This method NEVER blocks on tool execution.
+        Tools are spawned as background tasks so ping_pong always gets answered.
+        """
+        from starlette.websockets import WebSocketDisconnect
+
+        try:
             async for message in self.websocket.iter_text():
+                if self._shutdown.is_set():
+                    break
+
                 try:
                     data = json.loads(message)
                     await self._handle_message(data)
                 except json.JSONDecodeError as e:
                     self.logger.warning("invalid_json", error=str(e))
                 except WebSocketDisconnect:
-                    # Normal disconnection during message handling - don't log as error
                     self.logger.info("websocket_disconnected_during_handling")
                     break
                 except Exception as e:
-                    # Only log as error if it's not a normal disconnect
                     if "WebSocket" in str(e) or "disconnect" in str(e).lower():
                         self.logger.info("websocket_closed", reason=str(e))
                     else:
                         self.logger.exception("message_handler_error", error=str(e))
 
         except WebSocketDisconnect:
-            # Normal disconnection - Retell closed the connection
-            self.logger.info("retell_closed_connection")
-        except Exception as e:
-            # Only log unexpected errors
-            if "WebSocket" in str(e) or "disconnect" in str(e).lower():
-                self.logger.info("connection_closed", reason=str(e))
-            else:
-                self.logger.exception("connection_error", error=str(e))
+            pass
         finally:
-            self.logger.info("retell_llm_connection_closed")
+            self._shutdown.set()
+
+    async def _response_sender(self) -> None:
+        """Process queued responses from background tool execution.
+
+        Runs concurrently with _message_receiver, checking the queue for
+        tool results that need to be sent back to Retell.
+        """
+        while not self._shutdown.is_set():
+            try:
+                # Short timeout to check shutdown flag frequently
+                item = await asyncio.wait_for(self._response_queue.get(), timeout=0.1)
+            except TimeoutError:
+                continue
+
+            try:
+                if item["type"] == "tool_results":
+                    await self._continue_after_tools_from_queue(item)
+                elif item["type"] == "special_action":
+                    await self._handle_special_action_from_queue(item)
+                elif item["type"] == "error":
+                    await self._send_error_response(item["response_id"])
+            except Exception as e:
+                self.logger.exception("response_sender_error", error=str(e))
+
+    async def _cancel_pending_tool_execution(self) -> None:
+        """Cancel any pending tool execution on shutdown or interruption."""
+        if self._pending_tool_execution:
+            self._pending_tool_execution.task.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await self._pending_tool_execution.task
+            self._pending_tool_execution = None
+            self.logger.info("tool_execution_cancelled")
 
     async def _send_config(self) -> None:
         """Send initial configuration to Retell.
@@ -250,14 +328,22 @@ class RetellLLMServer:
         This is the main response generation flow:
         1. Get transcript from Retell
         2. Generate streaming response from Claude
-        3. If Claude calls tools, execute them
-        4. Stream final response back to Retell
+        3. If Claude calls tools, spawn BACKGROUND task (don't block!)
+        4. Return immediately so we can handle ping_pong while tools run
 
         Args:
             data: Request data including transcript and response_id
         """
         response_id = data.get("response_id", 0)
         transcript = data.get("transcript", [])
+
+        # Track current response_id for stale response detection
+        self._current_response_id = response_id
+
+        # If user interrupted during tool execution, cancel it
+        if self._pending_tool_execution:
+            self.logger.info("user_interrupted_tool_execution")
+            await self._cancel_pending_tool_execution()
 
         self.logger.info(
             "generating_response",
@@ -304,12 +390,7 @@ class RetellLLMServer:
 
         # Execute any pending tool calls
         if pending_tool_calls:
-            # CRITICAL: ALWAYS mark the response complete BEFORE executing tools
-            # Retell has a ~1-2 second timeout - if we don't send content_complete=True,
-            # Retell will disconnect and reconnect thinking we've stalled
-            #
-            # If Claude didn't say anything before calling tools, send a brief
-            # "thinking" message so the user knows something is happening
+            # Send "thinking" message if Claude didn't say anything
             if not accumulated_content:
                 accumulated_content = "One moment..."
                 await self._send_response(
@@ -318,26 +399,43 @@ class RetellLLMServer:
                     content_complete=False,
                 )
 
-            # Now mark the response complete - this tells Retell we're done speaking
-            # and can start processing (executing tools) in the background
+            # Mark response complete - tells Retell we're done speaking for now
             await self._send_response(
                 response_id=response_id,
                 content="",
                 content_complete=True,
             )
 
-            # Pass the accumulated text that Claude said BEFORE the tool calls
-            # This is critical - Claude's API needs both text and tool_use in the same message
-            await self._execute_tool_calls(
-                response_id, transcript, pending_tool_calls, accumulated_content
+            # CRITICAL: Spawn background task - DON'T AWAIT!
+            # This returns immediately so we can handle ping_pong while tools run
+            task = asyncio.create_task(
+                self._execute_tools_background(
+                    response_id=response_id,
+                    transcript=transcript,
+                    tool_calls=pending_tool_calls,
+                    assistant_text=accumulated_content,
+                )
             )
-        else:
-            # No tools - mark response complete
-            await self._send_response(
+            self._pending_tool_execution = PendingToolExecution(
                 response_id=response_id,
-                content="",
-                content_complete=True,
+                transcript=transcript,
+                tool_calls=pending_tool_calls,
+                assistant_text=accumulated_content,
+                task=task,
             )
+            self.logger.info(
+                "tool_execution_spawned_background",
+                tool_count=len(pending_tool_calls),
+            )
+            # Return immediately - don't block!
+            return
+
+        # No tools - mark response complete
+        await self._send_response(
+            response_id=response_id,
+            content="",
+            content_complete=True,
+        )
 
     async def _handle_reminder_required(self, data: dict[str, Any]) -> None:
         """Handle reminder when user has been silent.
@@ -380,6 +478,263 @@ class RetellLLMServer:
         await self._send_response(
             response_id=response_id,
             content="",
+            content_complete=True,
+        )
+
+    async def _execute_tools_background(
+        self,
+        response_id: int,
+        transcript: list[dict[str, Any]],
+        tool_calls: list[dict[str, Any]],
+        assistant_text: str = "",
+    ) -> None:
+        """Execute tools in background and queue results for sending.
+
+        This runs as a background task so it doesn't block the WebSocket handler.
+        Results are put in the response queue for _response_sender to process.
+
+        Args:
+            response_id: Retell response ID
+            transcript: Current conversation transcript
+            tool_calls: List of tool calls to execute
+            assistant_text: Text Claude said BEFORE the tool calls
+        """
+        try:
+            tool_results: list[dict[str, Any]] = []
+
+            for tool_call in tool_calls:
+                tool_name = tool_call.get("name", "")
+                tool_use_id = tool_call.get("tool_use_id", str(uuid.uuid4()))
+                arguments = tool_call.get("arguments", {})
+
+                self.logger.info(
+                    "executing_tool_background",
+                    tool_name=tool_name,
+                    tool_use_id=tool_use_id,
+                )
+
+                # Execute the tool
+                try:
+                    result = await self.tool_registry.execute_tool(tool_name, arguments)
+                    is_error = False
+                except Exception as e:
+                    self.logger.exception("tool_execution_error", tool_name=tool_name, error=str(e))
+                    result = {"error": str(e)}
+                    is_error = True
+
+                # Check for special actions
+                if isinstance(result, dict):
+                    if result.get("action") == "end_call":
+                        await self._response_queue.put(
+                            {
+                                "type": "special_action",
+                                "action": "end_call",
+                                "response_id": response_id,
+                                "message": result.get("message", "Goodbye!"),
+                            }
+                        )
+                        return
+
+                    if result.get("action") == "transfer_call":
+                        await self._response_queue.put(
+                            {
+                                "type": "special_action",
+                                "action": "transfer_call",
+                                "response_id": response_id,
+                                "message": result.get("message", "Transferring you now."),
+                                "transfer_number": result.get("transfer_number"),
+                            }
+                        )
+                        return
+
+                # Collect result for Claude
+                tool_results.append(
+                    format_tool_result_for_claude(
+                        tool_use_id=tool_use_id,
+                        result=result,
+                        is_error=is_error,
+                    )
+                )
+
+            # Queue results for continuation
+            await self._response_queue.put(
+                {
+                    "type": "tool_results",
+                    "response_id": response_id,
+                    "transcript": transcript,
+                    "tool_calls": tool_calls,
+                    "tool_results": tool_results,
+                    "assistant_text": assistant_text,
+                }
+            )
+            self.logger.info(
+                "tool_results_queued",
+                tool_count=len(tool_calls),
+                result_count=len(tool_results),
+            )
+
+        except asyncio.CancelledError:
+            self.logger.info("tool_execution_cancelled")
+            raise
+        except Exception as e:
+            self.logger.exception("tool_execution_background_error", error=str(e))
+            await self._response_queue.put(
+                {
+                    "type": "error",
+                    "response_id": response_id,
+                    "error": str(e),
+                }
+            )
+        finally:
+            self._pending_tool_execution = None
+
+    async def _continue_after_tools_from_queue(self, item: dict[str, Any]) -> None:
+        """Continue conversation after tools complete (called from response sender).
+
+        Args:
+            item: Queued item with tool results
+        """
+        response_id = item["response_id"]
+        transcript = item["transcript"]
+        tool_calls = item["tool_calls"]
+        tool_results = item["tool_results"]
+        assistant_text = item["assistant_text"]
+
+        # Check if response is stale (user may have interrupted)
+        if self._current_response_id != response_id:
+            self.logger.warning(
+                "stale_tool_response_discarded",
+                stale_id=response_id,
+                current_id=self._current_response_id,
+            )
+            return
+
+        self.logger.info(
+            "continuing_after_tools",
+            tool_call_count=len(tool_calls),
+            tool_result_count=len(tool_results),
+        )
+
+        # Continue conversation with Claude using tool results
+        accumulated_text = ""
+        new_tool_calls: list[dict[str, Any]] = []
+
+        async for event in self.claude.generate_with_tool_results(
+            transcript=transcript,
+            system_prompt=self.system_prompt,
+            tools=self.openai_tools,
+            tool_calls=tool_calls,
+            tool_results=tool_results,
+            assistant_text_before_tools=assistant_text,
+            temperature=self.agent_config.get("temperature", 0.7),
+        ):
+            event_type = event.get("type")
+
+            if event_type == "text_delta":
+                delta = event.get("delta", "")
+                accumulated_text += delta
+                await self._send_response(
+                    response_id=response_id,
+                    content=delta,
+                    content_complete=False,
+                )
+
+            elif event_type == "tool_use":
+                # Claude wants another tool - collect for recursive execution
+                new_tool_call = event.get("tool_call", {})
+                new_tool_calls.append(new_tool_call)
+                self.logger.info(
+                    "recursive_tool_call_detected",
+                    tool_name=new_tool_call.get("name"),
+                )
+
+            elif event_type == "error":
+                self.logger.error("claude_error_after_tools", error=event.get("error"))
+                await self._send_response(
+                    response_id=response_id,
+                    content="I apologize, I'm having trouble. Could you repeat?",
+                    content_complete=True,
+                )
+                return
+
+        # Handle recursive tool calls
+        if new_tool_calls:
+            if not accumulated_text:
+                accumulated_text = "Let me check on that..."
+                await self._send_response(
+                    response_id=response_id,
+                    content=accumulated_text,
+                    content_complete=False,
+                )
+
+            await self._send_response(
+                response_id=response_id,
+                content="",
+                content_complete=True,
+            )
+
+            # Spawn another background task for recursive tools
+            updated_transcript = list(transcript)
+            updated_transcript.append({"role": "agent", "content": accumulated_text})
+
+            task = asyncio.create_task(
+                self._execute_tools_background(
+                    response_id=response_id,
+                    transcript=updated_transcript,
+                    tool_calls=new_tool_calls,
+                    assistant_text=accumulated_text,
+                )
+            )
+            self._pending_tool_execution = PendingToolExecution(
+                response_id=response_id,
+                transcript=updated_transcript,
+                tool_calls=new_tool_calls,
+                assistant_text=accumulated_text,
+                task=task,
+            )
+            return
+
+        # Mark response complete
+        await self._send_response(
+            response_id=response_id,
+            content="",
+            content_complete=True,
+        )
+
+    async def _handle_special_action_from_queue(self, item: dict[str, Any]) -> None:
+        """Handle special actions (end_call, transfer_call) from queue.
+
+        Args:
+            item: Queued special action item
+        """
+        response_id = item["response_id"]
+        action = item["action"]
+        message = item.get("message", "")
+
+        if action == "end_call":
+            await self._send_response(
+                response_id=response_id,
+                content=message,
+                content_complete=True,
+                end_call=True,
+            )
+        elif action == "transfer_call":
+            await self._send_response(
+                response_id=response_id,
+                content=message,
+                content_complete=True,
+                transfer_number=item.get("transfer_number"),
+            )
+
+    async def _send_error_response(self, response_id: int) -> None:
+        """Send error response when tool execution fails.
+
+        Args:
+            response_id: Retell response ID
+        """
+        await self._send_response(
+            response_id=response_id,
+            content="I apologize, I encountered an issue. How else can I help?",
             content_complete=True,
         )
 
