@@ -402,10 +402,10 @@ export default function AgentsPage() {
                     >
                       {agent.is_active ? "Active" : "Inactive"}
                     </Badge>
-                    {agent.phone_number_id ? (
+                    {agent.phone_number ? (
                       <Badge variant="outline" className="h-5 px-1.5 text-[10px]">
                         <Phone className="mr-0.5 h-2.5 w-2.5 text-green-500" />
-                        Phone
+                        {agent.phone_number}
                       </Badge>
                     ) : null}
                     {agent.enabled_tools.length > 0 && (
