@@ -17,8 +17,8 @@ RUN pip install --no-cache-dir uv
 # Copy dependency files first (for layer caching)
 COPY pyproject.toml uv.lock README.md ./
 
-# Install dependencies (production only, no dev dependencies)
-RUN uv sync --frozen --no-dev
+# Install dependencies only (skip building local package)
+RUN uv sync --frozen --no-dev --no-install-project
 
 # Copy application code
 COPY app ./app
