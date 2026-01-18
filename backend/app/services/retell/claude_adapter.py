@@ -158,7 +158,7 @@ class ClaudeAdapter:
                 "error": str(e),
             }
 
-    async def generate_with_tool_results(
+    async def generate_with_tool_results(  # noqa: PLR0912, PLR0915
         self,
         transcript: list[dict[str, Any]],
         system_prompt: str,
@@ -206,30 +206,38 @@ class ClaudeAdapter:
             # Add text block if Claude said something before tool calls
             # CRITICAL: Must strip whitespace - Claude API rejects trailing whitespace
             if assistant_text_before_tools and assistant_text_before_tools.strip():
-                assistant_content.append({
-                    "type": "text",
-                    "text": assistant_text_before_tools.strip(),
-                })
+                assistant_content.append(
+                    {
+                        "type": "text",
+                        "text": assistant_text_before_tools.strip(),
+                    }
+                )
 
             # Add tool_use blocks
             for tc in tool_calls:
-                assistant_content.append({
-                    "type": "tool_use",
-                    "id": tc.get("tool_use_id"),
-                    "name": tc.get("name"),
-                    "input": tc.get("arguments", {}),
-                })
+                assistant_content.append(
+                    {
+                        "type": "tool_use",
+                        "id": tc.get("tool_use_id"),
+                        "name": tc.get("name"),
+                        "input": tc.get("arguments", {}),
+                    }
+                )
 
-            messages.append({
-                "role": "assistant",
-                "content": assistant_content,
-            })
+            messages.append(
+                {
+                    "role": "assistant",
+                    "content": assistant_content,
+                }
+            )
 
             # Add user message with tool_result blocks
-            messages.append({
-                "role": "user",
-                "content": tool_results,
-            })
+            messages.append(
+                {
+                    "role": "user",
+                    "content": tool_results,
+                }
+            )
 
         claude_tools = openai_tools_to_claude(tools) if tools else None
 
@@ -244,14 +252,10 @@ class ClaudeAdapter:
         if len(messages) >= min_messages_for_tool_continuation:
             self.logger.debug(
                 "tool_continuation_messages",
-                assistant_msg_content_types=[
-                    c.get("type") for c in messages[-2].get("content", [])
-                ]
+                assistant_msg_content_types=[c.get("type") for c in messages[-2].get("content", [])]
                 if isinstance(messages[-2].get("content"), list)
                 else "string",
-                user_msg_content_types=[
-                    c.get("type") for c in messages[-1].get("content", [])
-                ]
+                user_msg_content_types=[c.get("type") for c in messages[-1].get("content", [])]
                 if isinstance(messages[-1].get("content"), list)
                 else "string",
             )
@@ -271,6 +275,10 @@ class ClaudeAdapter:
                 self.logger.debug("claude_stream_opened")
                 event_count = 0
 
+                # Track tool calls - Claude may call another tool after getting results
+                current_tool_use: dict[str, Any] | None = None
+                current_tool_input = ""
+
                 async for event in stream:
                     event_count += 1
                     self.logger.debug(
@@ -279,13 +287,52 @@ class ClaudeAdapter:
                         event_count=event_count,
                     )
 
-                    if event.type == "content_block_delta":
+                    if event.type == "content_block_start":
+                        # Check if Claude is starting a new tool call
+                        block = event.content_block
+                        if block.type == "tool_use":
+                            current_tool_use = {
+                                "id": block.id,
+                                "name": block.name,
+                            }
+                            current_tool_input = ""
+
+                    elif event.type == "content_block_delta":
                         delta = event.delta
                         if delta.type == "text_delta":
                             yield {
                                 "type": "text_delta",
                                 "delta": delta.text,
                             }
+                        elif delta.type == "input_json_delta":
+                            # Tool input being streamed
+                            current_tool_input += delta.partial_json
+
+                    elif event.type == "content_block_stop":
+                        # Content block finished - if it was a tool, yield it
+                        if current_tool_use:
+                            import json as json_module
+
+                            try:
+                                tool_input = (
+                                    json_module.loads(current_tool_input)
+                                    if current_tool_input
+                                    else {}
+                                )
+                            except json_module.JSONDecodeError:
+                                tool_input = {}
+
+                            # Yield tool call for recursive execution
+                            yield {
+                                "type": "tool_use",
+                                "tool_call": {
+                                    "tool_use_id": current_tool_use["id"],
+                                    "name": current_tool_use["name"],
+                                    "arguments": tool_input,
+                                },
+                            }
+                            current_tool_use = None
+                            current_tool_input = ""
 
                     elif event.type == "message_stop":
                         self.logger.debug("claude_stream_complete", total_events=event_count)
@@ -332,10 +379,12 @@ class ClaudeAdapter:
 
         for utterance in transcript:
             role = utterance.get("role", "")
-            content = utterance.get("content", "")
+            # CRITICAL: Strip whitespace from content - Claude API rejects trailing whitespace
+            # Speech-to-text engines often include trailing spaces from silence gaps
+            content = utterance.get("content", "").strip()
 
             # Skip empty content
-            if not content or not content.strip():
+            if not content:
                 continue
 
             # Map Retell roles to Claude roles

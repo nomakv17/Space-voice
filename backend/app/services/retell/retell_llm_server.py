@@ -461,6 +461,9 @@ class RetellLLMServer:
         )
 
         has_response = False
+        accumulated_text = ""
+        new_tool_calls: list[dict[str, Any]] = []
+
         async for event in self.claude.generate_with_tool_results(
             transcript=transcript,
             system_prompt=self.system_prompt,
@@ -474,10 +477,21 @@ class RetellLLMServer:
 
             if event_type == "text_delta":
                 has_response = True
+                delta = event.get("delta", "")
+                accumulated_text += delta
                 await self._send_response(
                     response_id=response_id,
-                    content=event.get("delta", ""),
+                    content=delta,
                     content_complete=False,
+                )
+
+            elif event_type == "tool_use":
+                # Claude wants to call another tool - collect it for recursive execution
+                new_tool_call = event.get("tool_call", {})
+                new_tool_calls.append(new_tool_call)
+                self.logger.info(
+                    "recursive_tool_call_detected",
+                    tool_name=new_tool_call.get("name"),
                 )
 
             elif event_type == "error":
@@ -492,6 +506,30 @@ class RetellLLMServer:
                     content_complete=True,
                 )
                 return
+
+        # If Claude called more tools, execute them recursively
+        if new_tool_calls:
+            # Mark current text response complete before executing new tools
+            if accumulated_text:
+                await self._send_response(
+                    response_id=response_id,
+                    content="",
+                    content_complete=True,
+                )
+
+            # Build updated transcript with the current exchange
+            updated_transcript: list[dict[str, Any]] = list(transcript)
+            if accumulated_text:
+                updated_transcript.append({"role": "agent", "content": accumulated_text})
+
+            # Recursively execute the new tools
+            await self._execute_tool_calls(
+                response_id=response_id,
+                transcript=updated_transcript,
+                tool_calls=new_tool_calls,
+                assistant_text=accumulated_text,
+            )
+            return
 
         # Mark response complete
         if not has_response:
