@@ -306,15 +306,27 @@ class RetellLLMServer:
 
         # Execute any pending tool calls
         if pending_tool_calls:
-            # CRITICAL: Mark the text response complete BEFORE executing tools
-            # Retell has a short timeout - if we don't send content_complete=True,
+            # CRITICAL: ALWAYS mark the response complete BEFORE executing tools
+            # Retell has a ~1-2 second timeout - if we don't send content_complete=True,
             # Retell will disconnect and reconnect thinking we've stalled
-            if accumulated_content:
+            #
+            # If Claude didn't say anything before calling tools, send a brief
+            # "thinking" message so the user knows something is happening
+            if not accumulated_content:
+                accumulated_content = "One moment..."
                 await self._send_response(
                     response_id=response_id,
-                    content="",
-                    content_complete=True,
+                    content=accumulated_content,
+                    content_complete=False,
                 )
+
+            # Now mark the response complete - this tells Retell we're done speaking
+            # and can start processing (executing tools) in the background
+            await self._send_response(
+                response_id=response_id,
+                content="",
+                content_complete=True,
+            )
 
             # Pass the accumulated text that Claude said BEFORE the tool calls
             # This is critical - Claude's API needs both text and tool_use in the same message
@@ -515,18 +527,26 @@ class RetellLLMServer:
 
         # If Claude called more tools, execute them recursively
         if new_tool_calls:
-            # Mark current text response complete before executing new tools
-            if accumulated_text:
+            # CRITICAL: ALWAYS mark response complete before executing more tools
+            # If Claude didn't say anything, send a brief "thinking" message
+            if not accumulated_text:
+                accumulated_text = "Let me check on that..."
                 await self._send_response(
                     response_id=response_id,
-                    content="",
-                    content_complete=True,
+                    content=accumulated_text,
+                    content_complete=False,
                 )
+
+            # Mark response complete - tells Retell we're done speaking
+            await self._send_response(
+                response_id=response_id,
+                content="",
+                content_complete=True,
+            )
 
             # Build updated transcript with the current exchange
             updated_transcript: list[dict[str, Any]] = list(transcript)
-            if accumulated_text:
-                updated_transcript.append({"role": "agent", "content": accumulated_text})
+            updated_transcript.append({"role": "agent", "content": accumulated_text})
 
             # Recursively execute the new tools
             await self._execute_tool_calls(
