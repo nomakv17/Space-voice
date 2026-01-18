@@ -27,9 +27,7 @@ from fastapi import WebSocket
 
 from app.services.retell.claude_adapter import ClaudeAdapter
 from app.services.retell.tool_converter import (
-    format_tool_call_for_retell,
     format_tool_result_for_claude,
-    format_tool_result_for_retell,
 )
 from app.services.tools.registry import ToolRegistry
 
@@ -413,14 +411,9 @@ class RetellLLMServer:
                 tool_use_id=tool_use_id,
             )
 
-            # Notify Retell about tool invocation
-            await self._send(
-                format_tool_call_for_retell(
-                    tool_use_id=tool_use_id,
-                    tool_name=tool_name,
-                    arguments=arguments,
-                )
-            )
+            # NOTE: We do NOT notify Retell about tool execution
+            # Retell's Custom LLM protocol doesn't support tool_call_invocation messages
+            # Tool execution is invisible to Retell - we just execute and continue
 
             # Execute the tool
             try:
@@ -431,13 +424,9 @@ class RetellLLMServer:
                 result = {"error": str(e)}
                 is_error = True
 
-            # Send tool result to Retell
-            await self._send(
-                format_tool_result_for_retell(
-                    tool_call_id=tool_use_id,
-                    result=result,
-                )
-            )
+            # NOTE: We do NOT send tool results to Retell
+            # Retell's Custom LLM protocol doesn't support tool_call_result messages
+            # Results are only sent to Claude for continuing the conversation
 
             # Collect result for Claude
             tool_results.append(
