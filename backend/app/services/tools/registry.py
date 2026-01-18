@@ -8,7 +8,9 @@ from app.services.tools.calendly_tools import CalendlyTools
 from app.services.tools.call_control_tools import CallControlTools
 from app.services.tools.crm_tools import CRMTools
 from app.services.tools.gohighlevel_tools import GoHighLevelTools
+from app.services.tools.google_calendar_tools import GoogleCalendarTools
 from app.services.tools.hvac_triage_tools import HVACTriageTools
+from app.services.tools.jobber_tools import JobberTools
 from app.services.tools.shopify_tools import ShopifyTools
 from app.services.tools.sms_tools import TelnyxSMSTools, TwilioSMSTools
 
@@ -45,6 +47,8 @@ class ToolRegistry:
         self.crm_tools = CRMTools(db, user_id, workspace_id=workspace_id)
         self._ghl_tools: GoHighLevelTools | None = None
         self._calendly_tools: CalendlyTools | None = None
+        self._google_calendar_tools: GoogleCalendarTools | None = None
+        self._jobber_tools: JobberTools | None = None
         self._shopify_tools: ShopifyTools | None = None
         self._twilio_sms_tools: TwilioSMSTools | None = None
         self._telnyx_sms_tools: TelnyxSMSTools | None = None
@@ -75,6 +79,36 @@ class ToolRegistry:
                 access_token=creds["access_token"],
             )
             return self._calendly_tools
+
+        return None
+
+    def _get_google_calendar_tools(self) -> GoogleCalendarTools | None:
+        """Get Google Calendar tools if credentials are available."""
+        if self._google_calendar_tools:
+            return self._google_calendar_tools
+
+        creds = self.integrations.get("google-calendar")
+        if creds and creds.get("access_token"):
+            self._google_calendar_tools = GoogleCalendarTools(
+                access_token=creds["access_token"],
+                refresh_token=creds.get("refresh_token"),
+            )
+            return self._google_calendar_tools
+
+        return None
+
+    def _get_jobber_tools(self) -> JobberTools | None:
+        """Get Jobber tools if credentials are available."""
+        if self._jobber_tools:
+            return self._jobber_tools
+
+        creds = self.integrations.get("jobber")
+        if creds and creds.get("access_token"):
+            self._jobber_tools = JobberTools(
+                access_token=creds["access_token"],
+                refresh_token=creds.get("refresh_token"),
+            )
+            return self._jobber_tools
 
         return None
 
@@ -188,6 +222,16 @@ class ToolRegistry:
             calendly_tools = CalendlyTools.get_tool_definitions()
             tools.extend(filter_tools("calendly", calendly_tools))
 
+        # Google Calendar tools
+        if "google-calendar" in enabled_tools and self._get_google_calendar_tools():
+            gcal_tools = GoogleCalendarTools.get_tool_definitions()
+            tools.extend(filter_tools("google-calendar", gcal_tools))
+
+        # Jobber tools (HVAC field service management)
+        if "jobber" in enabled_tools and self._get_jobber_tools():
+            jobber_tools = JobberTools.get_tool_definitions()
+            tools.extend(filter_tools("jobber", jobber_tools))
+
         # Shopify tools
         if "shopify" in enabled_tools and self._get_shopify_tools():
             shopify_tools = ShopifyTools.get_tool_definitions()
@@ -290,6 +334,44 @@ class ToolRegistry:
                 }
             return await calendly_tools.execute_tool(tool_name, arguments)
 
+        # Google Calendar tools
+        google_calendar_tool_names = {
+            "google_calendar_list_calendars",
+            "google_calendar_check_availability",
+            "google_calendar_create_event",
+            "google_calendar_list_events",
+            "google_calendar_cancel_event",
+        }
+
+        if tool_name in google_calendar_tool_names:
+            gcal_tools = self._get_google_calendar_tools()
+            if not gcal_tools:
+                return {
+                    "success": False,
+                    "error": "Google Calendar integration not configured. Please add your OAuth credentials.",
+                }
+            return await gcal_tools.execute_tool(tool_name, arguments)
+
+        # Jobber tools (HVAC field service management)
+        jobber_tool_names = {
+            "jobber_search_clients",
+            "jobber_create_client",
+            "jobber_get_client",
+            "jobber_create_job",
+            "jobber_list_jobs",
+            "jobber_create_quote",
+            "jobber_schedule_visit",
+        }
+
+        if tool_name in jobber_tool_names:
+            jobber_tools = self._get_jobber_tools()
+            if not jobber_tools:
+                return {
+                    "success": False,
+                    "error": "Jobber integration not configured. Please add your OAuth credentials.",
+                }
+            return await jobber_tools.execute_tool(tool_name, arguments)
+
         # Shopify tools
         shopify_tool_names = {
             "shopify_search_orders",
@@ -360,6 +442,10 @@ class ToolRegistry:
             await self._ghl_tools.close()
         if self._calendly_tools:
             await self._calendly_tools.close()
+        if self._google_calendar_tools:
+            await self._google_calendar_tools.close()
+        if self._jobber_tools:
+            await self._jobber_tools.close()
         if self._shopify_tools:
             await self._shopify_tools.close()
         if self._twilio_sms_tools:

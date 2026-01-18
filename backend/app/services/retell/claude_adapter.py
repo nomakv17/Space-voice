@@ -23,7 +23,8 @@ from app.services.retell.tool_converter import (
 logger = structlog.get_logger()
 
 # Claude model for voice conversations
-# Using Claude 4.5 Sonnet for best balance of speed and capability
+# Using Claude Sonnet 4 for best quality in voice conversations
+# Sonnet provides better reasoning and more natural responses
 CLAUDE_MODEL = "claude-sonnet-4-20250514"
 
 

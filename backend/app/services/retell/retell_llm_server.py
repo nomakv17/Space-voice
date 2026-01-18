@@ -77,6 +77,7 @@ class RetellLLMServer:
 
         self.session_id = str(uuid.uuid4())
         self.call_id: str | None = None
+        self.caller_phone: str | None = None  # Stored when call_details received
         self.logger = logger.bind(
             component="retell_llm_server",
             session_id=self.session_id,
@@ -204,14 +205,19 @@ class RetellLLMServer:
         """
         call = data.get("call", {})
         self.call_id = call.get("call_id")
+        self.caller_phone = call.get("from_number")  # Store caller's phone number
 
         self.logger = self.logger.bind(call_id=self.call_id)
         self.logger.info(
             "call_details_received",
-            from_number=call.get("from_number"),
+            from_number=self.caller_phone,
             to_number=call.get("to_number"),
             metadata=call.get("metadata"),
         )
+
+        # Append caller phone info to system prompt so agent can use it for SMS/booking
+        if self.caller_phone:
+            self.system_prompt += f"\n\nCALLER INFORMATION:\n- Caller Phone: {self.caller_phone}\n- Use this phone number for SMS confirmations and include in booking descriptions."
 
         # Send initial greeting - the agent must speak first in Custom LLM mode
         await self._send_initial_greeting()
