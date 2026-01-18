@@ -38,8 +38,10 @@ htmlcov
 !.env.example
 
 # Documentation
-*.md
 docs/
+# Keep README.md (needed for build), exclude others
+CHANGELOG.md
+CONTRIBUTING.md
 
 # Tests (not needed in production)
 tests/
