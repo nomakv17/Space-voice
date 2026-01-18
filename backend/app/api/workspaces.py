@@ -719,3 +719,74 @@ async def set_agent_workspaces(
             status_code=503,
             detail="Database temporarily unavailable. Please try again later.",
         ) from e
+
+
+# --- Demo Workspace ---
+
+
+class DemoWorkspaceResponse(BaseModel):
+    """Response for demo workspace creation."""
+
+    workspace_id: str
+    workspace_name: str
+    contacts_created: int
+    appointments_created: int
+    agents_linked: int
+    message: str
+
+
+@router.post("/demo/seed", response_model=DemoWorkspaceResponse, status_code=201)
+@limiter.limit("5/hour")
+async def seed_demo_workspace(
+    request: Request,
+    current_user: CurrentUser,
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, Any]:
+    """Create a demo workspace with sample HVAC data.
+
+    This creates:
+    - A "Demo HVAC Business" workspace
+    - 8 sample HVAC contacts (homeowners, businesses)
+    - 5 sample appointments (past and upcoming)
+    - Links all user's agents to the demo workspace
+
+    Rate limited to 5 per hour to prevent abuse.
+    """
+    from app.scripts.seed_demo import seed_demo_workspace as run_seeder
+
+    user_id = current_user.id
+
+    try:
+        result = await run_seeder(user_id=user_id)
+
+        if "error" in result:
+            raise HTTPException(status_code=400, detail=result["error"])
+
+        if result.get("existing"):
+            return {
+                "workspace_id": result["workspace_id"],
+                "workspace_name": "Demo HVAC Business",
+                "contacts_created": 0,
+                "appointments_created": 0,
+                "agents_linked": 0,
+                "message": "Demo workspace already exists",
+            }
+
+        logger.info("Created demo workspace for user %d: %s", user_id, result["workspace_id"])
+
+        return {
+            "workspace_id": result["workspace_id"],
+            "workspace_name": result["workspace_name"],
+            "contacts_created": result["contacts_created"],
+            "appointments_created": result["appointments_created"],
+            "agents_linked": result["agents_linked"],
+            "message": "Demo workspace created successfully with sample data",
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("Error creating demo workspace for user %d", user_id)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to create demo workspace: {e!s}",
+        ) from e

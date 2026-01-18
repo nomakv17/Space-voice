@@ -1,7 +1,7 @@
-"""Retell Custom LLM WebSocket Server using Claude 4.5 Sonnet.
+"""Retell Custom LLM WebSocket Server.
 
 This server implements Retell's Custom LLM WebSocket protocol, allowing
-Claude to power voice conversations while Retell handles:
+LLMs (Claude or GPT-4o) to power voice conversations while Retell handles:
 - Speech-to-Text (STT)
 - Text-to-Speech (TTS)
 - Barge-in detection
@@ -29,10 +29,14 @@ import structlog
 from fastapi import WebSocket
 
 from app.services.retell.claude_adapter import ClaudeAdapter
+from app.services.retell.openai_adapter import OpenAIAdapter
 from app.services.retell.tool_converter import (
     format_tool_result_for_claude,
 )
 from app.services.tools.registry import ToolRegistry
+
+# Type alias for LLM adapters (both have same interface)
+LLMAdapter = ClaudeAdapter | OpenAIAdapter
 
 logger = structlog.get_logger()
 
@@ -61,7 +65,7 @@ class RetellLLMServer:
     def __init__(
         self,
         websocket: WebSocket,
-        claude_adapter: ClaudeAdapter,
+        llm_adapter: LLMAdapter,
         tool_registry: ToolRegistry,
         system_prompt: str,
         enabled_tools: list[str],
@@ -72,7 +76,7 @@ class RetellLLMServer:
 
         Args:
             websocket: FastAPI WebSocket connection
-            claude_adapter: Claude API adapter for generating responses
+            llm_adapter: LLM adapter (Claude or OpenAI) for generating responses
             tool_registry: Registry of available tools
             system_prompt: Agent's system prompt (already voice-optimized)
             enabled_tools: List of enabled tool integration IDs
@@ -80,7 +84,7 @@ class RetellLLMServer:
             agent_config: Additional agent configuration (temperature, language, etc.)
         """
         self.websocket = websocket
-        self.claude = claude_adapter
+        self.llm = llm_adapter
         self.tool_registry = tool_registry
         self.system_prompt = system_prompt
         self.enabled_tools = enabled_tools
@@ -355,38 +359,65 @@ class RetellLLMServer:
         accumulated_content = ""
         pending_tool_calls: list[dict[str, Any]] = []
 
-        async for event in self.claude.generate_response(
-            transcript=transcript,
-            system_prompt=self.system_prompt,
-            tools=self.openai_tools,
-            temperature=self.agent_config.get("temperature", 0.7),
-            max_tokens=self.agent_config.get("max_tokens", 1024),
-        ):
-            event_type = event.get("type")
+        # Keepalive mechanism: Track last activity time
+        # Retell times out after ~5-7 seconds of inactivity
+        last_activity_time = [asyncio.get_event_loop().time()]
+        keepalive_interval = 2.0
 
-            if event_type == "text_delta":
-                # Stream text content to Retell
-                delta = event.get("delta", "")
-                accumulated_content += delta
-                await self._send_response(
-                    response_id=response_id,
-                    content=delta,
-                    content_complete=False,
-                )
+        async def send_keepalives() -> None:
+            """Background task to send keepalives during Claude's thinking time."""
+            while True:
+                await asyncio.sleep(keepalive_interval)
+                time_since_activity = asyncio.get_event_loop().time() - last_activity_time[0]
+                if time_since_activity >= keepalive_interval:
+                    self.logger.debug("sending_keepalive_initial", seconds_since_activity=time_since_activity)
+                    await self._send_response(
+                        response_id=response_id,
+                        content="",
+                        content_complete=False,
+                    )
+                    last_activity_time[0] = asyncio.get_event_loop().time()
 
-            elif event_type == "tool_use":
-                # Tool call detected
-                tool_call = event.get("tool_call", {})
-                pending_tool_calls.append(tool_call)
+        keepalive_task = asyncio.create_task(send_keepalives())
 
-            elif event_type == "error":
-                self.logger.error("claude_error", error=event.get("error"))
-                await self._send_response(
-                    response_id=response_id,
-                    content="I apologize, I'm having trouble processing that. Could you repeat?",
-                    content_complete=True,
-                )
-                return
+        try:
+            async for event in self.llm.generate_response(
+                transcript=transcript,
+                system_prompt=self.system_prompt,
+                tools=self.openai_tools,
+                temperature=self.agent_config.get("temperature", 0.7),
+                max_tokens=self.agent_config.get("max_tokens", 1024),
+            ):
+                last_activity_time[0] = asyncio.get_event_loop().time()
+                event_type = event.get("type")
+
+                if event_type == "text_delta":
+                    # Stream text content to Retell
+                    delta = event.get("delta", "")
+                    accumulated_content += delta
+                    await self._send_response(
+                        response_id=response_id,
+                        content=delta,
+                        content_complete=False,
+                    )
+
+                elif event_type == "tool_use":
+                    # Tool call detected
+                    tool_call = event.get("tool_call", {})
+                    pending_tool_calls.append(tool_call)
+
+                elif event_type == "error":
+                    self.logger.error("claude_error", error=event.get("error"))
+                    await self._send_response(
+                        response_id=response_id,
+                        content="I apologize, I'm having trouble processing that. Could you repeat?",
+                        content_complete=True,
+                    )
+                    return
+        finally:
+            keepalive_task.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await keepalive_task
 
         # Execute any pending tool calls
         if pending_tool_calls:
@@ -461,7 +492,7 @@ class RetellLLMServer:
         ]
 
         # Generate a brief reminder response
-        async for event in self.claude.generate_response(
+        async for event in self.llm.generate_response(
             transcript=reminder_transcript,
             system_prompt=self.system_prompt,
             tools=[],  # No tools for reminders
@@ -588,7 +619,7 @@ class RetellLLMServer:
         finally:
             self._pending_tool_execution = None
 
-    async def _continue_after_tools_from_queue(self, item: dict[str, Any]) -> None:
+    async def _continue_after_tools_from_queue(self, item: dict[str, Any]) -> None:  # noqa: PLR0915
         """Continue conversation after tools complete (called from response sender).
 
         Args:
@@ -619,43 +650,85 @@ class RetellLLMServer:
         accumulated_text = ""
         new_tool_calls: list[dict[str, Any]] = []
 
-        async for event in self.claude.generate_with_tool_results(
-            transcript=transcript,
-            system_prompt=self.system_prompt,
-            tools=self.openai_tools,
-            tool_calls=tool_calls,
-            tool_results=tool_results,
-            assistant_text_before_tools=assistant_text,
-            temperature=self.agent_config.get("temperature", 0.7),
-        ):
-            event_type = event.get("type")
+        # Keepalive mechanism: Track last activity time
+        # Retell times out after ~5-7 seconds of inactivity
+        last_activity_time = [asyncio.get_event_loop().time()]  # Use list for mutability
+        keepalive_interval = 2.0  # Send keepalive every 2 seconds
 
-            if event_type == "text_delta":
-                delta = event.get("delta", "")
-                accumulated_text += delta
-                await self._send_response(
-                    response_id=response_id,
-                    content=delta,
-                    content_complete=False,
-                )
+        async def send_keepalives() -> None:
+            """Background task to send keepalives during Claude's thinking time."""
+            try:
+                self.logger.debug("keepalive_task_started_continuation")
+                while True:
+                    await asyncio.sleep(keepalive_interval)
+                    time_since_activity = asyncio.get_event_loop().time() - last_activity_time[0]
+                    if time_since_activity >= keepalive_interval:
+                        self.logger.debug("sending_keepalive", seconds_since_activity=time_since_activity)
+                        try:
+                            await self._send_response(
+                                response_id=response_id,
+                                content="",  # Empty content = keepalive
+                                content_complete=False,
+                            )
+                        except Exception as e:
+                            self.logger.error("keepalive_send_failed", error=str(e))
+                            break
+                        last_activity_time[0] = asyncio.get_event_loop().time()
+            except asyncio.CancelledError:
+                self.logger.debug("keepalive_task_cancelled")
+                raise
+            except Exception as e:
+                self.logger.exception("keepalive_task_error", error=str(e))
 
-            elif event_type == "tool_use":
-                # Claude wants another tool - collect for recursive execution
-                new_tool_call = event.get("tool_call", {})
-                new_tool_calls.append(new_tool_call)
-                self.logger.info(
-                    "recursive_tool_call_detected",
-                    tool_name=new_tool_call.get("name"),
-                )
+        # Start keepalive task
+        keepalive_task = asyncio.create_task(send_keepalives())
+        self.logger.debug("keepalive_task_created_for_tool_continuation")
 
-            elif event_type == "error":
-                self.logger.error("claude_error_after_tools", error=event.get("error"))
-                await self._send_response(
-                    response_id=response_id,
-                    content="I apologize, I'm having trouble. Could you repeat?",
-                    content_complete=True,
-                )
-                return
+        try:
+            async for event in self.llm.generate_with_tool_results(
+                transcript=transcript,
+                system_prompt=self.system_prompt,
+                tools=self.openai_tools,
+                tool_calls=tool_calls,
+                tool_results=tool_results,
+                assistant_text_before_tools=assistant_text,
+                temperature=self.agent_config.get("temperature", 0.7),
+            ):
+                # Update activity time on any event
+                last_activity_time[0] = asyncio.get_event_loop().time()
+                event_type = event.get("type")
+
+                if event_type == "text_delta":
+                    delta = event.get("delta", "")
+                    accumulated_text += delta
+                    await self._send_response(
+                        response_id=response_id,
+                        content=delta,
+                        content_complete=False,
+                    )
+
+                elif event_type == "tool_use":
+                    # Claude wants another tool - collect for recursive execution
+                    new_tool_call = event.get("tool_call", {})
+                    new_tool_calls.append(new_tool_call)
+                    self.logger.info(
+                        "recursive_tool_call_detected",
+                        tool_name=new_tool_call.get("name"),
+                    )
+
+                elif event_type == "error":
+                    self.logger.error("claude_error_after_tools", error=event.get("error"))
+                    await self._send_response(
+                        response_id=response_id,
+                        content="I apologize, I'm having trouble. Could you repeat?",
+                        content_complete=True,
+                    )
+                    return
+        finally:
+            # Always cancel keepalive task when done
+            keepalive_task.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await keepalive_task
 
         # Handle recursive tool calls
         if new_tool_calls:
@@ -826,7 +899,7 @@ class RetellLLMServer:
         accumulated_text = ""
         new_tool_calls: list[dict[str, Any]] = []
 
-        async for event in self.claude.generate_with_tool_results(
+        async for event in self.llm.generate_with_tool_results(
             transcript=transcript,
             system_prompt=self.system_prompt,
             tools=self.openai_tools,

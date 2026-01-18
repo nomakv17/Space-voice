@@ -27,6 +27,7 @@ class Settings(BaseSettings):
     PORT: int = 8000
     RELOAD: bool = False
     PUBLIC_URL: str | None = None  # Public URL for webhook callbacks (e.g., ngrok URL)
+    FRONTEND_URL: str = "http://localhost:3000"  # Frontend URL for OAuth redirects
 
     # Database
     POSTGRES_SERVER: str = "localhost"
@@ -107,6 +108,22 @@ class Settings(BaseSettings):
 
     # Anthropic Claude (LLM Backend for Retell)
     ANTHROPIC_API_KEY: str | None = None
+
+    # LLM Provider for Retell Custom LLM
+    # Options: "openai" (GPT-4o mini) or "claude" (Claude Sonnet)
+    LLM_PROVIDER: str = "openai"
+
+    # Google Calendar OAuth (for calendar integration)
+    GOOGLE_CLIENT_ID: str | None = None
+    GOOGLE_CLIENT_SECRET: str | None = None
+
+    # Calendly OAuth (for scheduling integration)
+    CALENDLY_CLIENT_ID: str | None = None
+    CALENDLY_CLIENT_SECRET: str | None = None
+
+    # Jobber CRM (HVAC industry integration)
+    JOBBER_CLIENT_ID: str | None = None
+    JOBBER_CLIENT_SECRET: str | None = None
 
     # Telephony
     TELNYX_API_KEY: str | None = None

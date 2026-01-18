@@ -26,6 +26,7 @@ from app.db.session import get_db
 from app.models.agent import Agent
 from app.models.workspace import AgentWorkspace
 from app.services.retell.claude_adapter import ClaudeAdapter
+from app.services.retell.openai_adapter import OpenAIAdapter
 from app.services.retell.retell_llm_server import RetellLLMServer
 from app.services.tools.registry import ToolRegistry
 
@@ -158,15 +159,27 @@ async def retell_llm_websocket(
             await websocket.close(code=4003, reason="Agent is not active")
             return
 
-        # Verify Anthropic API key is configured
-        if not settings.ANTHROPIC_API_KEY:
-            log.error("anthropic_api_key_not_configured")
-            await websocket.close(code=5000, reason="Claude API not configured")
+        # Verify LLM API key is configured based on provider
+        llm_provider = settings.LLM_PROVIDER.lower()
+        if llm_provider == "openai":
+            if not settings.OPENAI_API_KEY:
+                log.error("openai_api_key_not_configured")
+                await websocket.close(code=5000, reason="OpenAI API not configured")
+                return
+        elif llm_provider == "claude":
+            if not settings.ANTHROPIC_API_KEY:
+                log.error("anthropic_api_key_not_configured")
+                await websocket.close(code=5000, reason="Claude API not configured")
+                return
+        else:
+            log.error("invalid_llm_provider", provider=llm_provider)
+            await websocket.close(code=5000, reason="Invalid LLM provider configured")
             return
 
         log = log.bind(
             agent_name=agent.name,
             user_id=agent.user_id,
+            llm_provider=llm_provider,
         )
 
         # Get workspace for this agent
@@ -202,11 +215,20 @@ async def retell_llm_websocket(
 
         log.info("loaded_integrations", integration_ids=list(integrations.keys()))
 
-        # Initialize Claude adapter
-        claude_adapter = ClaudeAdapter(
-            api_key=settings.ANTHROPIC_API_KEY,
-            timeout=settings.ANTHROPIC_TIMEOUT,
-        )
+        # Initialize LLM adapter based on provider setting
+        if llm_provider == "openai":
+            llm_adapter = OpenAIAdapter(
+                api_key=settings.OPENAI_API_KEY,  # type: ignore[arg-type]
+                model="gpt-4o-mini",
+                timeout=settings.OPENAI_TIMEOUT,
+            )
+            log.info("using_openai_adapter", model="gpt-4o-mini")
+        else:
+            llm_adapter = ClaudeAdapter(
+                api_key=settings.ANTHROPIC_API_KEY,  # type: ignore[arg-type]
+                timeout=settings.ANTHROPIC_TIMEOUT,
+            )
+            log.info("using_claude_adapter")
 
         # Initialize tool registry
         tool_registry = ToolRegistry(
@@ -232,7 +254,7 @@ async def retell_llm_websocket(
         # Create and run the LLM server
         llm_server = RetellLLMServer(
             websocket=websocket,
-            claude_adapter=claude_adapter,
+            llm_adapter=llm_adapter,
             tool_registry=tool_registry,
             system_prompt=system_prompt,
             enabled_tools=enabled_tools,

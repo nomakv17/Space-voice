@@ -135,7 +135,7 @@ class GoogleCalendarTools:
                 "type": "function",
                 "function": {
                     "name": "google_calendar_check_availability",
-                    "description": "Check available time slots by querying free/busy information. Use this to find when the user is available for appointments.",
+                    "description": "Get AVAILABLE appointment slots. Returns a list of specific available times like 'Monday January 20th at 10 AM'. Use this to offer customers real times to choose from. Check the next 5-7 days.",
                     "parameters": {
                         "type": "object",
                         "properties": {
@@ -145,11 +145,11 @@ class GoogleCalendarTools:
                             },
                             "start_time": {
                                 "type": "string",
-                                "description": "Start of availability window (ISO 8601 format, e.g., 2024-01-15T09:00:00-05:00)",
+                                "description": "Start of search window (ISO 8601, e.g., 2026-01-19T09:00:00-05:00). Use today or tomorrow.",
                             },
                             "end_time": {
                                 "type": "string",
-                                "description": "End of availability window (ISO 8601 format)",
+                                "description": "End of search window (ISO 8601). Search 5-7 days ahead.",
                             },
                         },
                         "required": ["start_time", "end_time"],
@@ -298,10 +298,12 @@ class GoogleCalendarTools:
         start_time: str,
         end_time: str,
         calendar_id: str = "primary",
+        slot_duration_minutes: int = 60,
     ) -> dict[str, Any]:
-        """Check free/busy information for a calendar.
+        """Check availability and return AVAILABLE time slots.
 
-        Returns busy periods within the specified time range.
+        Returns a list of available appointment slots (not busy periods).
+        This makes it easy for the AI to offer specific times to customers.
         """
         try:
             payload = {
@@ -326,24 +328,86 @@ class GoogleCalendarTools:
             calendar_data = data.get("calendars", {}).get(calendar_id, {})
             busy_periods = calendar_data.get("busy", [])
 
-            # Calculate available slots (gaps between busy periods)
-            # For simplicity, return busy periods and let the AI figure out availability
-            busy_times = []
+            # Parse busy periods into datetime objects
+            busy_ranges: list[tuple[datetime, datetime]] = []
             for period in busy_periods:
-                busy_times.append(
-                    {
-                        "start": period["start"],
-                        "end": period["end"],
-                    }
-                )
+                busy_start = datetime.fromisoformat(period["start"].replace("Z", "+00:00"))
+                busy_end = datetime.fromisoformat(period["end"].replace("Z", "+00:00"))
+                busy_ranges.append((busy_start, busy_end))
+
+            # Sort busy periods by start time
+            busy_ranges.sort(key=lambda x: x[0])
+
+            # Calculate available slots during business hours (9am-5pm)
+            range_start = datetime.fromisoformat(start_time.replace("Z", "+00:00"))
+            range_end = datetime.fromisoformat(end_time.replace("Z", "+00:00"))
+
+            available_slots: list[dict[str, str]] = []
+            slot_duration = timedelta(minutes=slot_duration_minutes)
+
+            # Iterate through each day in the range
+            current_day = range_start.replace(hour=0, minute=0, second=0, microsecond=0)
+            while current_day < range_end:
+                # Skip weekends
+                if current_day.weekday() < 5:  # Monday = 0, Friday = 4
+                    # Business hours: 9am to 5pm
+                    day_start = current_day.replace(hour=9, minute=0)
+                    day_end = current_day.replace(hour=17, minute=0)
+
+                    # Adjust if outside our search range
+                    if day_start < range_start:
+                        day_start = range_start
+                    if day_end > range_end:
+                        day_end = range_end
+
+                    # Find available slots on this day
+                    slot_start = day_start
+                    while slot_start + slot_duration <= day_end:
+                        slot_end = slot_start + slot_duration
+
+                        # Check if this slot overlaps with any busy period
+                        is_available = True
+                        for busy_start, busy_end in busy_ranges:
+                            if slot_start < busy_end and slot_end > busy_start:
+                                is_available = False
+                                # Skip to end of busy period
+                                slot_start = busy_end
+                                break
+
+                        if is_available:
+                            # Format nicely for voice: "Monday January 20th at 10am"
+                            day_name = slot_start.strftime("%A")
+                            month_day = slot_start.strftime("%B %d")
+                            time_str = slot_start.strftime("%I:%M %p").lstrip("0").replace(":00", "")
+
+                            available_slots.append({
+                                "start": slot_start.isoformat(),
+                                "end": slot_end.isoformat(),
+                                "display": f"{day_name} {month_day} at {time_str}",
+                            })
+                            slot_start = slot_end
+
+                            # Limit to 10 slots max
+                            if len(available_slots) >= 10:
+                                break
+
+                    if len(available_slots) >= 10:
+                        break
+
+                current_day += timedelta(days=1)
+
+            # Format response for easy use by AI
+            if available_slots:
+                slot_displays = [s["display"] for s in available_slots[:5]]
+                message = f"Available times: {', '.join(slot_displays)}"
+            else:
+                message = "No available slots found in the requested time range."
 
             return {
                 "success": True,
-                "calendar_id": calendar_id,
-                "time_range": {"start": start_time, "end": end_time},
-                "busy_periods": busy_times,
-                "busy_count": len(busy_times),
-                "message": f"Found {len(busy_times)} busy periods. Times NOT in busy periods are available.",
+                "available_slots": available_slots[:5],  # Top 5 for voice
+                "slot_count": len(available_slots),
+                "message": message,
             }
 
         except Exception as e:

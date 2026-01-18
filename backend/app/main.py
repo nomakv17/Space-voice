@@ -30,8 +30,11 @@ from app.api import (
     crm,
     embed,
     health,
+    integration_api,
     integrations,
+    oauth,
     phone_numbers,
+    phone_numbers_purchase,
     realtime,
     retell_webhooks,
     retell_ws,
@@ -210,10 +213,13 @@ app.include_router(retell_webhooks.router)  # Retell call event webhooks
 app.include_router(telnyx_webhooks.router)  # Telnyx Call Control webhooks (SIP bridge to Retell)
 app.include_router(calls.router)  # Call history API
 app.include_router(campaigns.router, prefix=settings.API_V1_PREFIX)  # Campaigns API
+app.include_router(phone_numbers_purchase.router)  # Phone number purchasing (Telnyx) - MUST be before phone_numbers for route priority
 app.include_router(phone_numbers.router)  # Phone numbers API
 app.include_router(auth.router)  # Authentication API
 app.include_router(compliance.router)  # Compliance API (GDPR/CCPA)
 app.include_router(integrations.router)  # Integrations API (external tools)
+app.include_router(integration_api.router, prefix=settings.API_V1_PREFIX)  # External CRM Integration API
+app.include_router(oauth.router)  # OAuth flows for Google Calendar, Calendly, etc.
 app.include_router(embed.router)  # Public embed API (unauthenticated)
 app.include_router(embed.ws_router)  # Public embed WebSocket
 
