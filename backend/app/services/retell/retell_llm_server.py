@@ -158,16 +158,16 @@ class RetellLLMServer:
 
         Retell disconnects after ~5-7 seconds of inactivity. This task runs
         for the entire connection lifetime, sending empty response chunks
-        every 3 seconds if no other activity has occurred.
+        every 1.5 seconds if no other activity has occurred.
 
         This is SEPARATE from the response-level keepalives and ensures the
         connection stays alive even between conversation turns.
         """
-        keepalive_interval = 3.0  # Send every 3 seconds
+        keepalive_interval = 1.5  # Send every 1.5 seconds (more aggressive)
         retry_count = 0
-        max_retries = 3
+        max_retries = 5  # More retries before giving up
 
-        self.logger.info("connection_keepalive_started")
+        self.logger.info("connection_keepalive_started", interval=keepalive_interval)
 
         while not self._shutdown.is_set():
             try:
@@ -181,13 +181,12 @@ class RetellLLMServer:
                 time_since_activity = current_time - self._last_activity_time
 
                 # Only send keepalive if we haven't had recent activity
-                if time_since_activity >= keepalive_interval - 0.5:
+                if time_since_activity >= keepalive_interval - 0.3:
                     self.logger.debug(
                         "connection_keepalive_sending",
                         seconds_since_activity=round(time_since_activity, 1),
                     )
                     # Send empty response chunk as keepalive
-                    # Using response_id 0 as a neutral keepalive
                     await self._send_response(
                         response_id=self._current_response_id,
                         content="",
@@ -209,8 +208,8 @@ class RetellLLMServer:
                 if retry_count >= max_retries:
                     self.logger.error("connection_keepalive_max_retries_exceeded")
                     break
-                # Short delay before retry
-                await asyncio.sleep(0.5)
+                # Very short delay before retry
+                await asyncio.sleep(0.2)
 
         self.logger.info("connection_keepalive_stopped")
 
@@ -430,7 +429,7 @@ class RetellLLMServer:
         # Keepalive mechanism: Track last activity time
         # Retell times out after ~5-7 seconds of inactivity
         last_activity_time = [asyncio.get_event_loop().time()]
-        keepalive_interval = 2.0
+        keepalive_interval = 1.5
 
         async def send_keepalives() -> None:
             """Background task to send keepalives during Claude's thinking time."""
@@ -721,7 +720,7 @@ class RetellLLMServer:
         # Keepalive mechanism: Track last activity time
         # Retell times out after ~5-7 seconds of inactivity
         last_activity_time = [asyncio.get_event_loop().time()]  # Use list for mutability
-        keepalive_interval = 2.0  # Send keepalive every 2 seconds
+        keepalive_interval = 1.5  # Send keepalive every 2 seconds
 
         async def send_keepalives() -> None:
             """Background task to send keepalives during Claude's thinking time."""
