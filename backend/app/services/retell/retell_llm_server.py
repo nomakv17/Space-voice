@@ -490,19 +490,16 @@ class RetellLLMServer:
         if pending_tool_calls:
             # Send "thinking" message if Claude didn't say anything
             if not accumulated_content:
-                accumulated_content = "One moment..."
+                accumulated_content = "One moment while I book that for you."
                 await self._send_response(
                     response_id=response_id,
                     content=accumulated_content,
                     content_complete=False,
                 )
 
-            # Mark response complete - tells Retell we're done speaking for now
-            await self._send_response(
-                response_id=response_id,
-                content="",
-                content_complete=True,
-            )
+            # DO NOT mark response complete yet!
+            # We'll send content_complete=True after the confirmation message
+            # The connection keepalive will keep Retell connected
 
             # CRITICAL: Spawn background task - DON'T AWAIT!
             # This returns immediately so we can handle ping_pong while tools run
@@ -835,11 +832,20 @@ class RetellLLMServer:
             return
 
         # Mark response complete
-        await self._send_response(
-            response_id=response_id,
-            content="",
-            content_complete=True,
-        )
+        # If Claude didn't generate any text, send a fallback confirmation
+        if not accumulated_text:
+            self.logger.info("sending_fallback_confirmation_after_tools")
+            await self._send_response(
+                response_id=response_id,
+                content="Your appointment has been booked and you'll receive a text confirmation shortly. Is there anything else I can help you with?",
+                content_complete=True,
+            )
+        else:
+            await self._send_response(
+                response_id=response_id,
+                content="",
+                content_complete=True,
+            )
 
     async def _handle_special_action_from_queue(self, item: dict[str, Any]) -> None:
         """Handle special actions (end_call, transfer_call) from queue.
@@ -1042,14 +1048,20 @@ class RetellLLMServer:
             return
 
         # Mark response complete
+        # If Claude didn't generate any text, send a fallback confirmation
         if not has_response:
-            self.logger.warning("no_response_after_tools")
-
-        await self._send_response(
-            response_id=response_id,
-            content="",
-            content_complete=True,
-        )
+            self.logger.info("sending_fallback_confirmation_sync")
+            await self._send_response(
+                response_id=response_id,
+                content="Your appointment has been booked and you'll receive a text confirmation shortly. Is there anything else I can help you with?",
+                content_complete=True,
+            )
+        else:
+            await self._send_response(
+                response_id=response_id,
+                content="",
+                content_complete=True,
+            )
 
     async def _send_response(
         self,
