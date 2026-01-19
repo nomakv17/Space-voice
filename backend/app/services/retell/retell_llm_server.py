@@ -542,7 +542,7 @@ When customer says a day name, calculate from TODAY. ALWAYS confirm full date be
 
             # Send "thinking" message if Claude didn't say anything
             if not accumulated_content:
-                accumulated_content = "One moment while I book that for you."
+                accumulated_content = "One moment please."
                 await self._send_response(
                     response_id=response_id,
                     content=accumulated_content,
