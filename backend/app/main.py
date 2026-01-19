@@ -56,6 +56,7 @@ from app.models.user import User
 from app.services.campaign_worker import start_campaign_worker, stop_campaign_worker
 
 # Configure structured logging with async processors
+# Always use INFO level minimum to see important operational logs
 structlog.configure(
     processors=[
         structlog.contextvars.merge_contextvars,
@@ -66,7 +67,7 @@ structlog.configure(
         structlog.processors.JSONRenderer(),
     ],
     wrapper_class=structlog.make_filtering_bound_logger(
-        logging.WARNING if not settings.DEBUG else logging.DEBUG
+        logging.DEBUG if settings.DEBUG else logging.INFO  # INFO minimum in production
     ),
     context_class=dict,
     logger_factory=structlog.PrintLoggerFactory(),
