@@ -379,22 +379,23 @@ class RetellLLMServer:
         central_tz = ZoneInfo("America/Chicago")
         now = datetime.now(central_tz)
         from datetime import timedelta
+
         tomorrow = now + timedelta(days=1)
 
         # Log the actual date being injected for debugging
         self.logger.info(
             "date_injection",
-            today=now.strftime('%A, %B %d, %Y'),
-            time=now.strftime('%I:%M %p %Z'),
+            today=now.strftime("%A, %B %d, %Y"),
+            time=now.strftime("%I:%M %p %Z"),
             iso=now.isoformat(),
         )
 
         date_info = f"""
 
 CURRENT DATE & TIME (USE THIS FOR ALL DATE CALCULATIONS):
-- TODAY is {now.strftime('%A, %B %d, %Y')}
-- Current time: {now.strftime('%I:%M %p')} Central Time
-- Tomorrow is {tomorrow.strftime('%A, %B %d, %Y')}
+- TODAY is {now.strftime("%A, %B %d, %Y")}
+- Current time: {now.strftime("%I:%M %p")} Central Time
+- Tomorrow is {tomorrow.strftime("%A, %B %d, %Y")}
 
 When customer says a day name, calculate from TODAY. ALWAYS confirm full date before booking."""
         self.system_prompt += date_info
@@ -478,7 +479,9 @@ When customer says a day name, calculate from TODAY. ALWAYS confirm full date be
                 await asyncio.sleep(keepalive_interval)
                 time_since_activity = asyncio.get_event_loop().time() - last_activity_time[0]
                 if time_since_activity >= keepalive_interval:
-                    self.logger.debug("sending_keepalive_initial", seconds_since_activity=time_since_activity)
+                    self.logger.debug(
+                        "sending_keepalive_initial", seconds_since_activity=time_since_activity
+                    )
                     await self._send_response(
                         response_id=response_id,
                         content="",
@@ -515,7 +518,9 @@ When customer says a day name, calculate from TODAY. ALWAYS confirm full date be
                     pending_tool_calls.append(tool_call)
 
                 elif event_type == "error":
-                    self.logger.error("claude_error", error=event.get("error"))
+                    error_msg = event.get("error", "unknown error")
+                    print(f"[LLM ERROR] Generation error: {error_msg}", flush=True)  # noqa: T201
+                    self.logger.error("claude_error", error=error_msg)
                     await self._send_response(
                         response_id=response_id,
                         content="I apologize, I'm having trouble processing that. Could you repeat?",
@@ -806,7 +811,9 @@ When customer says a day name, calculate from TODAY. ALWAYS confirm full date be
                     await asyncio.sleep(keepalive_interval)
                     time_since_activity = asyncio.get_event_loop().time() - last_activity_time[0]
                     if time_since_activity >= keepalive_interval:
-                        self.logger.debug("sending_keepalive", seconds_since_activity=time_since_activity)
+                        self.logger.debug(
+                            "sending_keepalive", seconds_since_activity=time_since_activity
+                        )
                         try:
                             await self._send_response(
                                 response_id=response_id,
@@ -860,7 +867,9 @@ When customer says a day name, calculate from TODAY. ALWAYS confirm full date be
                     )
 
                 elif event_type == "error":
-                    self.logger.error("claude_error_after_tools", error=event.get("error"))
+                    error_msg = event.get("error", "unknown error")
+                    print(f"[LLM ERROR] Error after tools: {error_msg}", flush=True)  # noqa: T201
+                    self.logger.error("claude_error_after_tools", error=error_msg)
                     await self._send_response(
                         response_id=response_id,
                         content="I apologize, I'm having trouble. Could you repeat?",

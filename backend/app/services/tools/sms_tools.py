@@ -295,15 +295,35 @@ class TelnyxSMSTools:
                     "error": error_msg,
                 }
 
-            data = response.json()["data"]
-            return {
-                "success": True,
-                "message_id": data["id"],
-                "to": data["to"][0]["phone_number"],
-                "from": data["from"]["phone_number"],
-                "status": data.get("to", [{}])[0].get("status"),
-                "message": f"SMS sent successfully to {to}",
-            }
+            # Safe parsing - handle unexpected response structures
+            try:
+                response_data = response.json()
+                data = response_data.get("data", {})
+
+                # Safely extract to/from info
+                to_list = data.get("to", [])
+                to_info = to_list[0] if to_list else {}
+                from_info = data.get("from", {})
+
+                return {
+                    "success": True,
+                    "message_id": data.get("id", "unknown"),
+                    "to": to_info.get("phone_number", to),
+                    "from": from_info.get("phone_number", self.from_number),
+                    "status": to_info.get("status", "sent"),
+                    "message": f"SMS sent successfully to {to}",
+                }
+            except Exception as parse_error:
+                print(f"[SMS ERROR] Response parse failed: {parse_error}", flush=True)  # noqa: T201
+                # SMS was sent (200 OK) but we couldn't parse response - still success
+                return {
+                    "success": True,
+                    "message_id": "unknown",
+                    "to": to,
+                    "from": self.from_number,
+                    "status": "sent",
+                    "message": f"SMS sent successfully to {to} (response parsing issue)",
+                }
 
         except Exception as e:
             logger.exception("telnyx_send_sms_error", error=str(e))

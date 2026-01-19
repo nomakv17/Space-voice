@@ -166,6 +166,9 @@ class OpenAIAdapter:
                     yield {"type": "message_end"}
 
         except Exception as e:
+            print(f"[OPENAI ERROR] Generation failed: {type(e).__name__}: {e}", flush=True)
+            import traceback
+            traceback.print_exc()
             self.logger.exception("openai_generation_error", error=str(e))
             yield {
                 "type": "error",

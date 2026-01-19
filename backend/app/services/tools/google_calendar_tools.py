@@ -9,7 +9,7 @@ Provides tools for:
 """
 
 from collections.abc import Awaitable, Callable
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from http import HTTPStatus
 from typing import Any
 
@@ -83,11 +83,21 @@ class GoogleCalendarTools:
         if response.status_code != HTTPStatus.UNAUTHORIZED:
             return False
 
-        if not self.refresh_token or not self.client_id or not self.client_secret:
+        # Validate we have all required credentials for refresh
+        if not self.refresh_token:
+            print("[CALENDAR ERROR] Token expired but no refresh_token available", flush=True)  # noqa: T201
+            logger.error("google_calendar_no_refresh_token")
             return False
 
+        if not self.client_id or not self.client_secret:
+            print("[CALENDAR ERROR] Token expired but missing client_id/client_secret", flush=True)  # noqa: T201
+            logger.error("google_calendar_missing_oauth_credentials")
+            return False
+
+        print("[CALENDAR] Attempting to refresh Google Calendar token...", flush=True)  # noqa: T201
+
         try:
-            async with httpx.AsyncClient() as refresh_client:
+            async with httpx.AsyncClient(timeout=10.0) as refresh_client:
                 refresh_response = await refresh_client.post(
                     "https://oauth2.googleapis.com/token",
                     data={
@@ -107,10 +117,19 @@ class GoogleCalendarTools:
                         await self._client.aclose()
                         self._client = None
 
+                    print("[CALENDAR] Token refreshed successfully", flush=True)  # noqa: T201
                     logger.info("google_calendar_token_refreshed")
                     return True
+                print(
+                    f"[CALENDAR ERROR] Token refresh failed: {refresh_response.status_code} - {refresh_response.text}",
+                    flush=True,
+                )  # noqa: T201
+                logger.error(
+                    "google_calendar_token_refresh_http_error", status=refresh_response.status_code
+                )
 
         except Exception as e:
+            print(f"[CALENDAR ERROR] Token refresh exception: {type(e).__name__}: {e}", flush=True)  # noqa: T201
             logger.warning("google_calendar_token_refresh_failed", error=str(e))
 
         return False
@@ -355,10 +374,8 @@ class GoogleCalendarTools:
                     day_end = current_day.replace(hour=17, minute=0)
 
                     # Adjust if outside our search range
-                    if day_start < range_start:
-                        day_start = range_start
-                    if day_end > range_end:
-                        day_end = range_end
+                    day_start = max(day_start, range_start)
+                    day_end = min(day_end, range_end)
 
                     # Find available slots on this day
                     slot_start = day_start
@@ -378,13 +395,17 @@ class GoogleCalendarTools:
                             # Format nicely for voice: "Monday January 20th at 10am"
                             day_name = slot_start.strftime("%A")
                             month_day = slot_start.strftime("%B %d")
-                            time_str = slot_start.strftime("%I:%M %p").lstrip("0").replace(":00", "")
+                            time_str = (
+                                slot_start.strftime("%I:%M %p").lstrip("0").replace(":00", "")
+                            )
 
-                            available_slots.append({
-                                "start": slot_start.isoformat(),
-                                "end": slot_end.isoformat(),
-                                "display": f"{day_name} {month_day} at {time_str}",
-                            })
+                            available_slots.append(
+                                {
+                                    "start": slot_start.isoformat(),
+                                    "end": slot_end.isoformat(),
+                                    "display": f"{day_name} {month_day} at {time_str}",
+                                }
+                            )
                             slot_start = slot_end
 
                             # Limit to 10 slots max
@@ -500,15 +521,13 @@ class GoogleCalendarTools:
             if time_min:
                 params["timeMin"] = time_min
             else:
-                params["timeMin"] = datetime.now(timezone.utc).isoformat()
+                params["timeMin"] = datetime.now(UTC).isoformat()
 
             if time_max:
                 params["timeMax"] = time_max
             else:
                 # Default to 30 days ahead if not specified
-                params["timeMax"] = (
-                    datetime.now(timezone.utc) + timedelta(days=30)
-                ).isoformat()
+                params["timeMax"] = (datetime.now(UTC) + timedelta(days=30)).isoformat()
 
             if query:
                 params["q"] = query

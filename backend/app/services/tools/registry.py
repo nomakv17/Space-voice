@@ -260,9 +260,7 @@ class ToolRegistry:
 
         return tools
 
-    async def execute_tool(  # noqa: PLR0911, PLR0912
-        self, tool_name: str, arguments: dict[str, Any]
-    ) -> dict[str, Any]:
+    async def execute_tool(self, tool_name: str, arguments: dict[str, Any]) -> dict[str, Any]:
         """Execute a tool by routing to appropriate handler.
 
         Args:
@@ -272,6 +270,20 @@ class ToolRegistry:
         Returns:
             Tool execution result
         """
+        # Top-level try-catch to prevent silent failures from crashing the call
+        try:
+            return await self._execute_tool_internal(tool_name, arguments)
+        except Exception as e:
+            print(f"[TOOL ERROR] {tool_name}: {type(e).__name__}: {e}", flush=True)  # noqa: T201
+            import traceback
+
+            traceback.print_exc()
+            return {"success": False, "error": f"Tool execution failed: {e!s}"}
+
+    async def _execute_tool_internal(
+        self, tool_name: str, arguments: dict[str, Any]
+    ) -> dict[str, Any]:
+        """Internal tool execution - routed from execute_tool with error handling."""
         # Call Control tools
         call_control_tool_names = {
             "end_call",
