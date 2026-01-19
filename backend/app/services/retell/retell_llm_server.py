@@ -848,19 +848,23 @@ CURRENT DATE & TIME:
 
         # Handle recursive tool calls
         if new_tool_calls:
+            self.logger.info(
+                "recursive_tool_calls_detected",
+                tool_count=len(new_tool_calls),
+                tool_names=[t.get("name") for t in new_tool_calls],
+            )
+
             if not accumulated_text:
-                accumulated_text = "Let me check on that..."
+                accumulated_text = "One moment please..."
                 await self._send_response(
                     response_id=response_id,
                     content=accumulated_text,
-                    content_complete=False,
+                    content_complete=False,  # Keep response OPEN
                 )
 
-            await self._send_response(
-                response_id=response_id,
-                content="",
-                content_complete=True,
-            )
+            # DO NOT send content_complete=True here!
+            # The recursive tools will complete and send the final confirmation
+            # Sending content_complete=True would tell Retell we're done speaking
 
             # Spawn another background task for recursive tools
             updated_transcript = list(transcript)
