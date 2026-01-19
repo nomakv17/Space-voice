@@ -84,7 +84,9 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:  # noqa: PLR0915
 
     # Create database tables if they don't exist
     try:
-        from app.models import Base  # Import all models
+        from app.db.base import Base  # Import SQLAlchemy Base
+        # Also import all models to ensure they're registered with Base
+        from app import models  # noqa: F401
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
         logger.info("Database tables created/verified")
