@@ -132,8 +132,12 @@ async def retell_llm_websocket(
         session_id=session_id,
     )
 
+    # DEBUG: Print to stdout to bypass structlog issues
+    print(f"[RETELL WS] Connection attempt - agent_id={agent_id}, session={session_id}", flush=True)
+
     # Accept the WebSocket connection
     await websocket.accept()
+    print(f"[RETELL WS] WebSocket accepted", flush=True)
     log.info("retell_llm_websocket_connected")
 
     try:
@@ -146,8 +150,10 @@ async def retell_llm_websocket(
             return
 
         # Load agent from database
+        print(f"[RETELL WS] Loading agent {agent_uuid}", flush=True)
         result = await db.execute(select(Agent).where(Agent.id == agent_uuid))
         agent = result.scalar_one_or_none()
+        print(f"[RETELL WS] Agent loaded: {agent.name if agent else 'NOT FOUND'}", flush=True)
 
         if not agent:
             log.error("agent_not_found")
@@ -213,6 +219,7 @@ async def retell_llm_websocket(
             workspace_integrations = await get_workspace_integrations(user_id_uuid, workspace_id, db)
             integrations.update(workspace_integrations)
 
+        print(f"[RETELL WS] Loaded integrations: {list(integrations.keys())}", flush=True)
         log.info("loaded_integrations", integration_ids=list(integrations.keys()))
 
         # Initialize LLM adapter based on provider setting
@@ -273,10 +280,15 @@ async def retell_llm_websocket(
         await llm_server.handle_connection()
 
     except WebSocketDisconnect:
+        print(f"[RETELL WS] WebSocket disconnected normally", flush=True)
         log.info("retell_llm_websocket_disconnected")
     except Exception as e:
+        print(f"[RETELL WS] ERROR: {type(e).__name__}: {e}", flush=True)
+        import traceback
+        traceback.print_exc()
         log.exception("retell_llm_websocket_error", error=str(e))
     finally:
+        print(f"[RETELL WS] Connection closed", flush=True)
         log.info("retell_llm_websocket_closed")
 
 
