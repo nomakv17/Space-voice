@@ -529,6 +529,12 @@ When customer says a day name, calculate from TODAY. ALWAYS confirm full date be
 
         # Execute any pending tool calls
         if pending_tool_calls:
+            self.logger.info(
+                "initial_tool_calls_detected",
+                tool_count=len(pending_tool_calls),
+                tool_names=[t.get("name") for t in pending_tool_calls],
+            )
+
             # Send "thinking" message if Claude didn't say anything
             if not accumulated_content:
                 accumulated_content = "One moment while I book that for you."
