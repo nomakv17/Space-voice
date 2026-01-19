@@ -82,6 +82,16 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:  # noqa: PLR0915
     # Startup
     logger.info("Starting application", app_name=settings.APP_NAME)
 
+    # Create database tables if they don't exist
+    try:
+        from app.models import Base  # Import all models
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+        logger.info("Database tables created/verified")
+    except Exception:
+        logger.exception("Failed to create database tables")
+        raise
+
     try:
         # Initialize Redis (fatal if fails)
         await get_redis()
