@@ -494,13 +494,15 @@ class RetellLLMServer:
                 await self._send_response(
                     response_id=response_id,
                     content=accumulated_content,
-                    content_complete=False,  # Keep response OPEN!
+                    content_complete=False,
                 )
 
-            # DO NOT send content_complete=True here!
-            # We need to keep the response open until tools finish and we send confirmation.
-            # Sending content_complete=True would tell Retell we're done speaking,
-            # and it would switch to listening mode, potentially hanging up on silence.
+            # Mark response complete so Retell speaks the "One moment" message
+            await self._send_response(
+                response_id=response_id,
+                content="",
+                content_complete=True,
+            )
 
             # CRITICAL: Spawn background task - DON'T AWAIT!
             # This returns immediately so we can handle ping_pong while tools run
@@ -690,20 +692,21 @@ class RetellLLMServer:
         Args:
             item: Queued item with tool results
         """
-        response_id = item["response_id"]
+        original_response_id = item["response_id"]
         transcript = item["transcript"]
         tool_calls = item["tool_calls"]
         tool_results = item["tool_results"]
         assistant_text = item["assistant_text"]
 
-        # Check if response is stale (user may have interrupted)
-        if self._current_response_id != response_id:
-            self.logger.warning(
-                "stale_tool_response_discarded",
-                stale_id=response_id,
-                current_id=self._current_response_id,
+        # Use current response_id even if original is stale
+        # This ensures we always try to send the confirmation
+        response_id = self._current_response_id
+        if response_id != original_response_id:
+            self.logger.info(
+                "using_current_response_id_for_tool_continuation",
+                original_id=original_response_id,
+                current_id=response_id,
             )
-            return
 
         self.logger.info(
             "continuing_after_tools",
