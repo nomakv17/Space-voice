@@ -884,15 +884,30 @@ CURRENT DATE & TIME:
             return
 
         # Mark response complete
-        # If Claude didn't generate any text, send a fallback confirmation
-        if not accumulated_text:
+        # Check if Claude generated meaningful text (not just whitespace/punctuation)
+        meaningful_text = accumulated_text.strip() if accumulated_text else ""
+        has_meaningful_content = len(meaningful_text) > 10  # At least a short sentence
+
+        self.logger.info(
+            "tool_continuation_complete",
+            accumulated_text_length=len(accumulated_text),
+            meaningful_text_length=len(meaningful_text),
+            has_meaningful_content=has_meaningful_content,
+            first_50_chars=meaningful_text[:50] if meaningful_text else "(empty)",
+        )
+
+        # If Claude didn't generate meaningful text, send a fallback confirmation
+        # This ensures we ALWAYS speak the confirmation before ending the turn
+        if not has_meaningful_content:
             self.logger.info("sending_fallback_confirmation_after_tools")
+            fallback = "Your appointment has been booked and you'll receive a text confirmation shortly. Is there anything else I can help you with?"
             await self._send_response(
                 response_id=response_id,
-                content="Your appointment has been booked and you'll receive a text confirmation shortly. Is there anything else I can help you with?",
+                content=fallback,
                 content_complete=True,
             )
         else:
+            self.logger.info("claude_generated_confirmation", text=meaningful_text[:100])
             await self._send_response(
                 response_id=response_id,
                 content="",
