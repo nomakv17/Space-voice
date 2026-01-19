@@ -23,7 +23,9 @@ import contextlib
 import json
 import uuid
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Any
+from zoneinfo import ZoneInfo
 
 import structlog
 from fastapi import WebSocket
@@ -361,6 +363,20 @@ class RetellLLMServer:
             to_number=call.get("to_number"),
             metadata=call.get("metadata"),
         )
+
+        # Inject current date/time so the agent knows what day it is
+        # This allows correct date calculation when users say "Tuesday" or "tomorrow"
+        # Using US Central timezone for HVAC service business
+        central_tz = ZoneInfo("America/Chicago")
+        now = datetime.now(central_tz)
+        date_info = f"""
+
+CURRENT DATE & TIME:
+- Today is {now.strftime('%A, %B %d, %Y')} (e.g., Monday, January 20, 2025)
+- Current time: {now.strftime('%I:%M %p %Z')} (e.g., 2:30 PM CST)
+- When a customer asks for "Tuesday", calculate the correct date from today's date.
+- ALWAYS use the full date format (e.g., "January 21, 2025") when confirming appointments."""
+        self.system_prompt += date_info
 
         # Append caller phone info to system prompt so agent can use it for SMS/booking
         if self.caller_phone:

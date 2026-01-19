@@ -24,6 +24,7 @@ export interface Integration {
   scopes?: string[];
   documentationUrl?: string;
   tools?: IntegrationTool[]; // Available tools for this integration
+  oauthConnectUrl?: string; // URL to initiate OAuth flow (for authType: "oauth")
 }
 
 export interface IntegrationField {
@@ -402,27 +403,49 @@ export const AVAILABLE_INTEGRATIONS: Integration[] = [
     slug: "google-calendar",
     description: "Schedule meetings, check availability, create events",
     category: "calendar",
-    authType: "api_key",
+    authType: "oauth",
+    oauthConnectUrl: "/api/v1/oauth/google-calendar/connect",
     icon: "https://cdn.simpleicons.org/googlecalendar",
     enabled: true,
     isPopular: true,
-    fields: [
+    documentationUrl: "https://developers.google.com/calendar/api/guides/auth",
+    tools: [
       {
-        name: "access_token",
-        label: "OAuth Access Token",
-        type: "password",
-        required: true,
-        description: "Google OAuth 2.0 access token",
+        id: "google_calendar_list_calendars",
+        name: "List Calendars",
+        description: "List all calendars the user has access to",
+        riskLevel: "safe",
+        defaultEnabled: true,
       },
       {
-        name: "refresh_token",
-        label: "Refresh Token",
-        type: "password",
-        required: false,
-        description: "Optional: OAuth refresh token for long-term access",
+        id: "google_calendar_check_availability",
+        name: "Check Availability",
+        description: "Check free/busy information to find available time slots",
+        riskLevel: "safe",
+        defaultEnabled: true,
+      },
+      {
+        id: "google_calendar_create_event",
+        name: "Create Event",
+        description: "Create a calendar event (book an appointment)",
+        riskLevel: "moderate",
+        defaultEnabled: true,
+      },
+      {
+        id: "google_calendar_list_events",
+        name: "List Events",
+        description: "List upcoming calendar events",
+        riskLevel: "safe",
+        defaultEnabled: true,
+      },
+      {
+        id: "google_calendar_cancel_event",
+        name: "Cancel Event",
+        description: "Cancel/delete a calendar event",
+        riskLevel: "high",
+        defaultEnabled: false,
       },
     ],
-    documentationUrl: "https://developers.google.com/calendar/api/guides/auth",
   },
   {
     id: "microsoft-calendar",
@@ -778,20 +801,11 @@ export const AVAILABLE_INTEGRATIONS: Integration[] = [
     slug: "calendly",
     description: "Check availability, schedule meetings, manage event types",
     category: "calendar",
-    authType: "api_key",
+    authType: "oauth",
+    oauthConnectUrl: "/api/v1/oauth/calendly/connect",
     icon: "https://cdn.simpleicons.org/calendly",
     enabled: true,
     isPopular: true,
-    fields: [
-      {
-        name: "access_token",
-        label: "Personal Access Token",
-        type: "password",
-        required: true,
-        placeholder: "eyJra...",
-        description: "Create token at calendly.com/integrations/api_webhooks",
-      },
-    ],
     documentationUrl: "https://developer.calendly.com/api-docs/",
     tools: [
       {
@@ -835,6 +849,87 @@ export const AVAILABLE_INTEGRATIONS: Integration[] = [
         description: "Cancel a scheduled event",
         riskLevel: "high",
         defaultEnabled: false,
+      },
+    ],
+  },
+
+  // HVAC / Field Service
+  {
+    id: "jobber",
+    name: "Jobber",
+    slug: "jobber",
+    description: "HVAC field service management - clients, jobs, quotes, scheduling",
+    category: "crm",
+    authType: "api_key",
+    icon: "https://cdn.simpleicons.org/j",
+    enabled: true,
+    isPopular: true,
+    fields: [
+      {
+        name: "access_token",
+        label: "OAuth Access Token",
+        type: "password",
+        required: true,
+        description: "Jobber OAuth 2.0 access token",
+      },
+      {
+        name: "refresh_token",
+        label: "Refresh Token",
+        type: "password",
+        required: false,
+        description: "Optional: OAuth refresh token for long-term access",
+      },
+    ],
+    documentationUrl: "https://developer.getjobber.com/docs",
+    tools: [
+      {
+        id: "jobber_search_clients",
+        name: "Search Clients",
+        description: "Search for clients by name, phone, or email",
+        riskLevel: "safe",
+        defaultEnabled: true,
+      },
+      {
+        id: "jobber_create_client",
+        name: "Create Client",
+        description: "Create a new client/customer in Jobber",
+        riskLevel: "moderate",
+        defaultEnabled: true,
+      },
+      {
+        id: "jobber_get_client",
+        name: "Get Client",
+        description: "Get detailed information about a client",
+        riskLevel: "safe",
+        defaultEnabled: true,
+      },
+      {
+        id: "jobber_create_job",
+        name: "Create Job",
+        description: "Create a new job/work order for a client",
+        riskLevel: "moderate",
+        defaultEnabled: true,
+      },
+      {
+        id: "jobber_list_jobs",
+        name: "List Jobs",
+        description: "List jobs for a client or all recent jobs",
+        riskLevel: "safe",
+        defaultEnabled: true,
+      },
+      {
+        id: "jobber_create_quote",
+        name: "Create Quote",
+        description: "Create a quote/estimate for a client",
+        riskLevel: "moderate",
+        defaultEnabled: true,
+      },
+      {
+        id: "jobber_schedule_visit",
+        name: "Schedule Visit",
+        description: "Schedule a service visit for a job",
+        riskLevel: "moderate",
+        defaultEnabled: true,
       },
     ],
   },

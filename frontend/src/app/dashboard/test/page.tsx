@@ -271,11 +271,15 @@ export default function TestAgentPage() {
   });
 
   // Get the list of agents based on selection mode
+  // Show all agents - WebRTC test works with premium tier, Retell agents work with any tier
   const availableAgents =
     selectedWorkspaceId === "all"
-      ? allAgents
-          .filter((a) => a.pricing_tier === "premium" || a.pricing_tier === "premium-mini")
-          .map((a) => ({ agent_id: a.id, agent_name: a.name, is_default: false }))
+      ? allAgents.map((a) => ({
+          agent_id: a.id,
+          agent_name: a.name,
+          is_default: false,
+          pricing_tier: a.pricing_tier,
+        }))
       : workspaceAgents;
 
   const transcriptEndRef = useRef<HTMLDivElement | null>(null);
@@ -1059,7 +1063,7 @@ export default function TestAgentPage() {
                         ? "Select a workspace first"
                         : availableAgents.length === 0
                           ? selectedWorkspaceId === "all"
-                            ? "No premium agents found"
+                            ? "No agents found"
                             : "No agents in this workspace"
                           : "Select an agent"
                     }

@@ -16,6 +16,7 @@ import {
   AlertCircle,
   ChevronLeft,
   ChevronRight,
+  X,
 } from "lucide-react";
 import {
   Table,
@@ -101,16 +102,21 @@ export default function CallHistoryPage() {
   const totalPages = data?.total_pages ?? 0;
   const totalCalls = data?.total ?? 0;
 
+  const [currentRecordingUrl, setCurrentRecordingUrl] = useState<string | null>(null);
+
   const handlePlayRecording = (call: CallRecord) => {
     if (!call.recording_url) {
       toast.error("No recording available for this call");
       return;
     }
 
-    // If already playing this call, pause it
-    if (playingCallId === call.id && audioRef.current) {
-      audioRef.current.pause();
+    // If already playing this call, close the player
+    if (playingCallId === call.id) {
+      if (audioRef.current) {
+        audioRef.current.pause();
+      }
       setPlayingCallId(null);
+      setCurrentRecordingUrl(null);
       return;
     }
 
@@ -119,19 +125,9 @@ export default function CallHistoryPage() {
       audioRef.current.pause();
     }
 
-    // Create new audio element and play
-    const audio = new Audio(call.recording_url);
-    audioRef.current = audio;
+    // Set the recording URL and playing state - audio will autoplay via controls
+    setCurrentRecordingUrl(call.recording_url);
     setPlayingCallId(call.id);
-
-    audio.play().catch((err: Error) => {
-      toast.error(`Failed to play recording: ${err.message}`);
-      setPlayingCallId(null);
-    });
-
-    audio.onended = () => {
-      setPlayingCallId(null);
-    };
   };
 
   const handleDownloadTranscript = (call: CallRecord) => {
@@ -188,6 +184,63 @@ export default function CallHistoryPage() {
 
   return (
     <div className="space-y-4">
+      {/* Audio player for recording playback */}
+      {currentRecordingUrl && playingCallId && (
+        <Card className="fixed bottom-4 left-1/2 z-50 w-[500px] -translate-x-1/2 shadow-lg">
+          <CardContent className="flex items-center gap-4 p-4">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => {
+                if (audioRef.current) {
+                  if (audioRef.current.paused) {
+                    audioRef.current.play();
+                  } else {
+                    audioRef.current.pause();
+                  }
+                }
+              }}
+            >
+              {audioRef.current?.paused ? (
+                <Play className="h-5 w-5" />
+              ) : (
+                <Pause className="h-5 w-5" />
+              )}
+            </Button>
+            <audio
+              ref={audioRef}
+              src={currentRecordingUrl}
+              autoPlay
+              onEnded={() => {
+                setPlayingCallId(null);
+                setCurrentRecordingUrl(null);
+              }}
+              onError={() => {
+                toast.error("Failed to load recording");
+                setPlayingCallId(null);
+                setCurrentRecordingUrl(null);
+              }}
+              controls
+              className="h-8 flex-1"
+            />
+            <Button
+              variant="ghost"
+              size="icon"
+              title="Close player"
+              onClick={() => {
+                if (audioRef.current) {
+                  audioRef.current.pause();
+                }
+                setPlayingCallId(null);
+                setCurrentRecordingUrl(null);
+              }}
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-semibold">Call History</h1>

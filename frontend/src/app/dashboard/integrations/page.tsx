@@ -474,13 +474,97 @@ const IntegrationConfigForm = memo(function IntegrationConfigForm({
     );
   }
 
-  // No fields defined - show placeholder
+  // OAuth flow - redirect to backend OAuth endpoint
+  if (integration.authType === "oauth" && integration.oauthConnectUrl) {
+    const handleOAuthConnect = async () => {
+      try {
+        const params = new URLSearchParams();
+        if (selectedWorkspaceId) {
+          params.set("workspace_id", selectedWorkspaceId);
+        }
+        const url = `${integration.oauthConnectUrl}${params.toString() ? `?${params.toString()}` : ""}`;
+        const response = await api.get(url);
+        const { auth_url } = response.data;
+        if (auth_url) {
+          window.location.href = auth_url;
+        }
+      } catch (error) {
+        toast.error(`Failed to start ${integration.name} connection`);
+      }
+    };
+
+    return (
+      <div className="space-y-4">
+        {isConnected && connectionData && (
+          <div className="rounded-lg border border-green-500/20 bg-green-500/10 p-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 text-green-600 dark:text-green-400">
+                <Check className="h-4 w-4" />
+                <span className="text-sm font-medium">Connected</span>
+              </div>
+              {connectionData.connected_at && (
+                <span className="text-xs text-muted-foreground">
+                  Since {new Date(connectionData.connected_at).toLocaleDateString()}
+                </span>
+              )}
+            </div>
+          </div>
+        )}
+        <div className="rounded-lg border bg-muted/50 p-4">
+          <p className="text-sm text-muted-foreground">
+            {isConnected
+              ? `Click below to reconnect your ${integration.name} account.`
+              : `Click below to authorize access to your ${integration.name} account via OAuth.`}
+          </p>
+        </div>
+        <div className="flex gap-2">
+          <Button onClick={handleOAuthConnect} className="flex-1">
+            <ExternalLink className="mr-2 h-4 w-4" />
+            {isConnected ? "Reconnect" : "Connect"} with {integration.name}
+          </Button>
+          {isConnected && (
+            <Button
+              variant="destructive"
+              onClick={() => setShowDisconnectDialog(true)}
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          )}
+        </div>
+
+        {/* Disconnect confirmation dialog for OAuth */}
+        <AlertDialog open={showDisconnectDialog} onOpenChange={setShowDisconnectDialog}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Disconnect {integration.name}?</AlertDialogTitle>
+              <AlertDialogDescription>
+                This will revoke access to your {integration.name} account. Any agents using this
+                integration will no longer have access.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={() => disconnectMutation.mutate()}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                {disconnectMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Disconnect
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </div>
+    );
+  }
+
+  // No fields defined and not OAuth - show placeholder
   if (!integration.fields || integration.fields.length === 0) {
     return (
       <div className="space-y-4">
         <div className="rounded-lg border p-4">
           <p className="text-sm text-muted-foreground">
-            This integration requires OAuth authentication which is coming soon.
+            This integration requires configuration which is not yet available.
           </p>
         </div>
         <Button onClick={onClose} className="w-full">
