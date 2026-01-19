@@ -153,6 +153,9 @@ class ClaudeAdapter:
                         yield {"type": "message_end"}
 
         except Exception as e:
+            print(f"[CLAUDE ERROR] Generation failed: {type(e).__name__}: {e}", flush=True)  # noqa: T201
+            import traceback
+            traceback.print_exc()
             self.logger.exception("claude_generation_error", error=str(e))
             yield {
                 "type": "error",
@@ -344,6 +347,9 @@ class ClaudeAdapter:
                     self.logger.warning("claude_stream_no_events")
 
         except Exception as e:
+            print(f"[CLAUDE ERROR] Tool continuation failed: {type(e).__name__}: {e}", flush=True)  # noqa: T201
+            import traceback
+            traceback.print_exc()
             self.logger.exception("claude_continuation_error", error=str(e))
             yield {
                 "type": "error",
