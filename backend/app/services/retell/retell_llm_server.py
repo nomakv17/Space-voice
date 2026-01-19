@@ -835,11 +835,21 @@ class RetellLLMServer:
             return
 
         # Mark response complete
-        await self._send_response(
-            response_id=response_id,
-            content="",
-            content_complete=True,
-        )
+        # CRITICAL: If Claude didn't say anything after tools, send a fallback message
+        # Otherwise Retell will think we're done and hang up
+        if not accumulated_text:
+            self.logger.warning("no_text_after_tools_sending_fallback")
+            await self._send_response(
+                response_id=response_id,
+                content="Is there anything else I can help you with today?",
+                content_complete=True,
+            )
+        else:
+            await self._send_response(
+                response_id=response_id,
+                content="",
+                content_complete=True,
+            )
 
     async def _handle_special_action_from_queue(self, item: dict[str, Any]) -> None:
         """Handle special actions (end_call, transfer_call) from queue.
@@ -1042,14 +1052,20 @@ class RetellLLMServer:
             return
 
         # Mark response complete
+        # CRITICAL: If Claude didn't say anything after tools, send a fallback message
         if not has_response:
-            self.logger.warning("no_response_after_tools")
-
-        await self._send_response(
-            response_id=response_id,
-            content="",
-            content_complete=True,
-        )
+            self.logger.warning("no_response_after_tools_sending_fallback")
+            await self._send_response(
+                response_id=response_id,
+                content="Is there anything else I can help you with today?",
+                content_complete=True,
+            )
+        else:
+            await self._send_response(
+                response_id=response_id,
+                content="",
+                content_complete=True,
+            )
 
     async def _send_response(
         self,
