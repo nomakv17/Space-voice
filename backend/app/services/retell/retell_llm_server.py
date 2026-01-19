@@ -144,12 +144,27 @@ class RetellLLMServer:
 
             # Run message receiver, response sender, and keepalive concurrently
             # The keepalive runs for the ENTIRE connection lifetime to prevent timeouts
-            await asyncio.gather(
+            results = await asyncio.gather(
                 self._message_receiver(),
                 self._response_sender(),
                 self._connection_keepalive(),
                 return_exceptions=True,
             )
+
+            # Check for exceptions that were silently caught
+            task_names = ["message_receiver", "response_sender", "connection_keepalive"]
+            for i, result in enumerate(results):
+                if isinstance(result, Exception):
+                    print(  # noqa: T201
+                        f"[TASK ERROR] {task_names[i]} failed: {type(result).__name__}: {result}",
+                        flush=True,
+                    )
+                    self.logger.error(
+                        "task_failed",
+                        task=task_names[i],
+                        error=str(result),
+                        error_type=type(result).__name__,
+                    )
 
         except WebSocketDisconnect:
             self.logger.info("retell_closed_connection")
@@ -598,35 +613,47 @@ When customer says a day name, calculate from TODAY. ALWAYS confirm full date be
 
         self.logger.info("reminder_required", response_id=response_id)
 
-        # Add context that this is a reminder
-        reminder_transcript = [
-            *transcript,
-            {
-                "role": "system",
-                "content": "[The user has been silent. Gently check if they're still there or need help.]",
-            },
-        ]
+        try:
+            # Add context that this is a reminder
+            reminder_transcript = [
+                *transcript,
+                {
+                    "role": "system",
+                    "content": "[The user has been silent. Gently check if they're still there or need help.]",
+                },
+            ]
 
-        # Generate a brief reminder response
-        async for event in self.llm.generate_response(
-            transcript=reminder_transcript,
-            system_prompt=self.system_prompt,
-            tools=[],  # No tools for reminders
-            temperature=0.7,
-            max_tokens=100,  # Keep reminders short
-        ):
-            if event.get("type") == "text_delta":
+            # Generate a brief reminder response
+            async for event in self.llm.generate_response(
+                transcript=reminder_transcript,
+                system_prompt=self.system_prompt,
+                tools=[],  # No tools for reminders
+                temperature=0.7,
+                max_tokens=100,  # Keep reminders short
+            ):
+                if event.get("type") == "text_delta":
+                    await self._send_response(
+                        response_id=response_id,
+                        content=event.get("delta", ""),
+                        content_complete=False,
+                    )
+                elif event.get("type") == "error":
+                    print(f"[REMINDER LLM ERROR] {event.get('error')}", flush=True)  # noqa: T201
+
+            await self._send_response(
+                response_id=response_id,
+                content="",
+                content_complete=True,
+            )
+        except Exception as e:
+            print(f"[REMINDER ERROR] {type(e).__name__}: {e}", flush=True)  # noqa: T201
+            # Send a safe fallback response - suppress errors if connection is dead
+            with contextlib.suppress(Exception):
                 await self._send_response(
                     response_id=response_id,
-                    content=event.get("delta", ""),
-                    content_complete=False,
+                    content="Are you still there?",
+                    content_complete=True,
                 )
-
-        await self._send_response(
-            response_id=response_id,
-            content="",
-            content_complete=True,
-        )
 
     async def _execute_tools_background(
         self,
@@ -1248,7 +1275,14 @@ When customer says a day name, calculate from TODAY. ALWAYS confirm full date be
 
         Args:
             data: Message to send
+
+        Raises:
+            Exception: Re-raised to signal connection is dead
         """
-        await self.websocket.send_text(json.dumps(data))
-        # Update activity time to prevent redundant keepalives
-        self._last_activity_time = asyncio.get_event_loop().time()
+        try:
+            await self.websocket.send_text(json.dumps(data))
+            # Update activity time to prevent redundant keepalives
+            self._last_activity_time = asyncio.get_event_loop().time()
+        except Exception as e:
+            print(f"[WEBSOCKET ERROR] Send failed: {type(e).__name__}: {e}", flush=True)  # noqa: T201
+            raise  # Re-raise to signal connection dead
