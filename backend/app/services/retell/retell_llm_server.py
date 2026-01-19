@@ -114,6 +114,10 @@ class RetellLLMServer:
         self._current_response_id: int = 0
         self._last_activity_time: float = 0.0  # Track last WebSocket activity
 
+        # Session-level deduplication to prevent double SMS/calendar bookings
+        self._sent_sms_numbers: set[str] = set()  # Track phone numbers we've sent SMS to
+        self._booked_calendar_events: set[str] = set()  # Track calendar events created
+
     async def handle_connection(self) -> None:
         """Main WebSocket handler for Retell LLM communication.
 
@@ -624,10 +628,41 @@ CURRENT DATE & TIME:
                     tool_use_id=tool_use_id,
                 )
 
+                # DEDUPLICATION: Prevent double SMS sends in same session
+                if tool_name in ("telnyx_send_sms", "twilio_send_sms"):
+                    to_number = arguments.get("to", "")
+                    if to_number in self._sent_sms_numbers:
+                        self.logger.warning(
+                            "duplicate_sms_blocked",
+                            tool_name=tool_name,
+                            to_number=to_number,
+                        )
+                        result = {
+                            "success": True,
+                            "message": f"SMS already sent to {to_number} in this session (duplicate blocked)",
+                            "deduplicated": True,
+                        }
+                        tool_results.append(
+                            format_tool_result_for_claude(
+                                tool_use_id=tool_use_id,
+                                result=result,
+                                is_error=False,
+                            )
+                        )
+                        continue  # Skip to next tool call
+
                 # Execute the tool
                 try:
                     result = await self.tool_registry.execute_tool(tool_name, arguments)
                     is_error = False
+
+                    # Track successful SMS sends for deduplication
+                    if tool_name in ("telnyx_send_sms", "twilio_send_sms"):
+                        to_number = arguments.get("to", "")
+                        if result.get("success"):
+                            self._sent_sms_numbers.add(to_number)
+                            self.logger.info("sms_sent_tracked", to_number=to_number)
+
                 except Exception as e:
                     self.logger.exception("tool_execution_error", tool_name=tool_name, error=str(e))
                     result = {"error": str(e)}
@@ -933,10 +968,41 @@ CURRENT DATE & TIME:
             # Retell's Custom LLM protocol doesn't support tool_call_invocation messages
             # Tool execution is invisible to Retell - we just execute and continue
 
+            # DEDUPLICATION: Prevent double SMS sends in same session
+            if tool_name in ("telnyx_send_sms", "twilio_send_sms"):
+                to_number = arguments.get("to", "")
+                if to_number in self._sent_sms_numbers:
+                    self.logger.warning(
+                        "duplicate_sms_blocked",
+                        tool_name=tool_name,
+                        to_number=to_number,
+                    )
+                    result = {
+                        "success": True,
+                        "message": f"SMS already sent to {to_number} in this session (duplicate blocked)",
+                        "deduplicated": True,
+                    }
+                    tool_results.append(
+                        format_tool_result_for_claude(
+                            tool_use_id=tool_use_id,
+                            result=result,
+                            is_error=False,
+                        )
+                    )
+                    continue  # Skip to next tool call
+
             # Execute the tool
             try:
                 result = await self.tool_registry.execute_tool(tool_name, arguments)
                 is_error = False
+
+                # Track successful SMS sends for deduplication
+                if tool_name in ("telnyx_send_sms", "twilio_send_sms"):
+                    to_number = arguments.get("to", "")
+                    if result.get("success"):
+                        self._sent_sms_numbers.add(to_number)
+                        self.logger.info("sms_sent_tracked", to_number=to_number)
+
             except Exception as e:
                 self.logger.exception("tool_execution_error", tool_name=tool_name, error=str(e))
                 result = {"error": str(e)}
