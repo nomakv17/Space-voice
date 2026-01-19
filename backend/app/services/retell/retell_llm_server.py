@@ -689,20 +689,21 @@ class RetellLLMServer:
         Args:
             item: Queued item with tool results
         """
-        response_id = item["response_id"]
+        original_response_id = item["response_id"]
         transcript = item["transcript"]
         tool_calls = item["tool_calls"]
         tool_results = item["tool_results"]
         assistant_text = item["assistant_text"]
 
-        # Check if response is stale (user may have interrupted)
-        if self._current_response_id != response_id:
-            self.logger.warning(
-                "stale_tool_response_discarded",
-                stale_id=response_id,
-                current_id=self._current_response_id,
+        # ALWAYS use current response_id to send the confirmation
+        # Don't discard - we must send the confirmation even if response_id changed
+        response_id = self._current_response_id
+        if response_id != original_response_id:
+            self.logger.info(
+                "using_current_response_id",
+                original_id=original_response_id,
+                current_id=response_id,
             )
-            return
 
         self.logger.info(
             "continuing_after_tools",
