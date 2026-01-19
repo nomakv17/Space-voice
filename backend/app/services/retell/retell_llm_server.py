@@ -490,14 +490,14 @@ class RetellLLMServer:
         if pending_tool_calls:
             # Send "thinking" message if Claude didn't say anything
             if not accumulated_content:
-                accumulated_content = "One moment while I book that for you..."
+                accumulated_content = "One moment..."
                 await self._send_response(
                     response_id=response_id,
                     content=accumulated_content,
                     content_complete=False,
                 )
 
-            # Mark response complete so Retell speaks the "One moment" message
+            # Mark response complete - tells Retell we're done speaking for now
             await self._send_response(
                 response_id=response_id,
                 content="",
@@ -692,21 +692,20 @@ class RetellLLMServer:
         Args:
             item: Queued item with tool results
         """
-        original_response_id = item["response_id"]
+        response_id = item["response_id"]
         transcript = item["transcript"]
         tool_calls = item["tool_calls"]
         tool_results = item["tool_results"]
         assistant_text = item["assistant_text"]
 
-        # Use current response_id even if original is stale
-        # This ensures we always try to send the confirmation
-        response_id = self._current_response_id
-        if response_id != original_response_id:
-            self.logger.info(
-                "using_current_response_id_for_tool_continuation",
-                original_id=original_response_id,
-                current_id=response_id,
+        # Check if response is stale (user may have interrupted)
+        if self._current_response_id != response_id:
+            self.logger.warning(
+                "stale_tool_response_discarded",
+                stale_id=response_id,
+                current_id=self._current_response_id,
             )
+            return
 
         self.logger.info(
             "continuing_after_tools",
@@ -836,24 +835,11 @@ class RetellLLMServer:
             return
 
         # Mark response complete
-        # CRITICAL: Always send a confirmation message after tools complete
-        # This ensures the agent speaks before ending, preventing silent hangups
-        if not accumulated_text:
-            self.logger.warning("no_text_after_tools_sending_confirmation")
-            # Send a proper confirmation message, not just a fallback
-            await self._send_response(
-                response_id=response_id,
-                content="Your appointment has been booked and you will receive a text confirmation shortly. Is there anything else I can help you with today?",
-                content_complete=True,
-            )
-        else:
-            # Claude did generate text - just finalize the response
-            self.logger.info("finalizing_response_after_tools", text_length=len(accumulated_text))
-            await self._send_response(
-                response_id=response_id,
-                content="",
-                content_complete=True,
-            )
+        await self._send_response(
+            response_id=response_id,
+            content="",
+            content_complete=True,
+        )
 
     async def _handle_special_action_from_queue(self, item: dict[str, Any]) -> None:
         """Handle special actions (end_call, transfer_call) from queue.
@@ -1056,21 +1042,14 @@ class RetellLLMServer:
             return
 
         # Mark response complete
-        # CRITICAL: Always send a confirmation message after tools complete
         if not has_response:
-            self.logger.warning("no_response_after_tools_sending_confirmation")
-            await self._send_response(
-                response_id=response_id,
-                content="Your appointment has been booked and you will receive a text confirmation shortly. Is there anything else I can help you with today?",
-                content_complete=True,
-            )
-        else:
-            self.logger.info("finalizing_response_after_tools_sync", text_generated=has_response)
-            await self._send_response(
-                response_id=response_id,
-                content="",
-                content_complete=True,
-            )
+            self.logger.warning("no_response_after_tools")
+
+        await self._send_response(
+            response_id=response_id,
+            content="",
+            content_complete=True,
+        )
 
     async def _send_response(
         self,
