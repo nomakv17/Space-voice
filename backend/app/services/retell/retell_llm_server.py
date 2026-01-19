@@ -375,8 +375,8 @@ class RetellLLMServer:
 
         # Inject current date/time so the agent knows what day it is
         # This allows correct date calculation when users say "Tuesday" or "tomorrow"
-        # Using US Central timezone for HVAC service business
-        central_tz = ZoneInfo("America/Chicago")
+        # Using Saskatchewan timezone for Yorkton, Canada (no DST)
+        central_tz = ZoneInfo("America/Regina")
         now = datetime.now(central_tz)
         from datetime import timedelta
 
