@@ -118,6 +118,11 @@ class RetellLLMServer:
         self._sent_sms_numbers: set[str] = set()  # Track phone numbers we've sent SMS to
         self._booked_calendar_events: set[str] = set()  # Track calendar events created
 
+        # Prevent recursive tool call spam
+        self._recursive_tool_depth: int = 0  # Track depth of recursive tool calls
+        self._max_recursive_depth: int = 2  # Max 2 levels of recursive tools
+        self._said_one_moment: bool = False  # Only say "one moment" once per turn
+
     async def handle_connection(self) -> None:
         """Main WebSocket handler for Retell LLM communication.
 
@@ -373,13 +378,25 @@ class RetellLLMServer:
         # Using US Central timezone for HVAC service business
         central_tz = ZoneInfo("America/Chicago")
         now = datetime.now(central_tz)
+        from datetime import timedelta
+        tomorrow = now + timedelta(days=1)
+
+        # Log the actual date being injected for debugging
+        self.logger.info(
+            "date_injection",
+            today=now.strftime('%A, %B %d, %Y'),
+            time=now.strftime('%I:%M %p %Z'),
+            iso=now.isoformat(),
+        )
+
         date_info = f"""
 
-CURRENT DATE & TIME:
-- Today is {now.strftime('%A, %B %d, %Y')} (e.g., Monday, January 20, 2025)
-- Current time: {now.strftime('%I:%M %p %Z')} (e.g., 2:30 PM CST)
-- When a customer asks for "Tuesday", calculate the correct date from today's date.
-- ALWAYS use the full date format (e.g., "January 21, 2025") when confirming appointments."""
+CURRENT DATE & TIME (USE THIS FOR ALL DATE CALCULATIONS):
+- TODAY is {now.strftime('%A, %B %d, %Y')}
+- Current time: {now.strftime('%I:%M %p')} Central Time
+- Tomorrow is {tomorrow.strftime('%A, %B %d, %Y')}
+
+When customer says a day name, calculate from TODAY. ALWAYS confirm full date before booking."""
         self.system_prompt += date_info
 
         # Append caller phone info to system prompt so agent can use it for SMS/booking
@@ -430,6 +447,10 @@ CURRENT DATE & TIME:
 
         # Track current response_id for stale response detection
         self._current_response_id = response_id
+
+        # Reset per-turn state for new user turn
+        self._recursive_tool_depth = 0
+        self._said_one_moment = False
 
         # If user interrupted during tool execution, cancel it
         if self._pending_tool_execution:
@@ -846,46 +867,56 @@ CURRENT DATE & TIME:
             with contextlib.suppress(asyncio.CancelledError):
                 await keepalive_task
 
-        # Handle recursive tool calls
+        # Handle recursive tool calls (with depth limit to prevent spam)
         if new_tool_calls:
+            self._recursive_tool_depth += 1
             self.logger.info(
                 "recursive_tool_calls_detected",
                 tool_count=len(new_tool_calls),
                 tool_names=[t.get("name") for t in new_tool_calls],
+                depth=self._recursive_tool_depth,
             )
 
-            if not accumulated_text:
-                accumulated_text = "One moment please..."
-                await self._send_response(
-                    response_id=response_id,
-                    content=accumulated_text,
-                    content_complete=False,  # Keep response OPEN
+            # Limit recursive depth to prevent infinite loops
+            if self._recursive_tool_depth > self._max_recursive_depth:
+                self.logger.warning(
+                    "max_recursive_depth_exceeded",
+                    depth=self._recursive_tool_depth,
+                    skipping_tools=[t.get("name") for t in new_tool_calls],
                 )
+                # Skip these tools and proceed to confirmation
+                new_tool_calls = []
+            else:
+                # Only say "one moment" ONCE per conversation turn
+                if not self._said_one_moment and not accumulated_text:
+                    self._said_one_moment = True
+                    accumulated_text = "One moment please..."
+                    await self._send_response(
+                        response_id=response_id,
+                        content=accumulated_text,
+                        content_complete=False,  # Keep response OPEN
+                    )
 
-            # DO NOT send content_complete=True here!
-            # The recursive tools will complete and send the final confirmation
-            # Sending content_complete=True would tell Retell we're done speaking
+                # Spawn another background task for recursive tools
+                updated_transcript = list(transcript)
+                updated_transcript.append({"role": "agent", "content": accumulated_text})
 
-            # Spawn another background task for recursive tools
-            updated_transcript = list(transcript)
-            updated_transcript.append({"role": "agent", "content": accumulated_text})
-
-            task = asyncio.create_task(
-                self._execute_tools_background(
+                task = asyncio.create_task(
+                    self._execute_tools_background(
+                        response_id=response_id,
+                        transcript=updated_transcript,
+                        tool_calls=new_tool_calls,
+                        assistant_text=accumulated_text,
+                    )
+                )
+                self._pending_tool_execution = PendingToolExecution(
                     response_id=response_id,
                     transcript=updated_transcript,
                     tool_calls=new_tool_calls,
                     assistant_text=accumulated_text,
+                    task=task,
                 )
-            )
-            self._pending_tool_execution = PendingToolExecution(
-                response_id=response_id,
-                transcript=updated_transcript,
-                tool_calls=new_tool_calls,
-                assistant_text=accumulated_text,
-                task=task,
-            )
-            return
+                return
 
         # Mark response complete
         # Check if Claude generated meaningful text (not just whitespace/punctuation)
