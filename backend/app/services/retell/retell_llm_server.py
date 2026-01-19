@@ -835,16 +835,19 @@ class RetellLLMServer:
             return
 
         # Mark response complete
-        # CRITICAL: If Claude didn't say anything after tools, send a fallback message
-        # Otherwise Retell will think we're done and hang up
+        # CRITICAL: Always send a confirmation message after tools complete
+        # This ensures the agent speaks before ending, preventing silent hangups
         if not accumulated_text:
-            self.logger.warning("no_text_after_tools_sending_fallback")
+            self.logger.warning("no_text_after_tools_sending_confirmation")
+            # Send a proper confirmation message, not just a fallback
             await self._send_response(
                 response_id=response_id,
-                content="Is there anything else I can help you with today?",
+                content="Your appointment has been booked and you will receive a text confirmation shortly. Is there anything else I can help you with today?",
                 content_complete=True,
             )
         else:
+            # Claude did generate text - just finalize the response
+            self.logger.info("finalizing_response_after_tools", text_length=len(accumulated_text))
             await self._send_response(
                 response_id=response_id,
                 content="",
@@ -1052,15 +1055,16 @@ class RetellLLMServer:
             return
 
         # Mark response complete
-        # CRITICAL: If Claude didn't say anything after tools, send a fallback message
+        # CRITICAL: Always send a confirmation message after tools complete
         if not has_response:
-            self.logger.warning("no_response_after_tools_sending_fallback")
+            self.logger.warning("no_response_after_tools_sending_confirmation")
             await self._send_response(
                 response_id=response_id,
-                content="Is there anything else I can help you with today?",
+                content="Your appointment has been booked and you will receive a text confirmation shortly. Is there anything else I can help you with today?",
                 content_complete=True,
             )
         else:
+            self.logger.info("finalizing_response_after_tools_sync", text_generated=has_response)
             await self._send_response(
                 response_id=response_id,
                 content="",
