@@ -490,19 +490,17 @@ class RetellLLMServer:
         if pending_tool_calls:
             # Send "thinking" message if Claude didn't say anything
             if not accumulated_content:
-                accumulated_content = "One moment..."
+                accumulated_content = "One moment while I book that for you..."
                 await self._send_response(
                     response_id=response_id,
                     content=accumulated_content,
-                    content_complete=False,
+                    content_complete=False,  # Keep response OPEN!
                 )
 
-            # Mark response complete - tells Retell we're done speaking for now
-            await self._send_response(
-                response_id=response_id,
-                content="",
-                content_complete=True,
-            )
+            # DO NOT send content_complete=True here!
+            # We need to keep the response open until tools finish and we send confirmation.
+            # Sending content_complete=True would tell Retell we're done speaking,
+            # and it would switch to listening mode, potentially hanging up on silence.
 
             # CRITICAL: Spawn background task - DON'T AWAIT!
             # This returns immediately so we can handle ping_pong while tools run
