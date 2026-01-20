@@ -122,6 +122,28 @@ class RetellLLMServer:
         self._recursive_tool_depth: int = 0  # Track depth of recursive tool calls
         self._max_recursive_depth: int = 2  # Max 2 levels of recursive tools
         self._said_one_moment: bool = False  # Only say "one moment" once per turn
+        self._said_goodbye: bool = False  # Track if we've already said goodbye
+        self._current_turn_text: str = ""  # Accumulate text for goodbye detection
+
+    def _is_goodbye_message(self, text: str) -> bool:
+        """Check if text contains a goodbye/call-ending phrase.
+
+        Used to auto-detect when to set end_call=True.
+        """
+        if not text:
+            return False
+        text_lower = text.lower()
+        # Patterns that indicate the agent is ending the call
+        goodbye_patterns = [
+            "goodbye",
+            "good bye",
+            "have a great day",
+            "have a good day",
+            "have a nice day",
+            "thank you for calling",
+            "thanks for calling",
+        ]
+        return any(pattern in text_lower for pattern in goodbye_patterns)
 
     async def handle_connection(self) -> None:
         """Main WebSocket handler for Retell LLM communication.
@@ -710,6 +732,35 @@ When customer says a day name, calculate from TODAY. ALWAYS confirm full date be
                         )
                         continue  # Skip to next tool call
 
+                # DEDUPLICATION: Prevent double calendar bookings in same session
+                if tool_name == "google_calendar_create_event":
+                    start_time = arguments.get("start_time", "")
+                    # Create unique key from start_time (same slot = duplicate)
+                    booking_key = f"{start_time}"
+                    if booking_key in self._booked_calendar_events:
+                        self.logger.warning(
+                            "duplicate_booking_blocked",
+                            tool_name=tool_name,
+                            start_time=start_time,
+                        )
+                        print(
+                            f"[CALENDAR DEDUP] Blocked duplicate booking for {start_time}",
+                            flush=True,
+                        )  # noqa: T201
+                        result = {
+                            "success": True,
+                            "message": f"Appointment already booked for {start_time} (duplicate blocked)",
+                            "deduplicated": True,
+                        }
+                        tool_results.append(
+                            format_tool_result_for_claude(
+                                tool_use_id=tool_use_id,
+                                result=result,
+                                is_error=False,
+                            )
+                        )
+                        continue  # Skip to next tool call
+
                 # Execute the tool
                 try:
                     result = await self.tool_registry.execute_tool(tool_name, arguments)
@@ -721,6 +772,15 @@ When customer says a day name, calculate from TODAY. ALWAYS confirm full date be
                         if result.get("success"):
                             self._sent_sms_numbers.add(to_number)
                             self.logger.info("sms_sent_tracked", to_number=to_number)
+
+                    # Track successful calendar bookings for deduplication
+                    if tool_name == "google_calendar_create_event":
+                        start_time = arguments.get("start_time", "")
+                        if result.get("success"):
+                            booking_key = f"{start_time}"
+                            self._booked_calendar_events.add(booking_key)
+                            self.logger.info("calendar_booking_tracked", start_time=start_time)
+                            print(f"[CALENDAR TRACK] Booking tracked for {start_time}", flush=True)  # noqa: T201
 
                 except Exception as e:
                     self.logger.exception("tool_execution_error", tool_name=tool_name, error=str(e))
@@ -1083,6 +1143,33 @@ When customer says a day name, calculate from TODAY. ALWAYS confirm full date be
                     )
                     continue  # Skip to next tool call
 
+            # DEDUPLICATION: Prevent double calendar bookings in same session
+            if tool_name == "google_calendar_create_event":
+                start_time = arguments.get("start_time", "")
+                booking_key = f"{start_time}"
+                if booking_key in self._booked_calendar_events:
+                    self.logger.warning(
+                        "duplicate_booking_blocked",
+                        tool_name=tool_name,
+                        start_time=start_time,
+                    )
+                    print(
+                        f"[CALENDAR DEDUP] Blocked duplicate booking for {start_time}", flush=True
+                    )  # noqa: T201
+                    result = {
+                        "success": True,
+                        "message": f"Appointment already booked for {start_time} (duplicate blocked)",
+                        "deduplicated": True,
+                    }
+                    tool_results.append(
+                        format_tool_result_for_claude(
+                            tool_use_id=tool_use_id,
+                            result=result,
+                            is_error=False,
+                        )
+                    )
+                    continue  # Skip to next tool call
+
             # Execute the tool
             try:
                 result = await self.tool_registry.execute_tool(tool_name, arguments)
@@ -1094,6 +1181,15 @@ When customer says a day name, calculate from TODAY. ALWAYS confirm full date be
                     if result.get("success"):
                         self._sent_sms_numbers.add(to_number)
                         self.logger.info("sms_sent_tracked", to_number=to_number)
+
+                # Track successful calendar bookings for deduplication
+                if tool_name == "google_calendar_create_event":
+                    start_time = arguments.get("start_time", "")
+                    if result.get("success"):
+                        booking_key = f"{start_time}"
+                        self._booked_calendar_events.add(booking_key)
+                        self.logger.info("calendar_booking_tracked", start_time=start_time)
+                        print(f"[CALENDAR TRACK] Booking tracked for {start_time}", flush=True)  # noqa: T201
 
             except Exception as e:
                 self.logger.exception("tool_execution_error", tool_name=tool_name, error=str(e))
@@ -1255,6 +1351,27 @@ When customer says a day name, calculate from TODAY. ALWAYS confirm full date be
             end_call: Whether to end the call after this response
             transfer_number: Phone number to transfer the call to
         """
+        # Track accumulated text for goodbye detection (streaming comes in chunks)
+        if content:
+            self._current_turn_text += content
+
+        # Auto-detect goodbye phrases and set end_call=True when turn completes
+        # This ensures the call ends when the agent says goodbye
+        if content_complete and not self._said_goodbye:
+            # Check accumulated text from this turn for goodbye phrases
+            if self._is_goodbye_message(self._current_turn_text):
+                self._said_goodbye = True
+                end_call = True
+                print(
+                    f"[GOODBYE DETECTED] Auto-ending call after: {self._current_turn_text[:60]}...",
+                    flush=True,
+                )  # noqa: T201
+                self.logger.info(
+                    "auto_end_call_goodbye_detected", content_preview=self._current_turn_text[:50]
+                )
+            # Reset accumulated text for next turn
+            self._current_turn_text = ""
+
         response: dict[str, Any] = {
             "response_type": "response",
             "response_id": response_id,
