@@ -116,7 +116,7 @@ class RetellLLMServer:
 
         # Session-level deduplication to prevent double SMS/calendar bookings
         self._sent_sms_numbers: set[str] = set()  # Track phone numbers we've sent SMS to
-        self._booked_calendar_events: set[str] = set()  # Track calendar events created
+        self._booking_completed: bool = False  # Track if ANY booking has been made (one per call)
 
         # Prevent recursive tool call spam
         self._recursive_tool_depth: int = 0  # Track depth of recursive tool calls
@@ -749,24 +749,18 @@ When customer says a day name, calculate from TODAY. ALWAYS confirm full date be
                         )
                         continue  # Skip to next tool call
 
-                # DEDUPLICATION: Prevent double calendar bookings in same session
+                # DEDUPLICATION: Only ONE booking per call - block all subsequent attempts
                 if tool_name == "google_calendar_create_event":
-                    start_time = arguments.get("start_time", "")
-                    # Create unique key from start_time (same slot = duplicate)
-                    booking_key = f"{start_time}"
-                    if booking_key in self._booked_calendar_events:
+                    if self._booking_completed:
                         self.logger.warning(
                             "duplicate_booking_blocked",
                             tool_name=tool_name,
-                            start_time=start_time,
+                            reason="booking_already_completed_this_session",
                         )
-                        print(
-                            f"[CALENDAR DEDUP] Blocked duplicate booking for {start_time}",
-                            flush=True,
-                        )  # noqa: T201
+                        print("[CALENDAR DEDUP] Blocked - already booked this call!", flush=True)  # noqa: T201
                         result = {
                             "success": True,
-                            "message": f"Appointment already booked for {start_time} (duplicate blocked)",
+                            "message": "Appointment already booked in this call. No additional booking needed.",
                             "deduplicated": True,
                         }
                         tool_results.append(
@@ -790,14 +784,14 @@ When customer says a day name, calculate from TODAY. ALWAYS confirm full date be
                             self._sent_sms_numbers.add(to_number)
                             self.logger.info("sms_sent_tracked", to_number=to_number)
 
-                    # Track successful calendar bookings for deduplication
-                    if tool_name == "google_calendar_create_event":
-                        start_time = arguments.get("start_time", "")
-                        if result.get("success"):
-                            booking_key = f"{start_time}"
-                            self._booked_calendar_events.add(booking_key)
-                            self.logger.info("calendar_booking_tracked", start_time=start_time)
-                            print(f"[CALENDAR TRACK] Booking tracked for {start_time}", flush=True)  # noqa: T201
+                    # Track successful calendar booking - only ONE per call allowed
+                    if tool_name == "google_calendar_create_event" and result.get("success"):
+                        self._booking_completed = True
+                        self.logger.info("booking_completed_for_session")
+                        print(
+                            "[CALENDAR] Booking completed - blocking future bookings this call",
+                            flush=True,
+                        )  # noqa: T201
 
                 except Exception as e:
                     self.logger.exception("tool_execution_error", tool_name=tool_name, error=str(e))
@@ -1160,22 +1154,18 @@ When customer says a day name, calculate from TODAY. ALWAYS confirm full date be
                     )
                     continue  # Skip to next tool call
 
-            # DEDUPLICATION: Prevent double calendar bookings in same session
+            # DEDUPLICATION: Only ONE booking per call - block all subsequent attempts
             if tool_name == "google_calendar_create_event":
-                start_time = arguments.get("start_time", "")
-                booking_key = f"{start_time}"
-                if booking_key in self._booked_calendar_events:
+                if self._booking_completed:
                     self.logger.warning(
                         "duplicate_booking_blocked",
                         tool_name=tool_name,
-                        start_time=start_time,
+                        reason="booking_already_completed_this_session",
                     )
-                    print(
-                        f"[CALENDAR DEDUP] Blocked duplicate booking for {start_time}", flush=True
-                    )  # noqa: T201
+                    print("[CALENDAR DEDUP] Blocked - already booked this call!", flush=True)  # noqa: T201
                     result = {
                         "success": True,
-                        "message": f"Appointment already booked for {start_time} (duplicate blocked)",
+                        "message": "Appointment already booked in this call. No additional booking needed.",
                         "deduplicated": True,
                     }
                     tool_results.append(
@@ -1199,14 +1189,14 @@ When customer says a day name, calculate from TODAY. ALWAYS confirm full date be
                         self._sent_sms_numbers.add(to_number)
                         self.logger.info("sms_sent_tracked", to_number=to_number)
 
-                # Track successful calendar bookings for deduplication
-                if tool_name == "google_calendar_create_event":
-                    start_time = arguments.get("start_time", "")
-                    if result.get("success"):
-                        booking_key = f"{start_time}"
-                        self._booked_calendar_events.add(booking_key)
-                        self.logger.info("calendar_booking_tracked", start_time=start_time)
-                        print(f"[CALENDAR TRACK] Booking tracked for {start_time}", flush=True)  # noqa: T201
+                # Track successful calendar booking - only ONE per call allowed
+                if tool_name == "google_calendar_create_event" and result.get("success"):
+                    self._booking_completed = True
+                    self.logger.info("booking_completed_for_session")
+                    print(
+                        "[CALENDAR] Booking completed - blocking future bookings this call",
+                        flush=True,
+                    )  # noqa: T201
 
             except Exception as e:
                 self.logger.exception("tool_execution_error", tool_name=tool_name, error=str(e))
@@ -1372,9 +1362,14 @@ When customer says a day name, calculate from TODAY. ALWAYS confirm full date be
         if content:
             self._current_turn_text += content
 
+        # If we've already said goodbye, ALWAYS end the call on any content_complete
+        if self._said_goodbye and content_complete:
+            end_call = True
+            print("[END CALL] Forcing end_call - goodbye already said", flush=True)  # noqa: T201
+
         # Auto-detect goodbye phrases and set end_call=True when turn completes
         # This ensures the call ends when the agent says goodbye
-        if content_complete and not self._said_goodbye:
+        elif content_complete:
             # Check accumulated text from this turn for goodbye phrases
             if self._is_goodbye_message(self._current_turn_text):
                 self._said_goodbye = True
@@ -1386,7 +1381,9 @@ When customer says a day name, calculate from TODAY. ALWAYS confirm full date be
                 self.logger.info(
                     "auto_end_call_goodbye_detected", content_preview=self._current_turn_text[:50]
                 )
-            # Reset accumulated text for next turn
+
+        # Reset accumulated text for next turn when complete
+        if content_complete:
             self._current_turn_text = ""
 
         response: dict[str, Any] = {
