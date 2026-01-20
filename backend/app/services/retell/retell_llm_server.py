@@ -628,6 +628,13 @@ When customer says a day name, calculate from TODAY. ALWAYS confirm full date be
                 "tool_execution_spawned_background",
                 tool_count=len(pending_tool_calls),
             )
+
+            # CRITICAL: Check for goodbye BEFORE returning for tool execution
+            # Otherwise goodbye detection never fires (it only runs on content_complete=True)
+            if self._is_goodbye_message(accumulated_content):
+                self._said_goodbye = True
+                print(f"[GOODBYE DETECTED BEFORE TOOLS] {accumulated_content[:60]}...", flush=True)  # noqa: T201
+
             # Return immediately - don't block!
             return
 
@@ -771,6 +778,12 @@ When customer says a day name, calculate from TODAY. ALWAYS confirm full date be
                             )
                         )
                         continue  # Skip to next tool call
+                    else:
+                        # Set flag BEFORE execution to prevent race condition
+                        self._booking_completed = True
+                        print(
+                            "[CALENDAR] Blocking future bookings NOW (before execution)", flush=True
+                        )  # noqa: T201
 
                 # Execute the tool
                 try:
@@ -784,14 +797,7 @@ When customer says a day name, calculate from TODAY. ALWAYS confirm full date be
                             self._sent_sms_numbers.add(to_number)
                             self.logger.info("sms_sent_tracked", to_number=to_number)
 
-                    # Track successful calendar booking - only ONE per call allowed
-                    if tool_name == "google_calendar_create_event" and result.get("success"):
-                        self._booking_completed = True
-                        self.logger.info("booking_completed_for_session")
-                        print(
-                            "[CALENDAR] Booking completed - blocking future bookings this call",
-                            flush=True,
-                        )  # noqa: T201
+                    # Note: Calendar booking tracking now happens BEFORE execution (race condition fix)
 
                 except Exception as e:
                     self.logger.exception("tool_execution_error", tool_name=tool_name, error=str(e))
@@ -1000,8 +1006,8 @@ When customer says a day name, calculate from TODAY. ALWAYS confirm full date be
                 # Skip these tools and proceed to confirmation
                 new_tool_calls = []
             else:
-                # Only say "one moment" ONCE per conversation turn
-                if not self._said_one_moment and not accumulated_text:
+                # Only say "one moment" if we haven't said goodbye and haven't said it this turn
+                if not self._said_goodbye and not self._said_one_moment and not accumulated_text:
                     self._said_one_moment = True
                     accumulated_text = "One moment please..."
                     await self._send_response(
@@ -1176,6 +1182,10 @@ When customer says a day name, calculate from TODAY. ALWAYS confirm full date be
                         )
                     )
                     continue  # Skip to next tool call
+                else:
+                    # Set flag BEFORE execution to prevent race condition
+                    self._booking_completed = True
+                    print("[CALENDAR] Blocking future bookings NOW (before execution)", flush=True)  # noqa: T201
 
             # Execute the tool
             try:
@@ -1189,14 +1199,7 @@ When customer says a day name, calculate from TODAY. ALWAYS confirm full date be
                         self._sent_sms_numbers.add(to_number)
                         self.logger.info("sms_sent_tracked", to_number=to_number)
 
-                # Track successful calendar booking - only ONE per call allowed
-                if tool_name == "google_calendar_create_event" and result.get("success"):
-                    self._booking_completed = True
-                    self.logger.info("booking_completed_for_session")
-                    print(
-                        "[CALENDAR] Booking completed - blocking future bookings this call",
-                        flush=True,
-                    )  # noqa: T201
+                # Note: Calendar booking tracking now happens BEFORE execution (race condition fix)
 
             except Exception as e:
                 self.logger.exception("tool_execution_error", tool_name=tool_name, error=str(e))
