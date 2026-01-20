@@ -92,6 +92,13 @@ APPOINTMENT BOOKING RULES:
 - NEVER book multi-day appointments - always single day, single hour slots
 - Always confirm the EXACT date and time before booking
 
+SMS CONFIRMATION (CRITICAL - DO THIS AFTER EVERY BOOKING):
+- IMMEDIATELY after successfully booking an appointment, send an SMS confirmation
+- Use the telnyx_send_sms tool with the caller's phone number
+- Message should include: appointment date, time, and business name
+- Example: "Your appointment with Jobber HVAC is confirmed for Monday, January 20 at 9:00 AM. See you then!"
+- You MUST send the SMS - do not skip this step
+
 CLOSING THE CALL (CRITICAL - FOLLOW EXACTLY):
 After booking is complete and you ask "Is there anything else I can help you with?":
 - If customer says ANY of: "no", "no thank you", "no thanks", "that's all", "I'm good", "nothing else", "nope", "yes" (meaning yes that's all), "yes thanks", "that will be all", etc.
@@ -150,7 +157,7 @@ async def retell_llm_websocket(
 
     # Accept the WebSocket connection
     await websocket.accept()
-    print(f"[RETELL WS] WebSocket accepted", flush=True)
+    print("[RETELL WS] WebSocket accepted", flush=True)
     log.info("retell_llm_websocket_connected")
 
     try:
@@ -212,6 +219,7 @@ async def retell_llm_websocket(
 
         # Load user-level integrations (workspace_id is NULL)
         from sqlalchemy import and_
+
         from app.models.user_integration import UserIntegration
 
         user_integrations_result = await db.execute(
@@ -295,7 +303,7 @@ async def retell_llm_websocket(
         await llm_server.handle_connection()
 
     except WebSocketDisconnect:
-        print(f"[RETELL WS] WebSocket disconnected normally", flush=True)
+        print("[RETELL WS] WebSocket disconnected normally", flush=True)
         log.info("retell_llm_websocket_disconnected")
     except Exception as e:
         print(f"[RETELL WS] ERROR: {type(e).__name__}: {e}", flush=True)
@@ -304,7 +312,7 @@ async def retell_llm_websocket(
         traceback.print_exc()
         log.exception("retell_llm_websocket_error", error=str(e))
     finally:
-        print(f"[RETELL WS] Connection closed", flush=True)
+        print("[RETELL WS] Connection closed", flush=True)
         log.info("retell_llm_websocket_closed")
 
 

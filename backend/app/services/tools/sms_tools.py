@@ -118,9 +118,11 @@ class TwilioSMSTools:
 
             if response.status_code != HTTPStatus.CREATED:
                 error_data = response.json()
+                error_msg = error_data.get("message", response.text)
+                print(f"[SMS ERROR] Twilio API error: {error_msg}", flush=True)  # noqa: T201
                 return {
                     "success": False,
-                    "error": error_data.get("message", response.text),
+                    "error": error_msg,
                 }
 
             data = response.json()
@@ -134,6 +136,7 @@ class TwilioSMSTools:
             }
 
         except Exception as e:
+            print(f"[SMS ERROR] Twilio exception: {type(e).__name__}: {e}", flush=True)  # noqa: T201
             logger.exception("twilio_send_sms_error", error=str(e))
             return {"success": False, "error": str(e)}
 
@@ -290,6 +293,7 @@ class TelnyxSMSTools:
                 error_data = response.json()
                 errors = error_data.get("errors", [])
                 error_msg = errors[0].get("detail") if errors else response.text
+                print(f"[SMS ERROR] Telnyx API error: {error_msg}", flush=True)  # noqa: T201
                 return {
                     "success": False,
                     "error": error_msg,
@@ -326,6 +330,7 @@ class TelnyxSMSTools:
                 }
 
         except Exception as e:
+            print(f"[SMS ERROR] Telnyx exception: {type(e).__name__}: {e}", flush=True)  # noqa: T201
             logger.exception("telnyx_send_sms_error", error=str(e))
             return {"success": False, "error": str(e)}
 

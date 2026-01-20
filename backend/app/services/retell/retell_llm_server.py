@@ -749,6 +749,7 @@ CRITICAL: When customer says a day name (Monday, Tuesday, etc.), use the EXACT d
                 if tool_name in ("telnyx_send_sms", "twilio_send_sms"):
                     to_number = arguments.get("to", "")
                     if to_number in self._sent_sms_numbers:
+                        print(f"[SMS DEDUP] Blocked duplicate to {to_number}", flush=True)  # noqa: T201
                         self.logger.warning(
                             "duplicate_sms_blocked",
                             tool_name=tool_name,
@@ -790,14 +791,18 @@ CRITICAL: When customer says a day name (Monday, Tuesday, etc.), use the EXACT d
                             )
                         )
                         continue  # Skip to next tool call
-                    else:
-                        # Set flag BEFORE execution to prevent race condition
-                        self._booking_completed = True
-                        print(
-                            "[CALENDAR] Blocking future bookings NOW (before execution)", flush=True
-                        )  # noqa: T201
+                    # Set flag BEFORE execution to prevent race condition
+                    self._booking_completed = True
+                    print("[CALENDAR] Blocking future bookings NOW (before execution)", flush=True)
 
                 # Execute the tool
+                # Debug print for SMS tools to diagnose sending issues
+                if tool_name in ("telnyx_send_sms", "twilio_send_sms"):
+                    print(
+                        f"[SMS] Executing {tool_name} to {arguments.get('to', 'unknown')}",
+                        flush=True,
+                    )  # noqa: T201
+
                 try:
                     result = await self.tool_registry.execute_tool(tool_name, arguments)
                     is_error = False
@@ -807,7 +812,13 @@ CRITICAL: When customer says a day name (Monday, Tuesday, etc.), use the EXACT d
                         to_number = arguments.get("to", "")
                         if result.get("success"):
                             self._sent_sms_numbers.add(to_number)
+                            print(f"[SMS] Sent successfully to {to_number}", flush=True)  # noqa: T201
                             self.logger.info("sms_sent_tracked", to_number=to_number)
+                        else:
+                            print(
+                                f"[SMS ERROR] Failed to send to {to_number}: {result.get('error', 'unknown')}",
+                                flush=True,
+                            )  # noqa: T201
 
                     # Note: Calendar booking tracking now happens BEFORE execution (race condition fix)
 
@@ -1153,6 +1164,7 @@ CRITICAL: When customer says a day name (Monday, Tuesday, etc.), use the EXACT d
             if tool_name in ("telnyx_send_sms", "twilio_send_sms"):
                 to_number = arguments.get("to", "")
                 if to_number in self._sent_sms_numbers:
+                    print(f"[SMS DEDUP] Blocked duplicate to {to_number}", flush=True)  # noqa: T201
                     self.logger.warning(
                         "duplicate_sms_blocked",
                         tool_name=tool_name,
@@ -1194,12 +1206,17 @@ CRITICAL: When customer says a day name (Monday, Tuesday, etc.), use the EXACT d
                         )
                     )
                     continue  # Skip to next tool call
-                else:
-                    # Set flag BEFORE execution to prevent race condition
-                    self._booking_completed = True
-                    print("[CALENDAR] Blocking future bookings NOW (before execution)", flush=True)  # noqa: T201
+                # Set flag BEFORE execution to prevent race condition
+                self._booking_completed = True
+                print("[CALENDAR] Blocking future bookings NOW (before execution)", flush=True)  # noqa: T201
 
             # Execute the tool
+            # Debug print for SMS tools to diagnose sending issues
+            if tool_name in ("telnyx_send_sms", "twilio_send_sms"):
+                print(
+                    f"[SMS] Executing {tool_name} to {arguments.get('to', 'unknown')}", flush=True
+                )  # noqa: T201
+
             try:
                 result = await self.tool_registry.execute_tool(tool_name, arguments)
                 is_error = False
@@ -1209,7 +1226,13 @@ CRITICAL: When customer says a day name (Monday, Tuesday, etc.), use the EXACT d
                     to_number = arguments.get("to", "")
                     if result.get("success"):
                         self._sent_sms_numbers.add(to_number)
+                        print(f"[SMS] Sent successfully to {to_number}", flush=True)  # noqa: T201
                         self.logger.info("sms_sent_tracked", to_number=to_number)
+                    else:
+                        print(
+                            f"[SMS ERROR] Failed to send to {to_number}: {result.get('error', 'unknown')}",
+                            flush=True,
+                        )  # noqa: T201
 
                 # Note: Calendar booking tracking now happens BEFORE execution (race condition fix)
 
@@ -1392,7 +1415,7 @@ CRITICAL: When customer says a day name (Monday, Tuesday, etc.), use the EXACT d
                 print(
                     f"[GOODBYE DETECTED] Auto-ending call after: {self._current_turn_text[:60]}...",
                     flush=True,
-                )  # noqa: T201
+                )
                 self.logger.info(
                     "auto_end_call_goodbye_detected", content_preview=self._current_turn_text[:50]
                 )
