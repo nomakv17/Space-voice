@@ -434,7 +434,19 @@ class RetellLLMServer:
         now = datetime.now(central_tz)
         from datetime import timedelta
 
-        tomorrow = now + timedelta(days=1)
+        # Build explicit day-to-date mapping for the next 7 days
+        day_mapping = []
+        for i in range(7):
+            future_date = now + timedelta(days=i)
+            day_name = future_date.strftime("%A")
+            date_str = future_date.strftime("%B %d, %Y")
+            if i == 0:
+                day_mapping.append(f"- TODAY ({day_name}) = {date_str}")
+            elif i == 1:
+                day_mapping.append(f"- TOMORROW ({day_name}) = {date_str}")
+            else:
+                day_mapping.append(f"- {day_name} = {date_str}")
+        day_mapping_str = "\n".join(day_mapping)
 
         # Log the actual date being injected for debugging
         self.logger.info(
@@ -446,12 +458,12 @@ class RetellLLMServer:
 
         date_info = f"""
 
-CURRENT DATE & TIME (USE THIS FOR ALL DATE CALCULATIONS):
-- TODAY is {now.strftime("%A, %B %d, %Y")}
-- Current time: {now.strftime("%I:%M %p")} Central Time
-- Tomorrow is {tomorrow.strftime("%A, %B %d, %Y")}
+CURRENT DATE & TIME (USE THESE EXACT DATES - DO NOT CALCULATE):
+{day_mapping_str}
 
-When customer says a day name, calculate from TODAY. ALWAYS confirm full date before booking."""
+Current time: {now.strftime("%I:%M %p")} Saskatchewan Time
+
+CRITICAL: When customer says a day name (Monday, Tuesday, etc.), use the EXACT date from the list above. DO NOT add or subtract days. Confirm the full date with the customer before booking."""
         self.system_prompt += date_info
 
         # Append caller phone info to system prompt so agent can use it for SMS/booking
