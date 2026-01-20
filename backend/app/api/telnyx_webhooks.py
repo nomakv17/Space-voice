@@ -105,7 +105,7 @@ async def telnyx_call_webhook(request: Request) -> dict[str, str]:  # noqa: PLR0
                 return {"status": "transfer_leg_answered"}
 
             # Transfer to Retell SIP for AI handling
-            await transfer_to_retell(call_control_id, to_number, log)
+            await transfer_to_retell(call_control_id, to_number, log, from_number)
             return {"status": "transferring_to_retell"}
 
         if event_type == "call.hangup":
@@ -158,30 +158,89 @@ async def answer_call(call_control_id: str, log: structlog.BoundLogger) -> None:
 
 
 async def transfer_to_retell(
-    call_control_id: str, to_number: str, log: structlog.BoundLogger
+    call_control_id: str,
+    to_number: str,
+    log: structlog.BoundLogger,
+    from_number: str = "",
 ) -> None:
     """Transfer the call to Retell's SIP endpoint.
 
-    Retell expects the SIP URI format: sip:+16399746645@sip.retellai.com
-    This tells Retell which phone number the call is for, so it can
-    route to the correct agent.
+    For custom telephony, we must first register the call with Retell to get
+    a call_id, then transfer to sip:{call_id}@sip.retellai.com.
 
     Args:
         call_control_id: Telnyx call control ID
         to_number: The number that was called (used for Retell routing)
         log: Logger instance
+        from_number: The caller's phone number
     """
     import httpx
+    from sqlalchemy import select
+    from sqlalchemy.ext.asyncio import AsyncSession
 
     from app.core.config import settings
+    from app.db.session import AsyncSessionLocal
+    from app.models.agent import Agent
+    from app.models.phone_number import PhoneNumber
 
-    # Build SIP URI for Retell
-    # Format: sip:+16399746645@sip.retellai.com
-    sip_uri = f"sip:{to_number}@{RETELL_SIP_ENDPOINT}"
-    log.info("transferring_to_retell", sip_uri=sip_uri)
+    # Step 1: Get the agent_id for this phone number directly from DB
+    log.info("fetching_agent_for_number", to_number=to_number)
+    async with AsyncSessionLocal() as db:
+        # Find agent by phone number assignment
+        result = await db.execute(
+            select(Agent)
+            .join(PhoneNumber, PhoneNumber.assigned_agent_id == Agent.id)
+            .where(PhoneNumber.phone_number == to_number)
+            .where(Agent.is_active.is_(True))
+        )
+        agent = result.scalar_one_or_none()
+
+        if not agent or not agent.retell_agent_id:
+            log.error("no_agent_found_for_number", to_number=to_number)
+            return
+
+        retell_agent_id = agent.retell_agent_id
+        log.info("agent_found", agent_name=agent.name, retell_agent_id=retell_agent_id)
 
     async with httpx.AsyncClient() as client:
-        response = await client.post(
+        # Step 2: Register the call with Retell to get a call_id
+        log.info("registering_call_with_retell")
+        register_response = await client.post(
+            "https://api.retellai.com/v2/register-phone-call",
+            headers={
+                "Authorization": f"Bearer {settings.RETELL_API_KEY}",
+                "Content-Type": "application/json",
+            },
+            json={
+                "agent_id": retell_agent_id,
+                "from_number": from_number,
+                "to_number": to_number,
+                "direction": "inbound",
+            },
+            timeout=10,
+        )
+
+        if register_response.status_code != HTTPStatus.CREATED:
+            log.error(
+                "retell_register_failed",
+                status=register_response.status_code,
+                body=register_response.text,
+            )
+            return
+
+        register_data = register_response.json()
+        retell_call_id = register_data.get("call_id")
+        if not retell_call_id:
+            log.error("no_call_id_from_retell", response=register_data)
+            return
+
+        log.info("retell_call_registered", call_id=retell_call_id)
+
+        # Step 3: Build SIP URI with the call_id and transfer
+        sip_uri = f"sip:{retell_call_id}@{RETELL_SIP_ENDPOINT}"
+        log.info("transferring_to_retell", sip_uri=sip_uri)
+
+        transfer_response = await client.post(
             f"https://api.telnyx.com/v2/calls/{call_control_id}/actions/transfer",
             headers={
                 "Authorization": f"Bearer {settings.TELNYX_API_KEY}",
@@ -192,7 +251,11 @@ async def transfer_to_retell(
             },
         )
 
-        if response.status_code == HTTPStatus.OK:
+        if transfer_response.status_code == HTTPStatus.OK:
             log.info("transfer_initiated_successfully")
         else:
-            log.error("transfer_failed", status=response.status_code, body=response.text)
+            log.error(
+                "transfer_failed",
+                status=transfer_response.status_code,
+                body=transfer_response.text,
+            )
