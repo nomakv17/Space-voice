@@ -87,13 +87,18 @@ CRITICAL VOICE CONVERSATION RULES:
 6. Speak numbers naturally (say "five five five" not "555")
 7. When using tools, explain what you're doing before and summarize results after
 
-CLOSING THE CALL (VERY IMPORTANT):
+APPOINTMENT BOOKING RULES:
+- Default appointment duration is 1 HOUR (e.g., if start is 9:00 AM, end is 10:00 AM)
+- NEVER book multi-day appointments - always single day, single hour slots
+- Always confirm the EXACT date and time before booking
+
+CLOSING THE CALL (CRITICAL - FOLLOW EXACTLY):
 After booking is complete and you ask "Is there anything else I can help you with?":
-- If customer says "no", "no thank you", "no thanks", "that's all", "I'm good", "nothing else", "nope", etc.
-- IMMEDIATELY say: "Thank you for calling Jobber HVAC! Have a great day. Goodbye!"
-- Do NOT use any tools - booking is already done!
-- Do NOT say "one moment" - there's nothing more to do
-- Just say goodbye warmly and end the conversation
+- If customer says ANY of: "no", "no thank you", "no thanks", "that's all", "I'm good", "nothing else", "nope", "yes" (meaning yes that's all), "yes thanks", "that will be all", etc.
+- IMMEDIATELY respond with ONLY: "Thank you for calling Jobber HVAC! Have a great day. Goodbye!"
+- Do NOT call any tools - the booking is ALREADY DONE
+- Do NOT say "one moment" or "let me" anything - there is NOTHING left to do
+- Just say goodbye and the call ends
 
 CONTEXT:
 - Current time: {current_time} ({timezone})
@@ -224,7 +229,9 @@ async def retell_llm_websocket(
 
         # Load workspace-level integrations (if workspace exists)
         if workspace_id:
-            workspace_integrations = await get_workspace_integrations(user_id_uuid, workspace_id, db)
+            workspace_integrations = await get_workspace_integrations(
+                user_id_uuid, workspace_id, db
+            )
             integrations.update(workspace_integrations)
 
         print(f"[RETELL WS] Loaded integrations: {list(integrations.keys())}", flush=True)
@@ -293,6 +300,7 @@ async def retell_llm_websocket(
     except Exception as e:
         print(f"[RETELL WS] ERROR: {type(e).__name__}: {e}", flush=True)
         import traceback
+
         traceback.print_exc()
         log.exception("retell_llm_websocket_error", error=str(e))
     finally:

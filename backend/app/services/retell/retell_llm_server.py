@@ -1279,10 +1279,17 @@ When customer says a day name, calculate from TODAY. ALWAYS confirm full date be
         Raises:
             Exception: Re-raised to signal connection is dead
         """
+        # Don't send if shutdown is in progress (connection already closed)
+        if self._shutdown.is_set():
+            self.logger.debug("skipping_send_shutdown", data_type=data.get("response_type"))
+            return
+
         try:
             await self.websocket.send_text(json.dumps(data))
             # Update activity time to prevent redundant keepalives
             self._last_activity_time = asyncio.get_event_loop().time()
         except Exception as e:
+            # Mark shutdown to prevent further send attempts
+            self._shutdown.set()
             print(f"[WEBSOCKET ERROR] Send failed: {type(e).__name__}: {e}", flush=True)  # noqa: T201
-            raise  # Re-raise to signal connection dead
+            # Don't raise - just log and return, connection is dead
