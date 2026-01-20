@@ -129,21 +129,38 @@ class RetellLLMServer:
         """Check if text contains a goodbye/call-ending phrase.
 
         Used to auto-detect when to set end_call=True.
+        IMPORTANT: Must NOT trigger on greetings like "Hello, thank you for calling"
         """
         if not text:
             return False
         text_lower = text.lower()
-        # Patterns that indicate the agent is ending the call
-        goodbye_patterns = [
+
+        # If it starts with a greeting, it's NOT a goodbye
+        greeting_starts = [
+            "hello",
+            "hi ",
+            "hi,",
+            "hey",
+            "good morning",
+            "good afternoon",
+            "good evening",
+        ]
+        if any(text_lower.strip().startswith(g) for g in greeting_starts):
+            return False
+
+        # Must have an EXPLICIT goodbye phrase (not just "thank you for calling")
+        explicit_goodbye_patterns = [
             "goodbye",
             "good bye",
+            "bye!",
+            "bye.",
+            "bye,",
             "have a great day",
             "have a good day",
             "have a nice day",
-            "thank you for calling",
-            "thanks for calling",
+            "take care",
         ]
-        return any(pattern in text_lower for pattern in goodbye_patterns)
+        return any(pattern in text_lower for pattern in explicit_goodbye_patterns)
 
     async def handle_connection(self) -> None:
         """Main WebSocket handler for Retell LLM communication.
