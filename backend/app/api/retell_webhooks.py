@@ -835,18 +835,28 @@ async def retell_inbound_webhook(
         log.info("retell_inbound_received")
 
         # Look up agent by the called phone number
-        # This assumes we've stored the Retell agent ID when linking numbers
+        # Strategy 1: Use PhoneNumber.assigned_agent_id (preferred relationship)
         result = await db.execute(
             select(Agent)
-            .join(PhoneNumber, Agent.phone_number_id == PhoneNumber.id)
+            .join(PhoneNumber, PhoneNumber.assigned_agent_id == Agent.id)
             .where(PhoneNumber.phone_number == inbound.to_number)
             .where(Agent.is_active == True)  # noqa: E712
         )
         agent = result.scalar_one_or_none()
 
+        # Strategy 2: Fallback - check if Agent.phone_number_id contains the phone number directly
+        # (handles legacy data where phone_number_id stores the E.164 number instead of UUID)
         if not agent:
-            # Fallback: try to find any active agent for this number
-            # This is a simplified lookup
+            log.info("trying_fallback_phone_lookup")
+            result = await db.execute(
+                select(Agent)
+                .where(Agent.phone_number_id == inbound.to_number)
+                .where(Agent.is_active == True)  # noqa: E712
+            )
+            agent = result.scalar_one_or_none()
+
+        if not agent:
+            # No agent found for this number
             log.warning("no_agent_for_number", to_number=inbound.to_number)
 
             # Return a default error response
