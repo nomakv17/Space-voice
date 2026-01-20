@@ -63,6 +63,12 @@ interface Workspace {
   is_default: boolean;
 }
 
+interface CRMStats {
+  total_contacts: number;
+  total_appointments: number;
+  total_calls: number;
+}
+
 interface Contact {
   id: number;
   user_id: number;
@@ -174,6 +180,15 @@ export default function CRMPage() {
           ? `/api/v1/crm/contacts?workspace_id=${selectedWorkspaceId}`
           : "/api/v1/crm/contacts";
       const response = await api.get(url);
+      return response.data;
+    },
+  });
+
+  // Fetch CRM stats (appointments, call interactions)
+  const { data: stats } = useQuery<CRMStats>({
+    queryKey: ["crm-stats"],
+    queryFn: async () => {
+      const response = await api.get("/api/v1/crm/stats");
       return response.data;
     },
   });
@@ -463,7 +478,7 @@ export default function CRMPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-xs text-muted-foreground">Total Contacts</p>
-                <p className="text-lg font-semibold">{contacts.length}</p>
+                <p className="text-lg font-semibold">{stats?.total_contacts ?? contacts.length}</p>
               </div>
               <Phone className="h-4 w-4 text-muted-foreground" />
             </div>
@@ -475,7 +490,7 @@ export default function CRMPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-xs text-muted-foreground">Appointments</p>
-                <p className="text-lg font-semibold">0</p>
+                <p className="text-lg font-semibold">{stats?.total_appointments ?? 0}</p>
               </div>
               <Building2 className="h-4 w-4 text-muted-foreground" />
             </div>
@@ -487,7 +502,7 @@ export default function CRMPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-xs text-muted-foreground">Call Interactions</p>
-                <p className="text-lg font-semibold">0</p>
+                <p className="text-lg font-semibold">{stats?.total_calls ?? 0}</p>
               </div>
               <Phone className="h-4 w-4 text-muted-foreground" />
             </div>

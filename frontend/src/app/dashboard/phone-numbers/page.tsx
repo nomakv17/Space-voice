@@ -106,11 +106,11 @@ export default function PhoneNumbersPage() {
   const [numberToRelease, setNumberToRelease] = useState<PhoneNumber | null>(null);
   const [isAssigning, setIsAssigning] = useState(false);
 
-  // Load phone numbers and agents on mount
+  // Load phone numbers and agents on mount and when workspace changes
   useEffect(() => {
     void loadData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [selectedWorkspaceId]);
 
   // Get the active workspace ID for API calls
   const getActiveWorkspaceId = (): string | null => {
@@ -433,8 +433,10 @@ export default function PhoneNumbersPage() {
             <CardTitle>Your Phone Numbers</CardTitle>
             <CardDescription>
               {phoneNumbers.length} number(s) available
-              {selectedWorkspaceId !== "all" && (
-                <span className="ml-1 text-muted-foreground">(workspace filter coming soon)</span>
+              {selectedWorkspaceId !== "all" && workspaces.length > 0 && (
+                <span className="ml-1">
+                  in {workspaces.find((ws) => ws.id === selectedWorkspaceId)?.name ?? "selected workspace"}
+                </span>
               )}
             </CardDescription>
           </CardHeader>

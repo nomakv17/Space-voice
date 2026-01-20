@@ -86,8 +86,8 @@ export default function ComplianceSettingsPage() {
     queryFn: async () => {
       const response = await api.get("/api/v1/compliance/privacy-settings");
       const data = response.data;
-      setPrivacyPolicyUrl(data.privacy_policy_url || "");
-      setDataRetentionDays(data.data_retention_days || 365);
+      setPrivacyPolicyUrl(data.privacy_policy_url ?? "");
+      setDataRetentionDays(data.data_retention_days ?? 365);
       return data;
     },
   });
@@ -189,17 +189,6 @@ export default function ComplianceSettingsPage() {
         return <AlertTriangle className="h-4 w-4 text-yellow-500" />;
       default:
         return <X className="h-4 w-4 text-red-500" />;
-    }
-  };
-
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case "complete":
-        return <Badge variant="default" className="bg-green-500">Complete</Badge>;
-      case "warning":
-        return <Badge variant="secondary" className="bg-yellow-500 text-black">Warning</Badge>;
-      default:
-        return <Badge variant="destructive">Incomplete</Badge>;
     }
   };
 
