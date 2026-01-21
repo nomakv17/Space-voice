@@ -110,8 +110,11 @@ const adminNavigation = [
 
 export function AppSidebar() {
   const pathname = usePathname();
-  const { sidebarOpen, setSidebarOpen } = useSidebarStore();
+  const { sidebarOpen, setSidebarOpen, hasHydrated } = useSidebarStore();
   const { user, logout } = useAuth();
+
+  // Use default width until hydrated to prevent layout shift
+  const effectiveSidebarOpen = hasHydrated ? sidebarOpen : true;
 
   const displayName = user?.username ?? "User";
   const displayEmail = user?.email ?? "user@example.com";
@@ -127,12 +130,12 @@ export function AppSidebar() {
   return (
     <motion.div
       initial={false}
-      animate={{ width: sidebarOpen ? 220 : 64 }}
-      transition={{ duration: 0.2, ease: [0.4, 0, 0.2, 1] }}
+      animate={{ width: effectiveSidebarOpen ? 220 : 64 }}
+      transition={hasHydrated ? { duration: 0.2, ease: [0.4, 0, 0.2, 1] } : { duration: 0 }}
       className="relative flex h-screen flex-col bg-sidebar"
     >
       {/* Logo */}
-      <div className={cn("flex h-12 items-center", sidebarOpen ? "px-4" : "justify-center")}>
+      <div className={cn("flex h-12 items-center", effectiveSidebarOpen ? "px-4" : "justify-center")}>
         <Link href="/dashboard" className="relative block overflow-hidden">
           <motion.span
             className="animate-gradient-flow block whitespace-nowrap bg-clip-text text-lg font-bold tracking-tight text-transparent"
@@ -142,7 +145,7 @@ export function AppSidebar() {
               backgroundSize: "200% 100%",
             }}
             initial={false}
-            animate={{ width: sidebarOpen ? 100 : 11 }}
+            animate={{ width: effectiveSidebarOpen ? 100 : 11 }}
             transition={{ duration: 0.2, ease: [0.4, 0, 0.2, 1] }}
           >
             SpaceVoice
@@ -162,7 +165,7 @@ export function AppSidebar() {
                   variant="ghost"
                   className={cn(
                     "relative h-9 w-full justify-start gap-3 px-3 font-normal",
-                    !sidebarOpen && "justify-center gap-0 px-0",
+                    !effectiveSidebarOpen && "justify-center gap-0 px-0",
                     active
                       ? "bg-sidebar-accent text-sidebar-foreground"
                       : "text-sidebar-foreground/60 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
@@ -177,7 +180,7 @@ export function AppSidebar() {
                   )}
                   <item.icon className={cn("h-[18px] w-[18px] shrink-0", active && item.color)} />
                   <AnimatePresence>
-                    {sidebarOpen && (
+                    {effectiveSidebarOpen && (
                       <motion.span
                         initial={{ opacity: 0, width: 0 }}
                         animate={{ opacity: 1, width: "auto" }}
@@ -208,7 +211,7 @@ export function AppSidebar() {
                   variant="ghost"
                   className={cn(
                     "relative h-9 w-full justify-start gap-3 px-3 font-normal",
-                    !sidebarOpen && "justify-center gap-0 px-0",
+                    !effectiveSidebarOpen && "justify-center gap-0 px-0",
                     active
                       ? "bg-sidebar-accent text-sidebar-foreground"
                       : "text-sidebar-foreground/60 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
@@ -223,7 +226,7 @@ export function AppSidebar() {
                   )}
                   <item.icon className={cn("h-[18px] w-[18px] shrink-0", active && item.color)} />
                   <AnimatePresence>
-                    {sidebarOpen && (
+                    {effectiveSidebarOpen && (
                       <motion.span
                         initial={{ opacity: 0, width: 0 }}
                         animate={{ opacity: 1, width: "auto" }}
@@ -248,18 +251,18 @@ export function AppSidebar() {
           variant="ghost"
           className={cn(
             "h-10 w-full justify-start gap-3 px-3 font-normal",
-            !sidebarOpen && "justify-center gap-0 px-0",
+            !effectiveSidebarOpen && "justify-center gap-0 px-0",
             "text-sidebar-foreground/60 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
           )}
           onClick={() => setSidebarOpen(!sidebarOpen)}
         >
-          {sidebarOpen ? (
+          {effectiveSidebarOpen ? (
             <PanelLeftClose className="h-[18px] w-[18px] shrink-0" />
           ) : (
             <PanelLeft className="h-[18px] w-[18px] shrink-0" />
           )}
           <AnimatePresence>
-            {sidebarOpen && (
+            {effectiveSidebarOpen && (
               <motion.span
                 initial={{ opacity: 0, width: 0 }}
                 animate={{ opacity: 1, width: "auto" }}
@@ -282,7 +285,7 @@ export function AppSidebar() {
               variant="ghost"
               className={cn(
                 "relative h-10 w-full justify-start gap-3 px-2 font-normal",
-                !sidebarOpen && "justify-center gap-0 px-0",
+                !effectiveSidebarOpen && "justify-center gap-0 px-0",
                 "text-sidebar-foreground/60 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
               )}
             >
@@ -292,7 +295,7 @@ export function AppSidebar() {
                 </AvatarFallback>
               </Avatar>
               <AnimatePresence>
-                {sidebarOpen && (
+                {effectiveSidebarOpen && (
                   <motion.div
                     initial={{ opacity: 0, width: 0 }}
                     animate={{ opacity: 1, width: "auto" }}
@@ -309,7 +312,7 @@ export function AppSidebar() {
               </AnimatePresence>
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align={sidebarOpen ? "end" : "center"} side="top" className="w-56">
+          <DropdownMenuContent align={effectiveSidebarOpen ? "end" : "center"} side="top" className="w-56">
             <DropdownMenuLabel>My Account</DropdownMenuLabel>
             <DropdownMenuSeparator />
             <DropdownMenuItem asChild>
