@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
+import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Loader2, CheckCircle, Rocket, Bot, Users, Phone, ArrowRight, Sparkles } from "lucide-react";
@@ -12,15 +13,18 @@ import { toast } from "sonner";
 export default function OnboardingCompletePage() {
   const router = useRouter();
   const queryClient = useQueryClient();
+  const { refetchUser } = useAuth();
 
   const completeOnboarding = useMutation({
     mutationFn: async () => {
       const response = await api.post("/api/v1/onboarding/complete");
       return response.data;
     },
-    onSuccess: () => {
+    onSuccess: async () => {
       void queryClient.invalidateQueries({ queryKey: ["onboarding-status"] });
       void queryClient.invalidateQueries({ queryKey: ["user"] });
+      // Refetch user to update onboarding_completed status in auth context
+      await refetchUser();
     },
     onError: (error: Error) => {
       toast.error(error.message || "Failed to complete onboarding");
