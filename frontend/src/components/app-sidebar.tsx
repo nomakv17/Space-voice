@@ -128,11 +128,9 @@ export function AppSidebar() {
   };
 
   return (
-    <motion.div
-      initial={false}
-      animate={{ width: effectiveSidebarOpen ? 220 : 64 }}
-      transition={hasHydrated ? { duration: 0.2, ease: [0.4, 0, 0.2, 1] } : { duration: 0 }}
+    <div
       className="relative flex h-screen flex-col bg-sidebar"
+      style={{ width: effectiveSidebarOpen ? 220 : 64, transition: hasHydrated ? 'width 0.2s ease' : 'none' }}
     >
       {/* Logo */}
       <div className={cn("flex h-12 items-center", effectiveSidebarOpen ? "px-4" : "justify-center")}>
@@ -335,6 +333,6 @@ export function AppSidebar() {
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
-    </motion.div>
+    </div>
   );
 }
