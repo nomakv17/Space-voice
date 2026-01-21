@@ -84,6 +84,7 @@ class Settings(BaseSettings):
     CORS_ORIGINS: list[str] = [
         "https://dashboard.spacevoice.ai",  # Production frontend
         "https://spacevoice.ai",  # Main domain
+        "https://frontend-kappa-sepia-72.vercel.app",  # Vercel deployment
         "http://localhost:3000",  # Local development
         "http://localhost:3001",
         "http://localhost:8000",
