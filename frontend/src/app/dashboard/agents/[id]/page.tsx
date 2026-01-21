@@ -277,7 +277,10 @@ export default function EditAgentPage({ params }: EditAgentPageProps) {
         router.replace("/dashboard/agents");
       }
     }
-  }, [error, router]);
+    // NOTE: router is intentionally excluded from deps - it's stable in Next.js but
+    // including it causes unnecessary re-renders that trigger excessive History API calls
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [error]);
 
   // Fetch all workspaces
   const { data: workspaces = [] } = useQuery({

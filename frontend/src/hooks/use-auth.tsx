@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useState, useRef, type ReactNode } from "react";
 import { useRouter, usePathname } from "next/navigation";
 
 interface User {
@@ -33,6 +33,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
 
+  // HARD PROTECTION: Prevent any navigation for 2 seconds after a redirect
+  const lastNavigationRef = useRef<number>(0);
+  const hasNavigatedRef = useRef<boolean>(false);
+
   // Check for existing token on mount
   useEffect(() => {
     const storedToken = localStorage.getItem("access_token");
@@ -48,18 +52,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (isLoading) return;
 
+    // HARD PROTECTION: Only allow one navigation per 3 seconds
+    const now = Date.now();
+    if (hasNavigatedRef.current && now - lastNavigationRef.current < 3000) {
+      return;
+    }
+
     const isAuthPage = pathname === "/login";
     const isPublicPage = pathname.startsWith("/embed");
 
     if (!token && !isAuthPage && !isPublicPage) {
       // No token and not on login/public page → go to login
+      hasNavigatedRef.current = true;
+      lastNavigationRef.current = now;
       router.push("/login");
     } else if (token && isAuthPage) {
       // Has token and on login page → go to dashboard
+      hasNavigatedRef.current = true;
+      lastNavigationRef.current = now;
       router.push("/dashboard");
     }
     // REMOVED: Force redirect to onboarding - users can navigate where they want
-  }, [token, isLoading, pathname, router]);
+    // NOTE: router is intentionally excluded from deps - it's stable in Next.js but
+    // including it causes unnecessary re-renders that trigger excessive History API calls
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token, isLoading, pathname]);
 
   const fetchUser = async (accessToken: string) => {
     try {

@@ -1,19 +1,29 @@
 "use client";
 
-import { useEffect } from "react";
+import { useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Loader2, CheckCircle, Rocket, Bot, Users, Phone, ArrowRight, Sparkles } from "lucide-react";
+import {
+  Loader2,
+  CheckCircle,
+  Rocket,
+  Bot,
+  Users,
+  Phone,
+  ArrowRight,
+  Sparkles,
+} from "lucide-react";
 import { toast } from "sonner";
 
 export default function OnboardingCompletePage() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const { refetchUser } = useAuth();
+  const isNavigatingRef = useRef(false);
 
   const completeOnboarding = useMutation({
     mutationFn: async () => {
@@ -22,40 +32,29 @@ export default function OnboardingCompletePage() {
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["onboarding-status"] });
-      // Try to refetch user, but don't block on it - user can navigate regardless
-      refetchUser().catch(() => {
-        console.warn("Failed to refetch user after onboarding - user can still navigate");
-      });
+      // Refetch user to update onboarding status in auth context
+      void refetchUser();
     },
     onError: (error: Error) => {
+      // Still navigate even on error - user can continue to dashboard
       toast.error(error.message || "Failed to complete onboarding");
     },
   });
 
-  // Auto-complete onboarding when page loads
-  useEffect(() => {
-    completeOnboarding.mutate();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  // Complete onboarding and navigate - called when user clicks any navigation button
+  const handleNavigate = (destination: string) => {
+    // Prevent double navigation
+    if (isNavigatingRef.current) return;
+    isNavigatingRef.current = true;
 
-  const handleGoToDashboard = () => {
-    router.push("/dashboard");
+    // Fire the complete API call (let it complete in background)
+    if (!completeOnboarding.isSuccess && !completeOnboarding.isPending) {
+      completeOnboarding.mutate();
+    }
+
+    // Navigate immediately so user sees instant feedback
+    router.push(destination);
   };
-
-  const handleCreateAgent = () => {
-    router.push("/dashboard/agents");
-  };
-
-  if (completeOnboarding.isPending) {
-    return (
-      <Card className="border-white/10 bg-white/[0.02]">
-        <CardContent className="flex flex-col items-center justify-center py-16">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
-          <p className="mt-4 text-muted-foreground">Setting up your account...</p>
-        </CardContent>
-      </Card>
-    );
-  }
 
   return (
     <Card className="border-white/10 bg-white/[0.02]">
@@ -107,7 +106,7 @@ export default function OnboardingCompletePage() {
           <h3 className="font-medium">Get started:</h3>
           <div className="grid gap-3">
             <button
-              onClick={handleCreateAgent}
+              onClick={() => handleNavigate("/dashboard/agents")}
               className="flex items-center gap-4 rounded-xl border border-white/10 bg-white/[0.02] p-4 text-left transition-all hover:border-violet-500/50 hover:bg-violet-500/5"
             >
               <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-violet-500/20">
@@ -128,7 +127,7 @@ export default function OnboardingCompletePage() {
             </button>
 
             <button
-              onClick={() => router.push("/dashboard/crm")}
+              onClick={() => handleNavigate("/dashboard/crm")}
               className="flex items-center gap-4 rounded-xl border border-white/10 bg-white/[0.02] p-4 text-left transition-all hover:border-blue-500/50 hover:bg-blue-500/5"
             >
               <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-blue-500/20">
@@ -144,7 +143,7 @@ export default function OnboardingCompletePage() {
             </button>
 
             <button
-              onClick={() => router.push("/dashboard/calls")}
+              onClick={() => handleNavigate("/dashboard/calls")}
               className="flex items-center gap-4 rounded-xl border border-white/10 bg-white/[0.02] p-4 text-left transition-all hover:border-emerald-500/50 hover:bg-emerald-500/5"
             >
               <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-emerald-500/20">
@@ -177,11 +176,16 @@ export default function OnboardingCompletePage() {
 
         {/* Go to Dashboard Button */}
         <Button
-          onClick={handleGoToDashboard}
+          onClick={() => handleNavigate("/dashboard")}
           size="lg"
+          disabled={completeOnboarding.isPending}
           className="w-full gap-2 bg-gradient-to-r from-violet-600 to-blue-600 text-white hover:from-violet-700 hover:to-blue-700"
         >
-          <Rocket className="h-4 w-4" />
+          {completeOnboarding.isPending ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <Rocket className="h-4 w-4" />
+          )}
           Go to Dashboard
         </Button>
       </CardContent>
