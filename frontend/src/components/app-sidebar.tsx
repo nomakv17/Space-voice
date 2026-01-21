@@ -170,10 +170,8 @@ export function AppSidebar() {
                   )}
                 >
                   {active && (
-                    <motion.div
-                      layoutId="activeNavAdmin"
+                    <div
                       className="absolute inset-y-0 left-0 my-auto h-5 w-0.5 rounded-r-full bg-indigo-400"
-                      transition={{ type: "spring", stiffness: 400, damping: 30 }}
                     />
                   )}
                   <item.icon className={cn("h-[18px] w-[18px] shrink-0", active && item.color)} />
@@ -216,10 +214,8 @@ export function AppSidebar() {
                   )}
                 >
                   {active && (
-                    <motion.div
-                      layoutId="activeNav"
+                    <div
                       className="absolute inset-y-0 left-0 my-auto h-5 w-0.5 rounded-r-full bg-sidebar-foreground"
-                      transition={{ type: "spring", stiffness: 400, damping: 30 }}
                     />
                   )}
                   <item.icon className={cn("h-[18px] w-[18px] shrink-0", active && item.color)} />

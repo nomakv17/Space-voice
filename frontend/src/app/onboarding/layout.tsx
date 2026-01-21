@@ -1,7 +1,5 @@
 "use client";
 
-import { useEffect } from "react";
-import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { Loader2 } from "lucide-react";
@@ -18,8 +16,6 @@ interface OnboardingStatus {
 }
 
 export default function OnboardingLayout({ children }: { children: React.ReactNode }) {
-  const router = useRouter();
-
   const { data: status, isLoading } = useQuery<OnboardingStatus>({
     queryKey: ["onboarding-status"],
     queryFn: async () => {
@@ -28,12 +24,8 @@ export default function OnboardingLayout({ children }: { children: React.ReactNo
     },
   });
 
-  // Redirect if onboarding is complete
-  useEffect(() => {
-    if (status?.onboarding_completed) {
-      router.push("/dashboard");
-    }
-  }, [status?.onboarding_completed, router]);
+  // NOTE: Removed auto-redirect here to prevent competing with explicit navigation
+  // from the complete page. User will click "Go to Dashboard" button instead.
 
   if (isLoading) {
     return (
