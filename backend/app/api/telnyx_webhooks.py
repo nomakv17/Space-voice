@@ -53,7 +53,7 @@ class TelnyxWebhookEvent(BaseModel):
 
 
 @router.post("/call")
-async def telnyx_call_webhook(request: Request) -> dict[str, str]:  # noqa: PLR0911
+async def telnyx_call_webhook(request: Request) -> dict[str, str]:
     """Handle Telnyx Call Control webhooks.
 
     This endpoint receives all call events and dispatches based on event type.
@@ -176,7 +176,6 @@ async def transfer_to_retell(
     """
     import httpx
     from sqlalchemy import select
-    from sqlalchemy.ext.asyncio import AsyncSession
 
     from app.core.config import settings
     from app.db.session import AsyncSessionLocal

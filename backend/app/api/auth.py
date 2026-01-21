@@ -49,13 +49,23 @@ class UserResponse(BaseModel):
     id: int
     email: str
     username: str | None = None  # Maps to full_name
+    onboarding_completed: bool = False
+    onboarding_step: int = 1
+    is_superuser: bool = False
 
     model_config = {"from_attributes": True}
 
     @classmethod
     def from_user(cls, user: "User") -> "UserResponse":
         """Create response from User model."""
-        return cls(id=user.id, email=user.email, username=user.full_name)
+        return cls(
+            id=user.id,
+            email=user.email,
+            username=user.full_name,
+            onboarding_completed=user.onboarding_completed,
+            onboarding_step=user.onboarding_step,
+            is_superuser=user.is_superuser,
+        )
 
 
 # =============================================================================
@@ -101,24 +111,24 @@ def create_access_token(subject: str | int, expires_delta: timedelta | None = No
 @router.post("/register", response_model=UserResponse)
 @limiter.limit("5/minute")  # Strict rate limit to prevent account spam
 async def register(
-    request: RegisterRequest,
-    http_request: Request,  # Required for rate limiter
+    body: RegisterRequest,
+    request: Request,  # Required for rate limiter
     db: AsyncSession = Depends(get_db),
 ) -> UserResponse:
     """Register a new user.
 
     Args:
-        request: Registration request with email, username, password
+        body: Registration request with email, username, password
         db: Database session
 
     Returns:
         Created user
     """
-    log = logger.bind(email=request.email, username=request.username)
+    log = logger.bind(email=body.email, username=body.username)
     log.info("registering_user")
 
     # Check if email already exists
-    result = await db.execute(select(User).where(User.email == request.email))
+    result = await db.execute(select(User).where(User.email == body.email))
     if result.scalar_one_or_none():
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -127,9 +137,9 @@ async def register(
 
     # Create user (username is stored as full_name)
     user = User(
-        email=request.email,
-        full_name=request.username,
-        hashed_password=get_password_hash(request.password),
+        email=body.email,
+        full_name=body.username,
+        hashed_password=get_password_hash(body.password),
     )
     db.add(user)
     await db.commit()
@@ -148,8 +158,12 @@ async def login(
 ) -> TokenResponse:
     """Login and get an access token.
 
+    Supports login with:
+    - Email (for admins)
+    - Client ID (for clients)
+
     Args:
-        form_data: OAuth2 form with username (email) and password
+        form_data: OAuth2 form with username (email or client_id) and password
         db: Database session
 
     Returns:
@@ -158,15 +172,20 @@ async def login(
     log = logger.bind(username=form_data.username)
     log.info("login_attempt")
 
-    # Find user by email
+    # Try to find user by email first (for admins), then by client_id (for clients)
     result = await db.execute(select(User).where(User.email == form_data.username))
     user = result.scalar_one_or_none()
+
+    if not user:
+        # Try client_id lookup
+        result = await db.execute(select(User).where(User.client_id == form_data.username))
+        user = result.scalar_one_or_none()
 
     if not user or not verify_password(form_data.password, user.hashed_password):
         log.warning("login_failed")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect email or password",
+            detail="Invalid credentials",
             headers={"WWW-Authenticate": "Bearer"},
         )
 

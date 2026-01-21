@@ -14,7 +14,7 @@ import hmac
 import logging
 import secrets
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 import httpx
@@ -26,7 +26,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.auth import CurrentUser
 from app.core.limiter import limiter
 from app.db.session import get_db
-from app.models.appointment import Appointment
 from app.models.call_record import CallRecord
 from app.models.contact import Contact
 from app.models.workspace import Workspace
@@ -145,10 +144,10 @@ async def create_or_update_contact(
         try:
             ws_uuid = uuid.UUID(workspace_id)
             # Verify workspace belongs to user
-            result = await db.execute(
+            ws_result = await db.execute(
                 select(Workspace).where(Workspace.id == ws_uuid, Workspace.user_id == user_id)
             )
-            if not result.scalar_one_or_none():
+            if not ws_result.scalar_one_or_none():
                 raise HTTPException(status_code=404, detail="Workspace not found")
         except ValueError as e:
             raise HTTPException(status_code=400, detail="Invalid workspace ID") from e
@@ -161,8 +160,8 @@ async def create_or_update_contact(
     if ws_uuid:
         query = query.where(Contact.workspace_id == ws_uuid)
 
-    result = await db.execute(query)
-    contact = result.scalar_one_or_none()
+    contact_result = await db.execute(query)
+    contact: Contact | None = contact_result.scalar_one_or_none()
 
     if contact:
         # Update existing contact
@@ -329,7 +328,7 @@ async def register_webhook(
         "url": webhook_data.url,
         "events": webhook_data.events,
         "secret": secret,
-        "created_at": datetime.now(timezone.utc),
+        "created_at": datetime.now(UTC),
     }
 
     # Store webhook (in production, use Redis or DB)
@@ -407,7 +406,7 @@ async def list_calls(
     user_id = current_user.id
 
     # Build query - user_id is a UUID in call_records
-    from app.core.security import user_id_to_uuid
+    from app.core.auth import user_id_to_uuid
 
     user_uuid = user_id_to_uuid(user_id)
     query = select(CallRecord).where(CallRecord.user_id == user_uuid)
@@ -434,15 +433,15 @@ async def list_calls(
         {
             "id": str(c.id),
             "agent_id": str(c.agent_id) if c.agent_id else None,
-            "caller_phone": c.caller_phone,
+            "caller_phone": c.from_number if c.direction == "inbound" else c.to_number,
             "status": c.status,
             "direction": c.direction,
             "started_at": c.started_at,
             "ended_at": c.ended_at,
             "duration_seconds": c.duration_seconds,
             "transcript": c.transcript,
-            "sentiment": c.sentiment,
-            "summary": c.summary,
+            "sentiment": None,  # Not implemented in model
+            "summary": None,  # Not implemented in model
         }
         for c in calls
     ]
@@ -458,7 +457,7 @@ async def get_call(
 ) -> dict[str, Any]:
     """Get a specific call record with full details."""
     user_id = current_user.id
-    from app.core.security import user_id_to_uuid
+    from app.core.auth import user_id_to_uuid
 
     user_uuid = user_id_to_uuid(user_id)
 
@@ -478,15 +477,15 @@ async def get_call(
     return {
         "id": str(call.id),
         "agent_id": str(call.agent_id) if call.agent_id else None,
-        "caller_phone": call.caller_phone,
+        "caller_phone": call.from_number if call.direction == "inbound" else call.to_number,
         "status": call.status,
         "direction": call.direction,
         "started_at": call.started_at,
         "ended_at": call.ended_at,
         "duration_seconds": call.duration_seconds,
         "transcript": call.transcript,
-        "sentiment": call.sentiment,
-        "summary": call.summary,
+        "sentiment": None,  # Not implemented in model
+        "summary": None,  # Not implemented in model
     }
 
 
@@ -517,7 +516,7 @@ async def send_webhook_event(
             # Prepare payload
             event_payload = {
                 "event": event_type,
-                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
                 "data": payload,
             }
 

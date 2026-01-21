@@ -50,18 +50,18 @@ class CallInteraction(Base, TimestampMixin):
         index=True,
     )  # answered, voicemail, no_answer, callback_requested, busy
 
-    # AI-generated content
-    transcript: Mapped[str | None] = mapped_column(Text, nullable=True, deferred=True)
-    ai_summary: Mapped[str | None] = mapped_column(Text, nullable=True, deferred=True)
+    # AI-generated content (removed deferred=True to avoid async SQLAlchemy issues)
+    transcript: Mapped[str | None] = mapped_column(Text, nullable=True)
+    ai_summary: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     # Sentiment analysis (optional, -1.0 to 1.0)
     sentiment_score: Mapped[float | None] = mapped_column(Float, nullable=True)
 
     # Action items extracted from call (JSON or comma-separated)
-    action_items: Mapped[str | None] = mapped_column(Text, nullable=True, deferred=True)
+    action_items: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     # Additional notes
-    notes: Mapped[str | None] = mapped_column(Text, nullable=True, deferred=True)
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     # Relationships
     workspace: Mapped["Workspace | None"] = relationship(

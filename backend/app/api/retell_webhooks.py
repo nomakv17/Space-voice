@@ -102,15 +102,21 @@ async def verify_retell_signature(request: Request) -> None:
     Raises:
         HTTPException: If signature verification fails
     """
-    # Skip verification if no API key configured (development mode)
+    # Require API key configuration - fail secure
     if not settings.RETELL_API_KEY:
-        return
+        logger.error("retell_api_key_not_configured")
+        raise HTTPException(
+            status_code=500,
+            detail="Retell API key not configured",
+        )
 
     signature = request.headers.get("x-retell-signature")
     if not signature:
-        # Allow requests without signature in development
         logger.warning("retell_webhook_no_signature")
-        return
+        raise HTTPException(
+            status_code=401,
+            detail="Missing webhook signature",
+        )
 
     body = await request.body()
 
@@ -121,9 +127,11 @@ async def verify_retell_signature(request: Request) -> None:
     ).hexdigest()
 
     if not hmac.compare_digest(signature, expected):
-        # Log but don't block - signature format may differ
         logger.warning("retell_webhook_signature_mismatch")
-        return  # Allow in development
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid webhook signature",
+        )
 
 
 # =============================================================================
@@ -861,7 +869,7 @@ async def retell_inbound_webhook(
 
             # Return a default error response
             # In production, you'd have a fallback agent
-            raise HTTPException(  # noqa: TRY301
+            raise HTTPException(
                 status_code=404,
                 detail=f"No agent configured for number {inbound.to_number}",
             )

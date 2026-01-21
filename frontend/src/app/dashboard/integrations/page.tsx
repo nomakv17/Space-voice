@@ -488,7 +488,7 @@ const IntegrationConfigForm = memo(function IntegrationConfigForm({
         if (auth_url) {
           window.location.href = auth_url;
         }
-      } catch (error) {
+      } catch {
         toast.error(`Failed to start ${integration.name} connection`);
       }
     };
@@ -518,15 +518,12 @@ const IntegrationConfigForm = memo(function IntegrationConfigForm({
           </p>
         </div>
         <div className="flex gap-2">
-          <Button onClick={handleOAuthConnect} className="flex-1">
+          <Button onClick={() => void handleOAuthConnect()} className="flex-1">
             <ExternalLink className="mr-2 h-4 w-4" />
             {isConnected ? "Reconnect" : "Connect"} with {integration.name}
           </Button>
           {isConnected && (
-            <Button
-              variant="destructive"
-              onClick={() => setShowDisconnectDialog(true)}
-            >
+            <Button variant="destructive" onClick={() => setShowDisconnectDialog(true)}>
               <Trash2 className="h-4 w-4" />
             </Button>
           )}

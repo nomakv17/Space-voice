@@ -1,8 +1,8 @@
 """Application configuration using Pydantic settings."""
 
-from typing import Any
+from typing import Any, Self
 
-from pydantic import PostgresDsn, RedisDsn, field_validator
+from pydantic import PostgresDsn, RedisDsn, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -82,7 +82,9 @@ class Settings(BaseSettings):
 
     # CORS
     CORS_ORIGINS: list[str] = [
-        "http://localhost:3000",
+        "https://dashboard.spacevoice.ai",  # Production frontend
+        "https://spacevoice.ai",  # Main domain
+        "http://localhost:3000",  # Local development
         "http://localhost:3001",
         "http://localhost:8000",
     ]
@@ -156,6 +158,30 @@ class Settings(BaseSettings):
     OTEL_ENABLED: bool = False
     OTEL_SERVICE_NAME: str = "voicenoob-api"
     OTEL_EXPORTER_OTLP_ENDPOINT: str | None = None
+
+    @model_validator(mode="after")
+    def validate_production_security(self) -> Self:
+        """Validate that production-critical secrets are not using defaults.
+
+        This prevents accidentally deploying with insecure default values.
+        Only enforced when DEBUG=False (production mode).
+        """
+        if not self.DEBUG:
+            # Check for default SECRET_KEY
+            if self.SECRET_KEY == "change-this-to-a-random-secret-key-in-production":
+                raise ValueError(
+                    "SECRET_KEY must be changed from default value in production! "
+                    'Generate a secure key with: python -c "import secrets; print(secrets.token_hex(32))"'
+                )
+
+            # Check for default ADMIN_PASSWORD
+            if self.ADMIN_PASSWORD == "admin":
+                raise ValueError(
+                    "ADMIN_PASSWORD must be changed from default 'admin' in production! "
+                    "Use a strong, unique password."
+                )
+
+        return self
 
 
 settings = Settings()

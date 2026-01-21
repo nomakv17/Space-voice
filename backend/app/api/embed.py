@@ -466,7 +466,7 @@ async def _bridge_embed_streams(
 
 
 @router.post("/{public_id}/token")
-async def get_embed_ephemeral_token(  # noqa: PLR0915
+async def get_embed_ephemeral_token(
     public_id: str,
     request: Request,
     db: AsyncSession = Depends(get_db),

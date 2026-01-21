@@ -106,7 +106,7 @@ class CampaignWorker:
                         campaign_name=campaign.name,
                     )
 
-    async def _process_campaign(  # noqa: PLR0915
+    async def _process_campaign(
         self, campaign: Campaign, db: AsyncSession
     ) -> None:
         """Process a single campaign.

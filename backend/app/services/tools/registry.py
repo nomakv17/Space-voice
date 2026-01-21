@@ -274,7 +274,7 @@ class ToolRegistry:
         try:
             return await self._execute_tool_internal(tool_name, arguments)
         except Exception as e:
-            print(f"[TOOL ERROR] {tool_name}: {type(e).__name__}: {e}", flush=True)  # noqa: T201
+            print(f"[TOOL ERROR] {tool_name}: {type(e).__name__}: {e}", flush=True)
             import traceback
 
             traceback.print_exc()

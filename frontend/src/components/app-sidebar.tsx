@@ -24,6 +24,7 @@ import {
   Mic,
   Zap,
   Users,
+  UserPlus,
   Calendar,
   FolderOpen,
   PanelLeftClose,
@@ -97,6 +98,16 @@ const navigation = [
   },
 ];
 
+// Admin-only navigation items
+const adminNavigation = [
+  {
+    name: "Clients",
+    href: "/dashboard/clients",
+    icon: UserPlus,
+    color: "text-indigo-400",
+  },
+];
+
 export function AppSidebar() {
   const pathname = usePathname();
   const { sidebarOpen, setSidebarOpen } = useSidebarStore();
@@ -142,6 +153,53 @@ export function AppSidebar() {
       {/* Navigation */}
       <nav className="flex-1 overflow-y-auto px-2 py-2">
         <div className="flex flex-col gap-1">
+          {/* Admin-only navigation */}
+          {user?.is_superuser && adminNavigation.map((item) => {
+            const active = isActive(item.href);
+            return (
+              <Link key={item.name} href={item.href} prefetch={true}>
+                <Button
+                  variant="ghost"
+                  className={cn(
+                    "relative h-9 w-full justify-start gap-3 px-3 font-normal",
+                    !sidebarOpen && "justify-center gap-0 px-0",
+                    active
+                      ? "bg-sidebar-accent text-sidebar-foreground"
+                      : "text-sidebar-foreground/60 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
+                  )}
+                >
+                  {active && (
+                    <motion.div
+                      layoutId="activeNavAdmin"
+                      className="absolute inset-y-0 left-0 my-auto h-5 w-0.5 rounded-r-full bg-indigo-400"
+                      transition={{ type: "spring", stiffness: 400, damping: 30 }}
+                    />
+                  )}
+                  <item.icon className={cn("h-[18px] w-[18px] shrink-0", active && item.color)} />
+                  <AnimatePresence>
+                    {sidebarOpen && (
+                      <motion.span
+                        initial={{ opacity: 0, width: 0 }}
+                        animate={{ opacity: 1, width: "auto" }}
+                        exit={{ opacity: 0, width: 0 }}
+                        transition={{ duration: 0.15 }}
+                        className="truncate text-sm"
+                      >
+                        {item.name}
+                      </motion.span>
+                    )}
+                  </AnimatePresence>
+                </Button>
+              </Link>
+            );
+          })}
+
+          {/* Divider for admin section */}
+          {user?.is_superuser && (
+            <div className="my-2 border-t border-sidebar-border" />
+          )}
+
+          {/* Regular navigation */}
           {navigation.map((item) => {
             const active = isActive(item.href);
             return (

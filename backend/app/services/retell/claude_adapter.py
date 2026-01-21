@@ -153,8 +153,9 @@ class ClaudeAdapter:
                         yield {"type": "message_end"}
 
         except Exception as e:
-            print(f"[CLAUDE ERROR] Generation failed: {type(e).__name__}: {e}", flush=True)  # noqa: T201
+            print(f"[CLAUDE ERROR] Generation failed: {type(e).__name__}: {e}", flush=True)
             import traceback
+
             traceback.print_exc()
             self.logger.exception("claude_generation_error", error=str(e))
             yield {
@@ -162,7 +163,7 @@ class ClaudeAdapter:
                 "error": str(e),
             }
 
-    async def generate_with_tool_results(  # noqa: PLR0912, PLR0915
+    async def generate_with_tool_results(
         self,
         transcript: list[dict[str, Any]],
         system_prompt: str,
@@ -347,8 +348,9 @@ class ClaudeAdapter:
                     self.logger.warning("claude_stream_no_events")
 
         except Exception as e:
-            print(f"[CLAUDE ERROR] Tool continuation failed: {type(e).__name__}: {e}", flush=True)  # noqa: T201
+            print(f"[CLAUDE ERROR] Tool continuation failed: {type(e).__name__}: {e}", flush=True)
             import traceback
+
             traceback.print_exc()
             self.logger.exception("claude_continuation_error", error=str(e))
             yield {

@@ -194,7 +194,7 @@ export default function CallHistoryPage() {
               onClick={() => {
                 if (audioRef.current) {
                   if (audioRef.current.paused) {
-                    audioRef.current.play();
+                    void audioRef.current.play();
                   } else {
                     audioRef.current.pause();
                   }

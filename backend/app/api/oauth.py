@@ -1,5 +1,6 @@
 """OAuth routes for Google Calendar and Calendly integrations."""
 
+import json
 import secrets
 import uuid
 from datetime import UTC, datetime
@@ -64,7 +65,7 @@ async def google_calendar_connect(
         "workspace_id": workspace_id,
         "provider": "google-calendar",
     }
-    await redis.setex(f"oauth_state:{state}", OAUTH_STATE_TTL, str(state_data))
+    await redis.setex(f"oauth_state:{state}", OAUTH_STATE_TTL, json.dumps(state_data))
 
     # Build authorization URL
     redirect_uri = f"{settings.PUBLIC_URL}/api/v1/oauth/google-calendar/callback"
@@ -97,9 +98,7 @@ async def google_calendar_callback(
     # Check for OAuth error
     if error:
         logger.warning("google_calendar_oauth_error", error=error)
-        return RedirectResponse(
-            url=f"{settings.FRONTEND_URL}/dashboard/integrations?error={error}"
-        )
+        return RedirectResponse(url=f"{settings.FRONTEND_URL}/dashboard/integrations?error={error}")
 
     # Verify state
     redis = await get_redis()
@@ -111,7 +110,7 @@ async def google_calendar_callback(
         )
 
     # Parse state data
-    state_data = eval(state_data_str)  # Safe since we created it
+    state_data = json.loads(state_data_str)
     user_id = state_data["user_id"]
     workspace_id = state_data.get("workspace_id")
 
@@ -229,7 +228,7 @@ async def calendly_connect(
         "workspace_id": workspace_id,
         "provider": "calendly",
     }
-    await redis.setex(f"oauth_state:{state}", OAUTH_STATE_TTL, str(state_data))
+    await redis.setex(f"oauth_state:{state}", OAUTH_STATE_TTL, json.dumps(state_data))
 
     # Build authorization URL
     redirect_uri = f"{settings.PUBLIC_URL}/api/v1/oauth/calendly/callback"
@@ -258,9 +257,7 @@ async def calendly_callback(
     """Handle Calendly OAuth callback."""
     if error:
         logger.warning("calendly_oauth_error", error=error)
-        return RedirectResponse(
-            url=f"{settings.FRONTEND_URL}/dashboard/integrations?error={error}"
-        )
+        return RedirectResponse(url=f"{settings.FRONTEND_URL}/dashboard/integrations?error={error}")
 
     # Verify state
     redis = await get_redis()
@@ -271,7 +268,7 @@ async def calendly_callback(
             url=f"{settings.FRONTEND_URL}/dashboard/integrations?error=invalid_state"
         )
 
-    state_data = eval(state_data_str)
+    state_data = json.loads(state_data_str)
     user_id = state_data["user_id"]
     workspace_id = state_data.get("workspace_id")
 
@@ -365,9 +362,7 @@ async def calendly_callback(
 
     logger.info("calendly_connected", user_id=user_id)
 
-    return RedirectResponse(
-        url=f"{settings.FRONTEND_URL}/dashboard/integrations?success=calendly"
-    )
+    return RedirectResponse(url=f"{settings.FRONTEND_URL}/dashboard/integrations?success=calendly")
 
 
 # =============================================================================

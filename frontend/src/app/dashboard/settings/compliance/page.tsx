@@ -167,7 +167,9 @@ export default function ComplianceSettingsPage() {
   // CCPA opt-out mutation
   const ccpaOptOutMutation = useMutation({
     mutationFn: async (optOut: boolean) => {
-      const endpoint = optOut ? "/api/v1/compliance/ccpa/opt-out" : "/api/v1/compliance/ccpa/opt-in";
+      const endpoint = optOut
+        ? "/api/v1/compliance/ccpa/opt-out"
+        : "/api/v1/compliance/ccpa/opt-in";
       const response = await api.post(endpoint);
       return response.data;
     },
@@ -215,7 +217,7 @@ export default function ComplianceSettingsPage() {
         <Card>
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
-              <CardTitle className="text-lg flex items-center gap-2">
+              <CardTitle className="flex items-center gap-2 text-lg">
                 <Shield className="h-5 w-5" />
                 GDPR Compliance
               </CardTitle>
@@ -223,25 +225,23 @@ export default function ComplianceSettingsPage() {
                 {complianceStatus?.gdpr.percentage}%
               </Badge>
             </div>
-            <CardDescription>
-              General Data Protection Regulation (EU)
-            </CardDescription>
+            <CardDescription>General Data Protection Regulation (EU)</CardDescription>
           </CardHeader>
           <CardContent>
             <Progress value={complianceStatus?.gdpr.percentage} className="mb-4" />
-            <p className="text-sm text-muted-foreground mb-4">
+            <p className="mb-4 text-sm text-muted-foreground">
               {complianceStatus?.gdpr.completed} of {complianceStatus?.gdpr.total} requirements met
             </p>
-            <div className="space-y-2 max-h-48 overflow-y-auto">
+            <div className="max-h-48 space-y-2 overflow-y-auto">
               {complianceStatus?.gdpr.checks.map((check) => (
                 <div
                   key={check.id}
-                  className="flex items-start gap-2 p-2 rounded-lg bg-muted/50 text-sm"
+                  className="flex items-start gap-2 rounded-lg bg-muted/50 p-2 text-sm"
                 >
                   {getStatusIcon(check.status)}
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium truncate">{check.label}</p>
-                    <p className="text-xs text-muted-foreground truncate">{check.description}</p>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate font-medium">{check.label}</p>
+                    <p className="truncate text-xs text-muted-foreground">{check.description}</p>
                   </div>
                   {check.action_url && check.status !== "complete" && (
                     <Button variant="ghost" size="sm" asChild>
@@ -260,7 +260,7 @@ export default function ComplianceSettingsPage() {
         <Card>
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
-              <CardTitle className="text-lg flex items-center gap-2">
+              <CardTitle className="flex items-center gap-2 text-lg">
                 <FileText className="h-5 w-5" />
                 CCPA Compliance
               </CardTitle>
@@ -268,25 +268,23 @@ export default function ComplianceSettingsPage() {
                 {complianceStatus?.ccpa.percentage}%
               </Badge>
             </div>
-            <CardDescription>
-              California Consumer Privacy Act (US)
-            </CardDescription>
+            <CardDescription>California Consumer Privacy Act (US)</CardDescription>
           </CardHeader>
           <CardContent>
             <Progress value={complianceStatus?.ccpa.percentage} className="mb-4" />
-            <p className="text-sm text-muted-foreground mb-4">
+            <p className="mb-4 text-sm text-muted-foreground">
               {complianceStatus?.ccpa.completed} of {complianceStatus?.ccpa.total} requirements met
             </p>
-            <div className="space-y-2 max-h-48 overflow-y-auto">
+            <div className="max-h-48 space-y-2 overflow-y-auto">
               {complianceStatus?.ccpa.checks.map((check) => (
                 <div
                   key={check.id}
-                  className="flex items-start gap-2 p-2 rounded-lg bg-muted/50 text-sm"
+                  className="flex items-start gap-2 rounded-lg bg-muted/50 p-2 text-sm"
                 >
                   {getStatusIcon(check.status)}
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium truncate">{check.label}</p>
-                    <p className="text-xs text-muted-foreground truncate">{check.description}</p>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate font-medium">{check.label}</p>
+                    <p className="truncate text-xs text-muted-foreground">{check.description}</p>
                   </div>
                 </div>
               ))}
@@ -299,12 +297,10 @@ export default function ComplianceSettingsPage() {
       <Card>
         <CardHeader>
           <CardTitle>Consent Management</CardTitle>
-          <CardDescription>
-            Record your consent for data processing activities
-          </CardDescription>
+          <CardDescription>Record your consent for data processing activities</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="flex items-center justify-between p-4 border rounded-lg">
+          <div className="flex items-center justify-between rounded-lg border p-4">
             <div>
               <p className="font-medium">Data Processing Consent</p>
               <p className="text-sm text-muted-foreground">
@@ -314,7 +310,9 @@ export default function ComplianceSettingsPage() {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => recordConsentMutation.mutate({ consent_type: "data_processing", granted: true })}
+              onClick={() =>
+                recordConsentMutation.mutate({ consent_type: "data_processing", granted: true })
+              }
               disabled={recordConsentMutation.isPending}
             >
               {recordConsentMutation.isPending ? (
@@ -325,7 +323,7 @@ export default function ComplianceSettingsPage() {
             </Button>
           </div>
 
-          <div className="flex items-center justify-between p-4 border rounded-lg">
+          <div className="flex items-center justify-between rounded-lg border p-4">
             <div>
               <p className="font-medium">Call Recording Consent</p>
               <p className="text-sm text-muted-foreground">
@@ -335,7 +333,9 @@ export default function ComplianceSettingsPage() {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => recordConsentMutation.mutate({ consent_type: "call_recording", granted: true })}
+              onClick={() =>
+                recordConsentMutation.mutate({ consent_type: "call_recording", granted: true })
+              }
               disabled={recordConsentMutation.isPending}
             >
               {recordConsentMutation.isPending ? (
@@ -346,7 +346,7 @@ export default function ComplianceSettingsPage() {
             </Button>
           </div>
 
-          <div className="flex items-center justify-between p-4 border rounded-lg">
+          <div className="flex items-center justify-between rounded-lg border p-4">
             <div>
               <p className="font-medium">CCPA: Do Not Sell My Information</p>
               <p className="text-sm text-muted-foreground">
@@ -366,9 +366,7 @@ export default function ComplianceSettingsPage() {
       <Card>
         <CardHeader>
           <CardTitle>Privacy Settings</CardTitle>
-          <CardDescription>
-            Configure your privacy preferences and policies
-          </CardDescription>
+          <CardDescription>Configure your privacy preferences and policies</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid gap-4 md:grid-cols-2">
@@ -419,19 +417,36 @@ export default function ComplianceSettingsPage() {
       <Card>
         <CardHeader>
           <CardTitle>Data Processing Agreements (DPAs)</CardTitle>
-          <CardDescription>
-            Acknowledge DPAs with third-party service providers
-          </CardDescription>
+          <CardDescription>Acknowledge DPAs with third-party service providers</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="space-y-3">
             {[
-              { key: "openai_dpa_signed", name: "OpenAI", url: "https://openai.com/policies/data-processing-addendum" },
-              { key: "telnyx_dpa_signed", name: "Telnyx", url: "https://telnyx.com/legal/data-processing-addendum" },
-              { key: "deepgram_dpa_signed", name: "Deepgram", url: "https://developers.deepgram.com/docs/data-privacy-compliance" },
-              { key: "elevenlabs_dpa_signed", name: "ElevenLabs", url: "https://elevenlabs.io/dpa" },
+              {
+                key: "openai_dpa_signed",
+                name: "OpenAI",
+                url: "https://openai.com/policies/data-processing-addendum",
+              },
+              {
+                key: "telnyx_dpa_signed",
+                name: "Telnyx",
+                url: "https://telnyx.com/legal/data-processing-addendum",
+              },
+              {
+                key: "deepgram_dpa_signed",
+                name: "Deepgram",
+                url: "https://developers.deepgram.com/docs/data-privacy-compliance",
+              },
+              {
+                key: "elevenlabs_dpa_signed",
+                name: "ElevenLabs",
+                url: "https://elevenlabs.io/dpa",
+              },
             ].map((dpa) => (
-              <div key={dpa.key} className="flex items-center justify-between p-3 border rounded-lg">
+              <div
+                key={dpa.key}
+                className="flex items-center justify-between rounded-lg border p-3"
+              >
                 <div className="flex items-center gap-3">
                   {privacySettings?.[dpa.key as keyof PrivacySettings] ? (
                     <Check className="h-5 w-5 text-green-500" />
@@ -444,7 +459,7 @@ export default function ComplianceSettingsPage() {
                       href={dpa.url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-xs text-primary hover:underline flex items-center gap-1"
+                      className="flex items-center gap-1 text-xs text-primary hover:underline"
                     >
                       View DPA <ExternalLink className="h-3 w-3" />
                     </a>
@@ -467,12 +482,10 @@ export default function ComplianceSettingsPage() {
       <Card>
         <CardHeader>
           <CardTitle>Your Data Rights</CardTitle>
-          <CardDescription>
-            Exercise your rights under GDPR and CCPA
-          </CardDescription>
+          <CardDescription>Exercise your rights under GDPR and CCPA</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="flex flex-col sm:flex-row gap-4">
+          <div className="flex flex-col gap-4 sm:flex-row">
             <Button
               variant="outline"
               onClick={() => exportDataMutation.mutate()}
@@ -499,8 +512,8 @@ export default function ComplianceSettingsPage() {
                   <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
                   <AlertDialogDescription>
                     This action cannot be undone. This will permanently delete all your data
-                    including agents, contacts, call records, and settings. Your account will
-                    remain active but empty.
+                    including agents, contacts, call records, and settings. Your account will remain
+                    active but empty.
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>

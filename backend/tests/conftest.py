@@ -3,18 +3,13 @@
 import asyncio
 import logging
 import os
-
-# Test database URL (using temp file SQLite for tests)
-import tempfile
 from collections.abc import AsyncGenerator, Generator
-from pathlib import Path
 from typing import Any
 
 import fakeredis
 import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
-from sqlalchemy import event
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.pool import NullPool
 
@@ -31,35 +26,47 @@ from app.models.user import User
 
 logger = logging.getLogger(__name__)
 
+# Use PostgreSQL for tests (supports ARRAY types, matches production)
+TEST_DATABASE_URL = os.getenv(
+    "TEST_DATABASE_URL", "postgresql+asyncpg://postgres:postgres@localhost:5432/voicenoob_test"
+)
+
 
 @pytest.fixture(scope="session")
 def event_loop() -> Generator[asyncio.AbstractEventLoop, None, None]:
-    """Create event loop for async tests."""
-    loop = asyncio.get_event_loop_policy().new_event_loop()
+    """Create event loop for async tests.
+
+    Note: Using session scope to avoid event loop closed issues between tests.
+    """
+    policy = asyncio.get_event_loop_policy()
+    loop = policy.new_event_loop()
+    asyncio.set_event_loop(loop)
     yield loop
-    loop.close()
+    # Graceful cleanup
+    try:
+        loop.run_until_complete(loop.shutdown_asyncgens())
+        loop.run_until_complete(loop.shutdown_default_executor())
+    finally:
+        asyncio.set_event_loop(None)
+        loop.close()
 
 
 @pytest_asyncio.fixture(scope="function")
 async def test_engine() -> AsyncGenerator[Any, None]:
-    """Create test database engine with fresh database for each test."""
-    # Create a unique temp file for each test to ensure complete isolation
-    test_db_fd, test_db_path = tempfile.mkstemp(suffix=".db")
-    os.close(test_db_fd)
-    test_db_url = f"sqlite+aiosqlite:///{test_db_path}"
+    """Create test database engine with fresh tables for each test.
 
+    Uses PostgreSQL to support ARRAY types and match production environment.
+    Tables are dropped and recreated for each test to ensure isolation.
+    """
     engine = create_async_engine(
-        test_db_url,
+        TEST_DATABASE_URL,
         echo=False,
         poolclass=NullPool,
     )
 
-    # Enable foreign keys for SQLite
-    @event.listens_for(engine.sync_engine, "connect")
-    def set_sqlite_pragma(dbapi_connection: Any, _connection_record: Any) -> None:
-        cursor = dbapi_connection.cursor()
-        cursor.execute("PRAGMA foreign_keys=ON")
-        cursor.close()
+    # Drop all tables first to ensure clean state
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.drop_all)
 
     # Create all tables
     async with engine.begin() as conn:
@@ -67,19 +74,11 @@ async def test_engine() -> AsyncGenerator[Any, None]:
 
     yield engine
 
-    # Drop all tables
+    # Drop all tables after test
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.drop_all)
 
     await engine.dispose()
-
-    # Clean up temp database file
-    try:
-        db_path = Path(test_db_path)
-        if db_path.exists():
-            db_path.unlink()
-    except Exception as e:
-        logger.debug("Failed to clean up test database: %s", e)
 
 
 @pytest_asyncio.fixture(scope="function")
@@ -143,14 +142,17 @@ async def test_client(
 @pytest_asyncio.fixture(scope="function")
 async def authenticated_test_client(
     test_engine: Any,
-) -> AsyncGenerator[tuple[AsyncClient, User], None]:
+) -> AsyncGenerator[tuple[AsyncClient, User, async_sessionmaker[AsyncSession]], None]:
     """Create test HTTP client with authentication.
 
-    Returns a tuple of (client, user) where user is the authenticated test user.
-    Use this for testing authenticated endpoints.
+    Returns a tuple of (client, user, session_maker) where:
+    - client: HTTP client for making requests
+    - user: The authenticated test user
+    - session_maker: Session maker for creating test data (same as HTTP client uses)
 
-    Note: This fixture creates its own session to avoid transaction isolation issues.
+    Use session_maker to create test data that will be visible to the HTTP client.
     """
+    import app.core.cache as cache_module
     import app.db.redis as redis_module
     from app.core.auth import get_current_user
 
@@ -161,7 +163,7 @@ async def authenticated_test_client(
     # Create a shared fakeredis instance for this test
     shared_fake_redis = fakeredis.FakeAsyncRedis(decode_responses=True)
 
-    # Create a fresh session for this test
+    # Create a session maker - shared between fixtures and HTTP client
     test_async_session = async_sessionmaker(
         test_engine,
         class_=AsyncSession,
@@ -183,7 +185,7 @@ async def authenticated_test_client(
         await session.commit()
         await session.refresh(test_user)
 
-        # Override database dependency - provide a fresh session for each request
+        # Override database dependency - use the same session maker
         async def override_get_db() -> AsyncGenerator[AsyncSession, None]:
             request_session = test_async_session()
             async with request_session:
@@ -193,13 +195,16 @@ async def authenticated_test_client(
         async def override_get_redis() -> Any:
             return shared_fake_redis
 
-        # Monkey patch the global get_redis to return our fake redis
-        original_get_redis = redis_module.get_redis
+        # Monkey patch the global get_redis in BOTH modules to return our fake redis
+        # This is necessary because the cache module imports get_redis directly
+        original_redis_get_redis = redis_module.get_redis
+        original_cache_get_redis = cache_module.get_redis
 
         async def patched_get_redis() -> Any:
             return shared_fake_redis
 
         redis_module.get_redis = patched_get_redis
+        cache_module.get_redis = patched_get_redis
 
         # Override authentication to return our test user
         async def override_get_current_user() -> User:
@@ -213,13 +218,15 @@ async def authenticated_test_client(
         # Create test client
         transport = ASGITransport(app=app)  # type: ignore[arg-type]
         async with AsyncClient(transport=transport, base_url="http://test") as client:
-            yield client, test_user
+            # Yield client, user, AND session_maker so tests can create data
+            yield client, test_user, test_async_session
 
         # Clean up overrides
         app.dependency_overrides.clear()
 
-        # Restore original get_redis
-        redis_module.get_redis = original_get_redis
+        # Restore original get_redis in both modules
+        redis_module.get_redis = original_redis_get_redis
+        cache_module.get_redis = original_cache_get_redis
 
         # Close shared fakeredis
         await shared_fake_redis.aclose()

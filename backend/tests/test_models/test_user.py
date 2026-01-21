@@ -74,18 +74,20 @@ class TestUserModel:
             await test_session.commit()
 
     @pytest.mark.asyncio
-    @pytest.mark.usefixtures("test_session")
-    async def test_user_email_required(self) -> None:
-        """Test that email is required."""
-        with pytest.raises(TypeError):
-            User(hashed_password="password")  # type: ignore[call-arg]  # noqa: S106
+    async def test_user_email_required(self, test_session: AsyncSession) -> None:
+        """Test that email is required at database level."""
+        user = User(hashed_password="password")  # noqa: S106
+        test_session.add(user)
+        with pytest.raises(IntegrityError):
+            await test_session.commit()
 
     @pytest.mark.asyncio
-    @pytest.mark.usefixtures("test_session")
-    async def test_user_password_required(self) -> None:
-        """Test that hashed_password is required."""
-        with pytest.raises(TypeError):
-            User(email="test@example.com")  # type: ignore[call-arg]
+    async def test_user_password_required(self, test_session: AsyncSession) -> None:
+        """Test that hashed_password is required at database level."""
+        user = User(email="test@example.com")
+        test_session.add(user)
+        with pytest.raises(IntegrityError):
+            await test_session.commit()
 
     @pytest.mark.asyncio
     async def test_user_defaults(

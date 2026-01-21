@@ -119,7 +119,7 @@ class TwilioSMSTools:
             if response.status_code != HTTPStatus.CREATED:
                 error_data = response.json()
                 error_msg = error_data.get("message", response.text)
-                print(f"[SMS ERROR] Twilio API error: {error_msg}", flush=True)  # noqa: T201
+                print(f"[SMS ERROR] Twilio API error: {error_msg}", flush=True)
                 return {
                     "success": False,
                     "error": error_msg,
@@ -136,7 +136,7 @@ class TwilioSMSTools:
             }
 
         except Exception as e:
-            print(f"[SMS ERROR] Twilio exception: {type(e).__name__}: {e}", flush=True)  # noqa: T201
+            print(f"[SMS ERROR] Twilio exception: {type(e).__name__}: {e}", flush=True)
             logger.exception("twilio_send_sms_error", error=str(e))
             return {"success": False, "error": str(e)}
 
@@ -293,7 +293,7 @@ class TelnyxSMSTools:
                 error_data = response.json()
                 errors = error_data.get("errors", [])
                 error_msg = errors[0].get("detail") if errors else response.text
-                print(f"[SMS ERROR] Telnyx API error: {error_msg}", flush=True)  # noqa: T201
+                print(f"[SMS ERROR] Telnyx API error: {error_msg}", flush=True)
                 return {
                     "success": False,
                     "error": error_msg,
@@ -318,7 +318,7 @@ class TelnyxSMSTools:
                     "message": f"SMS sent successfully to {to}",
                 }
             except Exception as parse_error:
-                print(f"[SMS ERROR] Response parse failed: {parse_error}", flush=True)  # noqa: T201
+                print(f"[SMS ERROR] Response parse failed: {parse_error}", flush=True)
                 # SMS was sent (200 OK) but we couldn't parse response - still success
                 return {
                     "success": True,
@@ -330,7 +330,7 @@ class TelnyxSMSTools:
                 }
 
         except Exception as e:
-            print(f"[SMS ERROR] Telnyx exception: {type(e).__name__}: {e}", flush=True)  # noqa: T201
+            print(f"[SMS ERROR] Telnyx exception: {type(e).__name__}: {e}", flush=True)
             logger.exception("telnyx_send_sms_error", error=str(e))
             return {"success": False, "error": str(e)}
 

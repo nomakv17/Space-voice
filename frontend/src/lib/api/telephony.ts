@@ -89,7 +89,39 @@ export interface CallResponse {
 }
 
 /**
- * List all phone numbers for the user's account
+ * List all phone numbers from database (owned by user)
+ */
+export async function listPhoneNumbersFromDB(workspaceId?: string): Promise<PhoneNumber[]> {
+  const params = new URLSearchParams();
+  if (workspaceId && workspaceId !== "all") {
+    params.set("workspace_id", workspaceId);
+  }
+  const url = `${API_BASE}/api/v1/phone-numbers${params.toString() ? `?${params.toString()}` : ""}`;
+
+  const response = await fetchWithTimeout(url);
+
+  if (!response.ok) {
+    if (response.status === 401) {
+      return []; // Not authenticated
+    }
+    const error = await response.json().catch(() => ({ detail: response.statusText }));
+    throw new Error(error.detail ?? "Failed to list phone numbers");
+  }
+
+  const data = await response.json();
+  // The API returns { phone_numbers: [...], total: N, ... }
+  return (data.phone_numbers ?? []).map((n: Record<string, unknown>) => ({
+    id: n.id,
+    phone_number: n.phone_number,
+    friendly_name: n.friendly_name,
+    provider: n.provider,
+    capabilities: n.capabilities,
+    assigned_agent_id: n.assigned_agent_id,
+  }));
+}
+
+/**
+ * List phone numbers from provider API (Twilio/Telnyx)
  */
 export async function listPhoneNumbers(
   provider: Provider,

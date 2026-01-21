@@ -165,7 +165,10 @@ async def search_available_numbers(
                     state=n.get("administrative_area"),
                     country_code=n.get("country_code", country_code),
                     cost=n.get("cost_information", {}).get("upfront_cost"),
-                    features=[f.get("name", f) if isinstance(f, dict) else f for f in n.get("features", [])],
+                    features=[
+                        f.get("name", f) if isinstance(f, dict) else f
+                        for f in n.get("features", [])
+                    ],
                     record_type=n.get("record_type"),
                 )
                 for n in numbers
@@ -206,7 +209,9 @@ async def purchase_phone_number(
     log.info("purchasing_phone_number")
 
     user_uuid = user_id_to_uuid(current_user.id)
-    workspace_uuid = uuid.UUID(purchase_request.workspace_id) if purchase_request.workspace_id else None
+    workspace_uuid = (
+        uuid.UUID(purchase_request.workspace_id) if purchase_request.workspace_id else None
+    )
 
     # Step 1: Order the phone number from Telnyx
     order_payload = {

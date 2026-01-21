@@ -4,6 +4,7 @@ from typing import Any
 
 import pytest
 from httpx import AsyncClient
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.core.config import settings
 from app.models.user import User
@@ -18,10 +19,10 @@ class TestContactsAPI:
     @pytest.mark.asyncio
     async def test_list_contacts_empty(
         self,
-        authenticated_test_client: tuple[AsyncClient, User],
+        authenticated_test_client: tuple[AsyncClient, User, async_sessionmaker[AsyncSession]],
     ) -> None:
         """Test listing contacts returns empty list when no contacts exist."""
-        client, _user = authenticated_test_client
+        client, _user, _ = authenticated_test_client
         response = await client.get(f"{API_PREFIX}/crm/contacts")
 
         assert response.status_code == 200
@@ -30,11 +31,11 @@ class TestContactsAPI:
     @pytest.mark.asyncio
     async def test_create_contact_success(
         self,
-        authenticated_test_client: tuple[AsyncClient, User],
+        authenticated_test_client: tuple[AsyncClient, User, async_sessionmaker[AsyncSession]],
         sample_contact_data: dict[str, Any],
     ) -> None:
         """Test creating a contact with valid data."""
-        client, _user = authenticated_test_client
+        client, _user, _ = authenticated_test_client
         response = await client.post(f"{API_PREFIX}/crm/contacts", json=sample_contact_data)
 
         assert response.status_code == 201
@@ -52,10 +53,10 @@ class TestContactsAPI:
     @pytest.mark.asyncio
     async def test_create_contact_minimal_data(
         self,
-        authenticated_test_client: tuple[AsyncClient, User],
+        authenticated_test_client: tuple[AsyncClient, User, async_sessionmaker[AsyncSession]],
     ) -> None:
         """Test creating contact with only required fields."""
-        client, _user = authenticated_test_client
+        client, _user, _ = authenticated_test_client
         minimal_data = {
             "first_name": "John",
             "phone_number": "+15551234567",
@@ -73,10 +74,10 @@ class TestContactsAPI:
     @pytest.mark.asyncio
     async def test_create_contact_validation_error(
         self,
-        authenticated_test_client: tuple[AsyncClient, User],
+        authenticated_test_client: tuple[AsyncClient, User, async_sessionmaker[AsyncSession]],
     ) -> None:
         """Test creating contact with missing required fields."""
-        client, _user = authenticated_test_client
+        client, _user, _ = authenticated_test_client
         invalid_data = {
             "first_name": "John",
             # Missing phone_number
@@ -89,10 +90,10 @@ class TestContactsAPI:
     @pytest.mark.asyncio
     async def test_list_contacts_with_data(
         self,
-        authenticated_test_client: tuple[AsyncClient, User],
+        authenticated_test_client: tuple[AsyncClient, User, async_sessionmaker[AsyncSession]],
     ) -> None:
         """Test listing contacts returns created contacts."""
-        client, _user = authenticated_test_client
+        client, _user, _ = authenticated_test_client
 
         # Create contacts via API
         contact1 = await client.post(
@@ -125,10 +126,10 @@ class TestContactsAPI:
     @pytest.mark.asyncio
     async def test_list_contacts_pagination(
         self,
-        authenticated_test_client: tuple[AsyncClient, User],
+        authenticated_test_client: tuple[AsyncClient, User, async_sessionmaker[AsyncSession]],
     ) -> None:
         """Test contact listing pagination."""
-        client, _user = authenticated_test_client
+        client, _user, _ = authenticated_test_client
 
         # Create 5 test contacts via API
         for i in range(5):
@@ -153,10 +154,10 @@ class TestContactsAPI:
     @pytest.mark.asyncio
     async def test_get_contact_success(
         self,
-        authenticated_test_client: tuple[AsyncClient, User],
+        authenticated_test_client: tuple[AsyncClient, User, async_sessionmaker[AsyncSession]],
     ) -> None:
         """Test getting a single contact by ID."""
-        client, _user = authenticated_test_client
+        client, _user, _ = authenticated_test_client
 
         # Create test contact via API
         create_response = await client.post(
@@ -171,6 +172,8 @@ class TestContactsAPI:
         )
         assert create_response.status_code == 201
         created_contact = create_response.json()
+        # Verify email was saved on create
+        assert created_contact["email"] == "john@example.com"
 
         # Get contact by ID
         response = await client.get(f"{API_PREFIX}/crm/contacts/{created_contact['id']}")
@@ -181,14 +184,16 @@ class TestContactsAPI:
         assert data["first_name"] == "John"
         assert data["last_name"] == "Doe"
         assert data["email"] == "john@example.com"
+        assert data["phone_number"] == "+15551234567"
+        assert data["status"] == "qualified"
 
     @pytest.mark.asyncio
     async def test_get_contact_not_found(
         self,
-        authenticated_test_client: tuple[AsyncClient, User],
+        authenticated_test_client: tuple[AsyncClient, User, async_sessionmaker[AsyncSession]],
     ) -> None:
         """Test getting non-existent contact returns 404."""
-        client, _user = authenticated_test_client
+        client, _user, _ = authenticated_test_client
         response = await client.get(f"{API_PREFIX}/crm/contacts/99999")
 
         assert response.status_code == 404
@@ -201,10 +206,10 @@ class TestCRMStatsAPI:
     @pytest.mark.asyncio
     async def test_get_crm_stats_empty(
         self,
-        authenticated_test_client: tuple[AsyncClient, User],
+        authenticated_test_client: tuple[AsyncClient, User, async_sessionmaker[AsyncSession]],
     ) -> None:
         """Test CRM stats with no data returns zero counts."""
-        client, _user = authenticated_test_client
+        client, _user, _ = authenticated_test_client
         response = await client.get(f"{API_PREFIX}/crm/stats")
 
         assert response.status_code == 200
@@ -216,10 +221,10 @@ class TestCRMStatsAPI:
     @pytest.mark.asyncio
     async def test_get_crm_stats_with_contacts(
         self,
-        authenticated_test_client: tuple[AsyncClient, User],
+        authenticated_test_client: tuple[AsyncClient, User, async_sessionmaker[AsyncSession]],
     ) -> None:
         """Test CRM stats reflects created contacts."""
-        client, _user = authenticated_test_client
+        client, _user, _ = authenticated_test_client
 
         # Create test contacts via API
         for i in range(3):

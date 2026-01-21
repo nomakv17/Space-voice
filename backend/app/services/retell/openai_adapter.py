@@ -168,6 +168,7 @@ class OpenAIAdapter:
         except Exception as e:
             print(f"[OPENAI ERROR] Generation failed: {type(e).__name__}: {e}", flush=True)
             import traceback
+
             traceback.print_exc()
             self.logger.exception("openai_generation_error", error=str(e))
             yield {
@@ -214,7 +215,9 @@ class OpenAIAdapter:
         if tool_calls:
             assistant_message: dict[str, Any] = {
                 "role": "assistant",
-                "content": assistant_text_before_tools.strip() if assistant_text_before_tools else None,
+                "content": assistant_text_before_tools.strip()
+                if assistant_text_before_tools
+                else None,
                 "tool_calls": [],
             }
 
@@ -382,9 +385,7 @@ class OpenAIAdapter:
             OpenAI-format messages list
         """
         # Start with system message
-        messages: list[dict[str, Any]] = [
-            {"role": "system", "content": system_prompt}
-        ]
+        messages: list[dict[str, Any]] = [{"role": "system", "content": system_prompt}]
 
         for utterance in transcript:
             role = utterance.get("role", "")

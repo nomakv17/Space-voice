@@ -80,10 +80,9 @@ def validate_telnyx_signature(
     # Use provided key or fall back to settings
     key = public_key or settings.TELNYX_PUBLIC_KEY
     if not key:
-        logger.warning("telnyx_public_key_not_configured")
-        # If no key is configured, skip validation in development
-        # In production, this should always fail
-        return settings.DEBUG
+        logger.error("telnyx_public_key_not_configured")
+        # Fail secure - always reject if key not configured
+        return False
 
     try:
         import base64
@@ -125,21 +124,15 @@ async def verify_twilio_webhook(request: Request) -> bool:
     Raises:
         HTTPException: If signature validation fails in production
     """
-    # Get auth token from settings
+    # Get auth token from settings - fail secure if not configured
     auth_token = settings.TWILIO_AUTH_TOKEN
     if not auth_token:
-        if settings.DEBUG:
-            logger.warning("twilio_auth_token_not_configured_debug_mode")
-            return True
         logger.error("twilio_auth_token_not_configured")
         raise HTTPException(status_code=500, detail="Twilio not configured")
 
-    # Get signature from header
+    # Get signature from header - always require signature
     signature = request.headers.get("X-Twilio-Signature", "")
     if not signature:
-        if settings.DEBUG:
-            logger.warning("missing_twilio_signature_debug_mode")
-            return True
         logger.warning("missing_twilio_signature")
         raise HTTPException(status_code=403, detail="Missing Twilio signature")
 
@@ -167,14 +160,11 @@ async def verify_telnyx_webhook(request: Request) -> bool:
     Raises:
         HTTPException: If signature validation fails in production
     """
-    # Get signature headers
+    # Get signature headers - always require both
     signature = request.headers.get("telnyx-signature-ed25519", "")
     timestamp = request.headers.get("telnyx-timestamp", "")
 
     if not signature or not timestamp:
-        if settings.DEBUG:
-            logger.warning("missing_telnyx_signature_debug_mode")
-            return True
         logger.warning("missing_telnyx_signature")
         raise HTTPException(status_code=403, detail="Missing Telnyx signature")
 

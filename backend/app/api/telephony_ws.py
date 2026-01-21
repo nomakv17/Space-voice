@@ -159,7 +159,7 @@ async def twilio_media_stream(
         log.info("twilio_websocket_closed", stream_sid=stream_sid, call_sid=call_sid)
 
 
-async def _handle_twilio_stream(  # noqa: PLR0915
+async def _handle_twilio_stream(
     websocket: WebSocket,
     realtime_session: GPTRealtimeSession,
     log: Any,
@@ -224,7 +224,7 @@ async def _handle_twilio_stream(  # noqa: PLR0915
         except Exception as e:
             log.exception("twilio_to_realtime_error", error=str(e))
 
-    async def realtime_to_twilio() -> None:  # noqa: PLR0912, PLR0915
+    async def realtime_to_twilio() -> None:
         """Forward audio from GPT Realtime to Twilio."""
         nonlocal should_end_call
 
@@ -467,7 +467,7 @@ async def telnyx_media_stream(
         log.info("telnyx_websocket_closed", stream_id=stream_id, call_control_id=call_control_id)
 
 
-async def _handle_telnyx_stream(  # noqa: PLR0915
+async def _handle_telnyx_stream(
     websocket: WebSocket,
     realtime_session: GPTRealtimeSession,
     log: Any,
@@ -525,7 +525,7 @@ async def _handle_telnyx_stream(  # noqa: PLR0915
         except Exception as e:
             log.exception("telnyx_to_realtime_error", error=str(e))
 
-    async def realtime_to_telnyx() -> None:  # noqa: PLR0912
+    async def realtime_to_telnyx() -> None:
         """Forward audio from GPT Realtime to Telnyx."""
         nonlocal should_end_call
 

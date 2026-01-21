@@ -246,6 +246,7 @@ async def retell_llm_websocket(
         log.info("loaded_integrations", integration_ids=list(integrations.keys()))
 
         # Initialize LLM adapter based on provider setting
+        llm_adapter: OpenAIAdapter | ClaudeAdapter
         if llm_provider == "openai":
             llm_adapter = OpenAIAdapter(
                 api_key=settings.OPENAI_API_KEY,  # type: ignore[arg-type]

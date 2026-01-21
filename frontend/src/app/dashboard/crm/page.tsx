@@ -388,17 +388,6 @@ export default function CRMPage() {
     setIsDeleteDialogOpen(false);
   };
 
-  const getStatusColor = (status: string) => {
-    const colors: Record<string, string> = {
-      new: "bg-blue-100 text-blue-800",
-      contacted: "bg-yellow-100 text-yellow-800",
-      qualified: "bg-green-100 text-green-800",
-      converted: "bg-purple-100 text-purple-800",
-      lost: "bg-gray-100 text-gray-800",
-    };
-    return colors[status] ?? "bg-gray-100 text-gray-800";
-  };
-
   const isSubmitting = createContactMutation.isPending || updateContactMutation.isPending;
 
   if (error) {
@@ -424,10 +413,11 @@ export default function CRMPage() {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
+      {/* Header Section */}
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-semibold">CRM</h1>
+        <div className="space-y-1">
+          <h1 className="text-2xl font-bold tracking-tight">CRM</h1>
           <p className="text-sm text-muted-foreground">Manage your contacts and interactions</p>
         </div>
         <div className="flex items-center gap-3">
@@ -443,8 +433,8 @@ export default function CRMPage() {
                 toast.info(`Switched to ${wsName}`);
               }}
             >
-              <SelectTrigger className="h-8 w-[220px] text-sm">
-                <FolderOpen className="mr-2 h-3.5 w-3.5" />
+              <SelectTrigger className="h-9 w-[220px] border-white/[0.1] bg-white/[0.02] text-sm backdrop-blur-sm">
+                <FolderOpen className="mr-2 h-3.5 w-3.5 text-muted-foreground" />
                 <SelectValue placeholder="All Workspaces" />
               </SelectTrigger>
               <SelectContent>
@@ -459,52 +449,62 @@ export default function CRMPage() {
           ) : (
             <Link
               href="/dashboard/workspaces"
-              className="text-sm text-muted-foreground hover:text-foreground"
+              className="text-sm text-muted-foreground transition-colors hover:text-foreground"
             >
               Create a workspace
             </Link>
           )}
-          <Button size="sm" onClick={openAddModal}>
+          <Button size="sm" className="shadow-lg shadow-primary/20" onClick={openAddModal}>
             <Plus className="mr-2 h-4 w-4" />
             Add Contact
           </Button>
         </div>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid gap-3 md:grid-cols-3">
-        <Card>
+      {/* Stats Cards - Premium glass style */}
+      <div className="grid gap-4 md:grid-cols-3">
+        <Card className="group hover:-translate-y-0.5 hover:border-violet-500/20 hover:shadow-card-hover">
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs text-muted-foreground">Total Contacts</p>
-                <p className="text-lg font-semibold">{stats?.total_contacts ?? contacts.length}</p>
+              <div className="space-y-1">
+                <p className="text-xs font-medium text-muted-foreground">Total Contacts</p>
+                <p className="text-2xl font-bold tracking-tight">
+                  {stats?.total_contacts ?? contacts.length}
+                </p>
               </div>
-              <Phone className="h-4 w-4 text-muted-foreground" />
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-violet-500/20 to-purple-500/10 shadow-inner-glow">
+                <Phone className="h-5 w-5 text-violet-400" />
+              </div>
             </div>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="group hover:-translate-y-0.5 hover:border-blue-500/20 hover:shadow-card-hover">
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs text-muted-foreground">Appointments</p>
-                <p className="text-lg font-semibold">{stats?.total_appointments ?? 0}</p>
+              <div className="space-y-1">
+                <p className="text-xs font-medium text-muted-foreground">Appointments</p>
+                <p className="text-2xl font-bold tracking-tight">
+                  {stats?.total_appointments ?? 0}
+                </p>
               </div>
-              <Building2 className="h-4 w-4 text-muted-foreground" />
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500/20 to-cyan-500/10 shadow-inner-glow">
+                <Building2 className="h-5 w-5 text-blue-400" />
+              </div>
             </div>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="group hover:-translate-y-0.5 hover:border-emerald-500/20 hover:shadow-card-hover">
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs text-muted-foreground">Call Interactions</p>
-                <p className="text-lg font-semibold">{stats?.total_calls ?? 0}</p>
+              <div className="space-y-1">
+                <p className="text-xs font-medium text-muted-foreground">Call Interactions</p>
+                <p className="text-2xl font-bold tracking-tight">{stats?.total_calls ?? 0}</p>
               </div>
-              <Phone className="h-4 w-4 text-muted-foreground" />
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-500/20 to-green-500/10 shadow-inner-glow">
+                <Phone className="h-5 w-5 text-emerald-400" />
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -513,40 +513,46 @@ export default function CRMPage() {
       {/* Contacts List */}
       {isLoading ? (
         <Card>
-          <CardContent className="flex items-center justify-center py-16">
-            <p className="text-muted-foreground">Loading contacts...</p>
+          <CardContent className="flex items-center justify-center py-20">
+            <div className="flex flex-col items-center gap-3">
+              <div className="h-8 w-8 animate-spin rounded-full border-2 border-violet-500/30 border-t-violet-500" />
+              <p className="text-sm text-muted-foreground">Loading contacts...</p>
+            </div>
           </CardContent>
         </Card>
       ) : contacts.length === 0 ? (
         <Card>
-          <CardContent className="flex flex-col items-center justify-center py-16">
-            <Phone className="mb-4 h-16 w-16 text-muted-foreground/50" />
+          <CardContent className="flex flex-col items-center justify-center py-20">
+            <div className="mb-5 flex h-20 w-20 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-500/20 to-purple-500/10">
+              <Phone className="h-10 w-10 text-violet-400" />
+            </div>
             <h3 className="mb-2 text-lg font-semibold">No contacts yet</h3>
-            <p className="mb-4 max-w-sm text-center text-sm text-muted-foreground">
+            <p className="mb-6 max-w-sm text-center text-sm text-muted-foreground">
               Add contacts manually or they&apos;ll be created automatically from voice agent calls
             </p>
-            <Button size="sm" onClick={openAddModal}>
+            <Button size="sm" className="shadow-lg shadow-primary/20" onClick={openAddModal}>
               <Plus className="mr-2 h-4 w-4" />
               Add Your First Contact
             </Button>
           </CardContent>
         </Card>
       ) : (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {contacts.map((contact) => (
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          {contacts.map((contact, index) => (
             <Card
               key={contact.id}
-              className="group cursor-pointer transition-all hover:border-primary/50"
+              className="group cursor-pointer hover:-translate-y-0.5 hover:border-violet-500/20 hover:shadow-card-hover"
               onClick={() => openViewModal(contact)}
+              style={{ animationDelay: `${index * 50}ms` }}
             >
               <CardContent className="p-4">
                 <div className="flex items-start justify-between gap-2">
-                  <div className="flex items-center gap-2.5 overflow-hidden">
-                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-primary/10">
-                      <Phone className="h-4 w-4 text-primary" />
+                  <div className="flex items-center gap-3 overflow-hidden">
+                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-violet-500/20 to-purple-500/10 shadow-inner-glow transition-transform group-hover:scale-105">
+                      <Phone className="h-5 w-5 text-violet-400" />
                     </div>
                     <div className="min-w-0">
-                      <h3 className="truncate text-sm font-medium">
+                      <h3 className="truncate text-sm font-semibold">
                         {contact.first_name} {contact.last_name}
                       </h3>
                       <p className="truncate text-xs text-muted-foreground">
@@ -555,30 +561,40 @@ export default function CRMPage() {
                     </div>
                   </div>
                   <span
-                    className={`inline-flex h-5 shrink-0 items-center rounded-full px-1.5 text-[10px] font-medium ${getStatusColor(contact.status)}`}
+                    className={`inline-flex h-6 shrink-0 items-center rounded-lg px-2 text-[11px] font-medium ${
+                      contact.status === "new"
+                        ? "border border-blue-500/20 bg-blue-500/10 text-blue-400"
+                        : contact.status === "contacted"
+                          ? "border border-amber-500/20 bg-amber-500/10 text-amber-400"
+                          : contact.status === "qualified"
+                            ? "border border-emerald-500/20 bg-emerald-500/10 text-emerald-400"
+                            : contact.status === "converted"
+                              ? "border border-purple-500/20 bg-purple-500/10 text-purple-400"
+                              : "border border-gray-500/20 bg-gray-500/10 text-gray-400"
+                    }`}
                   >
                     {contact.status}
                   </span>
                 </div>
 
-                <div className="mt-3 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
+                <div className="mt-3.5 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                   {contact.email && (
-                    <div className="flex items-center gap-1">
-                      <Mail className="h-3 w-3" />
-                      <span className="truncate">{contact.email}</span>
+                    <div className="flex items-center gap-1.5 rounded-md bg-white/[0.03] px-2 py-1">
+                      <Mail className="h-3 w-3 text-muted-foreground/70" />
+                      <span className="max-w-[120px] truncate">{contact.email}</span>
                     </div>
                   )}
                   {contact.company_name && (
-                    <div className="flex items-center gap-1">
-                      <Building2 className="h-3 w-3" />
-                      <span className="truncate">{contact.company_name}</span>
+                    <div className="flex items-center gap-1.5 rounded-md bg-white/[0.03] px-2 py-1">
+                      <Building2 className="h-3 w-3 text-muted-foreground/70" />
+                      <span className="max-w-[100px] truncate">{contact.company_name}</span>
                     </div>
                   )}
                 </div>
 
                 {contact.tags && (
-                  <div className="mt-2.5 flex items-center gap-1 border-t border-border/50 pt-2.5 text-xs text-muted-foreground">
-                    <Tag className="h-3 w-3" />
+                  <div className="mt-3.5 flex items-center gap-1.5 border-t border-white/[0.06] pt-3.5 text-xs text-muted-foreground">
+                    <Tag className="h-3 w-3 text-amber-500/70" />
                     <span className="truncate">{contact.tags}</span>
                   </div>
                 )}

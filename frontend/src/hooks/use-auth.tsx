@@ -7,6 +7,9 @@ interface User {
   id: number;
   email: string;
   username: string;
+  onboarding_completed: boolean;
+  onboarding_step: number;
+  is_superuser?: boolean;
 }
 
 interface AuthContextType {
@@ -45,15 +48,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (isLoading) return;
 
-    const isAuthPage = pathname === "/login" || pathname === "/register";
+    const isAuthPage = pathname === "/login";
     const isPublicPage = pathname.startsWith("/embed"); // Embed pages are public, no auth required
+    const isOnboardingPage = pathname.startsWith("/onboarding");
 
     if (!token && !isAuthPage && !isPublicPage) {
       router.push("/login");
     } else if (token && isAuthPage) {
+      // Admins always go to dashboard, clients check onboarding
+      if (user?.is_superuser || user?.onboarding_completed) {
+        router.push("/dashboard");
+      } else if (user && !user.onboarding_completed) {
+        router.push("/onboarding");
+      } else {
+        router.push("/dashboard");
+      }
+    } else if (token && user && !user.is_superuser && !user.onboarding_completed && !isOnboardingPage && !isPublicPage) {
+      // Force onboarding for non-admin users who haven't completed it
+      router.push("/onboarding");
+    } else if (token && user?.is_superuser && isOnboardingPage) {
+      // Admins should never see onboarding - redirect to dashboard
       router.push("/dashboard");
     }
-  }, [token, isLoading, pathname, router]);
+  }, [token, isLoading, pathname, router, user]);
 
   const fetchUser = async (accessToken: string) => {
     try {
@@ -100,8 +117,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const data = await response.json();
     localStorage.setItem("access_token", data.access_token);
     setToken(data.access_token);
-    await fetchUser(data.access_token);
-    router.push("/dashboard");
+
+    // Fetch user and redirect based on role and onboarding status
+    const userResponse = await fetch(`${API_BASE}/api/v1/auth/me`, {
+      headers: { Authorization: `Bearer ${data.access_token}` },
+    });
+
+    if (userResponse.ok) {
+      const userData = await userResponse.json();
+      setUser(userData);
+
+      // Admins always go to dashboard, clients check onboarding
+      if (userData.is_superuser || userData.onboarding_completed) {
+        router.push("/dashboard");
+      } else {
+        router.push("/onboarding");
+      }
+    } else {
+      router.push("/dashboard");
+    }
+
+    setIsLoading(false);
   };
 
   const register = async (email: string, username: string, password: string) => {

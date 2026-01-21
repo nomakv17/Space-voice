@@ -340,7 +340,7 @@ class CRMTools:
     async def check_availability(
         self,
         date: str,
-        duration_minutes: int = 30,  # noqa: ARG002
+        duration_minutes: int = 30,
     ) -> dict[str, Any]:
         """Check available time slots for a date.
 
@@ -684,7 +684,7 @@ class CRMTools:
             self.logger.exception("reschedule_appointment_failed", error=str(e))
             return {"success": False, "error": str(e)}
 
-    async def execute_tool(  # noqa: PLR0911
+    async def execute_tool(
         self, tool_name: str, arguments: dict[str, Any]
     ) -> dict[str, Any]:
         """Execute a CRM tool by name.

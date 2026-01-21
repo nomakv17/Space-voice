@@ -48,7 +48,7 @@ import {
 } from "@/components/ui/table";
 import { toast } from "sonner";
 import {
-  listPhoneNumbers,
+  listPhoneNumbersFromDB,
   searchPhoneNumbers,
   purchasePhoneNumber,
   releasePhoneNumber,
@@ -155,39 +155,16 @@ export default function PhoneNumbersPage() {
         return;
       }
 
-      // Load phone numbers from both providers
-      const [telnyxNumbers, twilioNumbers] = await Promise.allSettled([
-        listPhoneNumbers("telnyx", workspaceId),
-        listPhoneNumbers("twilio", workspaceId),
-      ]);
+      // Load phone numbers from database
+      const dbNumbers = await listPhoneNumbersFromDB(workspaceId);
 
-      const numbers: PhoneNumber[] = [];
-
-      // Process Telnyx numbers
-      if (telnyxNumbers.status === "fulfilled") {
-        numbers.push(
-          ...telnyxNumbers.value.map((n: ApiPhoneNumber) => ({
-            id: n.id,
-            phoneNumber: n.phone_number,
-            provider: "telnyx",
-            agentId: n.assigned_agent_id ?? undefined,
-            isActive: true,
-          }))
-        );
-      }
-
-      // Process Twilio numbers
-      if (twilioNumbers.status === "fulfilled") {
-        numbers.push(
-          ...twilioNumbers.value.map((n: ApiPhoneNumber) => ({
-            id: n.id,
-            phoneNumber: n.phone_number,
-            provider: "twilio",
-            agentId: n.assigned_agent_id ?? undefined,
-            isActive: true,
-          }))
-        );
-      }
+      const numbers: PhoneNumber[] = dbNumbers.map((n: ApiPhoneNumber) => ({
+        id: n.id,
+        phoneNumber: n.phone_number,
+        provider: n.provider ?? "telnyx",
+        agentId: n.assigned_agent_id ?? undefined,
+        isActive: true,
+      }));
 
       // Map agent names to phone numbers
       const numbersWithAgents = numbers.map((num) => {
@@ -435,7 +412,9 @@ export default function PhoneNumbersPage() {
               {phoneNumbers.length} number(s) available
               {selectedWorkspaceId !== "all" && workspaces.length > 0 && (
                 <span className="ml-1">
-                  in {workspaces.find((ws) => ws.id === selectedWorkspaceId)?.name ?? "selected workspace"}
+                  in{" "}
+                  {workspaces.find((ws) => ws.id === selectedWorkspaceId)?.name ??
+                    "selected workspace"}
                 </span>
               )}
             </CardDescription>

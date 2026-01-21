@@ -10,7 +10,8 @@ Usage:
 
 import asyncio
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
+from typing import Any
 
 from sqlalchemy import select
 
@@ -22,7 +23,7 @@ from app.models.user import User
 from app.models.workspace import AgentWorkspace, Workspace
 
 # Sample HVAC contacts data
-SAMPLE_CONTACTS = [
+SAMPLE_CONTACTS: list[dict[str, Any]] = [
     {
         "first_name": "John",
         "last_name": "Mitchell",
@@ -106,7 +107,7 @@ SAMPLE_CONTACTS = [
 ]
 
 # Sample appointments (scheduled for next few days)
-SAMPLE_APPOINTMENTS = [
+SAMPLE_APPOINTMENTS: list[dict[str, Any]] = [
     {
         "contact_index": 0,  # John Mitchell
         "days_from_now": 1,
@@ -155,7 +156,7 @@ SAMPLE_APPOINTMENTS = [
 ]
 
 
-async def seed_demo_workspace(user_id: int | None = None) -> dict:
+async def seed_demo_workspace(user_id: int | None = None) -> dict[str, Any]:
     """Seed demo workspace with sample data.
 
     Args:
@@ -223,7 +224,7 @@ async def seed_demo_workspace(user_id: int | None = None) -> dict:
         print(f"Created workspace: {workspace.id}")
 
         # Create contacts
-        contacts = []
+        contacts: list[Contact] = []
         for contact_data in SAMPLE_CONTACTS:
             contact = Contact(
                 user_id=user.id,
@@ -237,11 +238,14 @@ async def seed_demo_workspace(user_id: int | None = None) -> dict:
 
         # Create appointments
         appointments_created = 0
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         for appt_data in SAMPLE_APPOINTMENTS:
-            contact = contacts[appt_data["contact_index"]]
-            scheduled_at = now.replace(hour=appt_data["hour"], minute=0, second=0, microsecond=0)
-            scheduled_at += timedelta(days=appt_data["days_from_now"])
+            contact_index = int(appt_data["contact_index"])
+            hour = int(appt_data["hour"])
+            days_from_now = int(appt_data["days_from_now"])
+            contact = contacts[contact_index]
+            scheduled_at = now.replace(hour=hour, minute=0, second=0, microsecond=0)
+            scheduled_at += timedelta(days=days_from_now)
 
             appointment = Appointment(
                 contact_id=contact.id,

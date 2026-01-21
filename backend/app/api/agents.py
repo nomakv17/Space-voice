@@ -9,6 +9,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.auth import CurrentUser
+from app.core.config import settings
 from app.core.limiter import limiter
 from app.core.public_id import generate_public_id
 from app.db.session import get_db
@@ -583,9 +584,8 @@ async def get_embed_settings(
                 await db.refresh(agent)
                 break
 
-    # Build embed code snippets
-    # In production, replace with actual domain
-    base_url = "https://yourplatform.com"  # TODO: Get from config
+    # Build embed code snippets using PUBLIC_URL from settings
+    base_url = settings.PUBLIC_URL or "https://yourplatform.com"
     script_tag = f"""<script src="{base_url}/widget/v1/widget.js" defer></script>
 <voice-agent agent-id="{agent.public_id}"></voice-agent>"""
 

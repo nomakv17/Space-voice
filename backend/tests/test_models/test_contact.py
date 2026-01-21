@@ -6,6 +6,7 @@ import pytest
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.models.contact import Contact
 
@@ -286,12 +287,17 @@ class TestContactRelationships:
         appointment1 = await create_test_appointment(contact_id=contact.id)
         appointment2 = await create_test_appointment(contact_id=contact.id)
 
-        # Refresh to load relationships
-        await test_session.refresh(contact)
+        # Query with eagerly loaded relationships (required for async SQLAlchemy)
+        result = await test_session.execute(
+            select(Contact)
+            .where(Contact.id == contact.id)
+            .options(selectinload(Contact.appointments))
+        )
+        loaded_contact = result.scalar_one()
 
         # Access appointments through relationship
-        assert len(contact.appointments) == 2
-        appointment_ids = {a.id for a in contact.appointments}
+        assert len(loaded_contact.appointments) == 2
+        appointment_ids = {a.id for a in loaded_contact.appointments}
         assert appointment1.id in appointment_ids
         assert appointment2.id in appointment_ids
 
@@ -311,11 +317,16 @@ class TestContactRelationships:
         call1 = await create_test_call_interaction(contact_id=contact.id)
         call2 = await create_test_call_interaction(contact_id=contact.id)
 
-        # Refresh to load relationships
-        await test_session.refresh(contact)
+        # Query with eagerly loaded relationships (required for async SQLAlchemy)
+        result = await test_session.execute(
+            select(Contact)
+            .where(Contact.id == contact.id)
+            .options(selectinload(Contact.call_interactions))
+        )
+        loaded_contact = result.scalar_one()
 
         # Access call interactions through relationship
-        assert len(contact.call_interactions) == 2
-        call_ids = {c.id for c in contact.call_interactions}
+        assert len(loaded_contact.call_interactions) == 2
+        call_ids = {c.id for c in loaded_contact.call_interactions}
         assert call1.id in call_ids
         assert call2.id in call_ids

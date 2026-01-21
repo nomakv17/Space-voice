@@ -326,9 +326,7 @@ class JobberTools:
             },
         ]
 
-    async def search_clients(
-        self, search_term: str, limit: int = 10
-    ) -> dict[str, Any]:
+    async def search_clients(self, search_term: str, limit: int = 10) -> dict[str, Any]:
         """Search for clients by name, phone, or email."""
         query = """
         query SearchClients($searchTerm: String!, $first: Int) {

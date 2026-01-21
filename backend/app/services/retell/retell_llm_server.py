@@ -194,7 +194,7 @@ class RetellLLMServer:
             task_names = ["message_receiver", "response_sender", "connection_keepalive"]
             for i, result in enumerate(results):
                 if isinstance(result, Exception):
-                    print(  # noqa: T201
+                    print(
                         f"[TASK ERROR] {task_names[i]} failed: {type(result).__name__}: {result}",
                         flush=True,
                     )
@@ -585,7 +585,7 @@ CRITICAL: When customer says a day name (Monday, Tuesday, etc.), use the EXACT d
 
                 elif event_type == "error":
                     error_msg = event.get("error", "unknown error")
-                    print(f"[LLM ERROR] Generation error: {error_msg}", flush=True)  # noqa: T201
+                    print(f"[LLM ERROR] Generation error: {error_msg}", flush=True)
                     self.logger.error("claude_error", error=error_msg)
                     await self._send_response(
                         response_id=response_id,
@@ -645,7 +645,7 @@ CRITICAL: When customer says a day name (Monday, Tuesday, etc.), use the EXACT d
             # Otherwise goodbye detection never fires (it only runs on content_complete=True)
             if self._is_goodbye_message(accumulated_content):
                 self._said_goodbye = True
-                print(f"[GOODBYE DETECTED BEFORE TOOLS] {accumulated_content[:60]}...", flush=True)  # noqa: T201
+                print(f"[GOODBYE DETECTED BEFORE TOOLS] {accumulated_content[:60]}...", flush=True)
 
             # Return immediately - don't block!
             return
@@ -696,7 +696,7 @@ CRITICAL: When customer says a day name (Monday, Tuesday, etc.), use the EXACT d
                         content_complete=False,
                     )
                 elif event.get("type") == "error":
-                    print(f"[REMINDER LLM ERROR] {event.get('error')}", flush=True)  # noqa: T201
+                    print(f"[REMINDER LLM ERROR] {event.get('error')}", flush=True)
 
             await self._send_response(
                 response_id=response_id,
@@ -704,7 +704,7 @@ CRITICAL: When customer says a day name (Monday, Tuesday, etc.), use the EXACT d
                 content_complete=True,
             )
         except Exception as e:
-            print(f"[REMINDER ERROR] {type(e).__name__}: {e}", flush=True)  # noqa: T201
+            print(f"[REMINDER ERROR] {type(e).__name__}: {e}", flush=True)
             # Send a safe fallback response - suppress errors if connection is dead
             with contextlib.suppress(Exception):
                 await self._send_response(
@@ -749,7 +749,7 @@ CRITICAL: When customer says a day name (Monday, Tuesday, etc.), use the EXACT d
                 if tool_name in ("telnyx_send_sms", "twilio_send_sms"):
                     to_number = arguments.get("to", "")
                     if to_number in self._sent_sms_numbers:
-                        print(f"[SMS DEDUP] Blocked duplicate to {to_number}", flush=True)  # noqa: T201
+                        print(f"[SMS DEDUP] Blocked duplicate to {to_number}", flush=True)
                         self.logger.warning(
                             "duplicate_sms_blocked",
                             tool_name=tool_name,
@@ -777,7 +777,7 @@ CRITICAL: When customer says a day name (Monday, Tuesday, etc.), use the EXACT d
                             tool_name=tool_name,
                             reason="booking_already_completed_this_session",
                         )
-                        print("[CALENDAR DEDUP] Blocked - already booked this call!", flush=True)  # noqa: T201
+                        print("[CALENDAR DEDUP] Blocked - already booked this call!", flush=True)
                         result = {
                             "success": True,
                             "message": "Appointment already booked in this call. No additional booking needed.",
@@ -801,7 +801,7 @@ CRITICAL: When customer says a day name (Monday, Tuesday, etc.), use the EXACT d
                     print(
                         f"[SMS] Executing {tool_name} to {arguments.get('to', 'unknown')}",
                         flush=True,
-                    )  # noqa: T201
+                    )
 
                 try:
                     result = await self.tool_registry.execute_tool(tool_name, arguments)
@@ -812,13 +812,13 @@ CRITICAL: When customer says a day name (Monday, Tuesday, etc.), use the EXACT d
                         to_number = arguments.get("to", "")
                         if result.get("success"):
                             self._sent_sms_numbers.add(to_number)
-                            print(f"[SMS] Sent successfully to {to_number}", flush=True)  # noqa: T201
+                            print(f"[SMS] Sent successfully to {to_number}", flush=True)
                             self.logger.info("sms_sent_tracked", to_number=to_number)
                         else:
                             print(
                                 f"[SMS ERROR] Failed to send to {to_number}: {result.get('error', 'unknown')}",
                                 flush=True,
-                            )  # noqa: T201
+                            )
 
                     # Note: Calendar booking tracking now happens BEFORE execution (race condition fix)
 
@@ -893,7 +893,7 @@ CRITICAL: When customer says a day name (Monday, Tuesday, etc.), use the EXACT d
         finally:
             self._pending_tool_execution = None
 
-    async def _continue_after_tools_from_queue(self, item: dict[str, Any]) -> None:  # noqa: PLR0915
+    async def _continue_after_tools_from_queue(self, item: dict[str, Any]) -> None:
         """Continue conversation after tools complete (called from response sender).
 
         Args:
@@ -995,7 +995,7 @@ CRITICAL: When customer says a day name (Monday, Tuesday, etc.), use the EXACT d
 
                 elif event_type == "error":
                     error_msg = event.get("error", "unknown error")
-                    print(f"[LLM ERROR] Error after tools: {error_msg}", flush=True)  # noqa: T201
+                    print(f"[LLM ERROR] Error after tools: {error_msg}", flush=True)
                     self.logger.error("claude_error_after_tools", error=error_msg)
                     await self._send_response(
                         response_id=response_id,
@@ -1164,7 +1164,7 @@ CRITICAL: When customer says a day name (Monday, Tuesday, etc.), use the EXACT d
             if tool_name in ("telnyx_send_sms", "twilio_send_sms"):
                 to_number = arguments.get("to", "")
                 if to_number in self._sent_sms_numbers:
-                    print(f"[SMS DEDUP] Blocked duplicate to {to_number}", flush=True)  # noqa: T201
+                    print(f"[SMS DEDUP] Blocked duplicate to {to_number}", flush=True)
                     self.logger.warning(
                         "duplicate_sms_blocked",
                         tool_name=tool_name,
@@ -1192,7 +1192,7 @@ CRITICAL: When customer says a day name (Monday, Tuesday, etc.), use the EXACT d
                         tool_name=tool_name,
                         reason="booking_already_completed_this_session",
                     )
-                    print("[CALENDAR DEDUP] Blocked - already booked this call!", flush=True)  # noqa: T201
+                    print("[CALENDAR DEDUP] Blocked - already booked this call!", flush=True)
                     result = {
                         "success": True,
                         "message": "Appointment already booked in this call. No additional booking needed.",
@@ -1208,14 +1208,14 @@ CRITICAL: When customer says a day name (Monday, Tuesday, etc.), use the EXACT d
                     continue  # Skip to next tool call
                 # Set flag BEFORE execution to prevent race condition
                 self._booking_completed = True
-                print("[CALENDAR] Blocking future bookings NOW (before execution)", flush=True)  # noqa: T201
+                print("[CALENDAR] Blocking future bookings NOW (before execution)", flush=True)
 
             # Execute the tool
             # Debug print for SMS tools to diagnose sending issues
             if tool_name in ("telnyx_send_sms", "twilio_send_sms"):
                 print(
                     f"[SMS] Executing {tool_name} to {arguments.get('to', 'unknown')}", flush=True
-                )  # noqa: T201
+                )
 
             try:
                 result = await self.tool_registry.execute_tool(tool_name, arguments)
@@ -1226,13 +1226,13 @@ CRITICAL: When customer says a day name (Monday, Tuesday, etc.), use the EXACT d
                     to_number = arguments.get("to", "")
                     if result.get("success"):
                         self._sent_sms_numbers.add(to_number)
-                        print(f"[SMS] Sent successfully to {to_number}", flush=True)  # noqa: T201
+                        print(f"[SMS] Sent successfully to {to_number}", flush=True)
                         self.logger.info("sms_sent_tracked", to_number=to_number)
                     else:
                         print(
                             f"[SMS ERROR] Failed to send to {to_number}: {result.get('error', 'unknown')}",
                             flush=True,
-                        )  # noqa: T201
+                        )
 
                 # Note: Calendar booking tracking now happens BEFORE execution (race condition fix)
 
@@ -1259,18 +1259,19 @@ CRITICAL: When customer says a day name (Monday, Tuesday, etc.), use the EXACT d
                 if result.get("action") == "end_call":
                     await self._send_response(
                         response_id=response_id,
-                        content=result.get("message", "Goodbye!"),
+                        content=str(result.get("message", "Goodbye!")),
                         content_complete=True,
                         end_call=True,
                     )
                     return
 
                 if result.get("action") == "transfer_call":
+                    transfer_num = result.get("transfer_number")
                     await self._send_response(
                         response_id=response_id,
-                        content=result.get("message", "Transferring you now."),
+                        content=str(result.get("message", "Transferring you now.")),
                         content_complete=True,
-                        transfer_number=result.get("transfer_number"),
+                        transfer_number=str(transfer_num) if transfer_num else None,
                     )
                     return
 
@@ -1403,7 +1404,7 @@ CRITICAL: When customer says a day name (Monday, Tuesday, etc.), use the EXACT d
         # If we've already said goodbye, ALWAYS end the call on any content_complete
         if self._said_goodbye and content_complete:
             end_call = True
-            print("[END CALL] Forcing end_call - goodbye already said", flush=True)  # noqa: T201
+            print("[END CALL] Forcing end_call - goodbye already said", flush=True)
 
         # Auto-detect goodbye phrases and set end_call=True when turn completes
         # This ensures the call ends when the agent says goodbye
@@ -1460,5 +1461,5 @@ CRITICAL: When customer says a day name (Monday, Tuesday, etc.), use the EXACT d
         except Exception as e:
             # Mark shutdown to prevent further send attempts
             self._shutdown.set()
-            print(f"[WEBSOCKET ERROR] Send failed: {type(e).__name__}: {e}", flush=True)  # noqa: T201
+            print(f"[WEBSOCKET ERROR] Send failed: {type(e).__name__}: {e}", flush=True)
             # Don't raise - just log and return, connection is dead

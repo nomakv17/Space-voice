@@ -22,6 +22,7 @@ from slowapi.errors import RateLimitExceeded
 from sqlalchemy import func, select
 
 from app.api import (
+    admin,
     agents,
     auth,
     calls,
@@ -33,6 +34,7 @@ from app.api import (
     integration_api,
     integrations,
     oauth,
+    onboarding,
     phone_numbers,
     phone_numbers_purchase,
     realtime,
@@ -78,16 +80,17 @@ logger = structlog.get_logger()
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:  # noqa: PLR0915
+async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Lifespan context manager for startup and shutdown events."""
     # Startup
     logger.info("Starting application", app_name=settings.APP_NAME)
 
     # Create database tables if they don't exist
     try:
-        from app.db.base import Base  # Import SQLAlchemy Base
         # Also import all models to ensure they're registered with Base
         from app import models  # noqa: F401
+        from app.db.base import Base  # Import SQLAlchemy Base
+
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
         logger.info("Database tables created/verified")
@@ -116,6 +119,8 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:  # noqa: PLR0915
                     full_name=settings.ADMIN_NAME,
                     is_active=True,
                     is_superuser=True,
+                    onboarding_completed=True,  # Admin skips onboarding
+                    onboarding_step=5,
                 )
                 db.add(admin_user)
                 await db.commit()
@@ -216,7 +221,8 @@ app.include_router(workspaces.router, prefix=settings.API_V1_PREFIX)
 app.include_router(agents.router)
 app.include_router(settings_api.router)
 app.include_router(realtime.router)
-app.include_router(realtime.webrtc_router)  # WebRTC session endpoint
+app.include_router(realtime.webrtc_router)  # WebRTC session endpoint (OpenAI)
+app.include_router(realtime.retell_router)  # Retell web call endpoint
 app.include_router(tools.router)  # Tool execution endpoint
 app.include_router(telephony.router)  # Telephony API (phone numbers, calls)
 app.include_router(telephony.webhook_router)  # Twilio/Telnyx webhooks
@@ -226,12 +232,18 @@ app.include_router(retell_webhooks.router)  # Retell call event webhooks
 app.include_router(telnyx_webhooks.router)  # Telnyx Call Control webhooks (SIP bridge to Retell)
 app.include_router(calls.router)  # Call history API
 app.include_router(campaigns.router, prefix=settings.API_V1_PREFIX)  # Campaigns API
-app.include_router(phone_numbers_purchase.router)  # Phone number purchasing (Telnyx) - MUST be before phone_numbers for route priority
+app.include_router(
+    phone_numbers_purchase.router
+)  # Phone number purchasing (Telnyx) - MUST be before phone_numbers for route priority
 app.include_router(phone_numbers.router)  # Phone numbers API
 app.include_router(auth.router)  # Authentication API
+app.include_router(admin.router)  # Admin API (client management)
+app.include_router(onboarding.router)  # Onboarding API (new user setup)
 app.include_router(compliance.router)  # Compliance API (GDPR/CCPA)
 app.include_router(integrations.router)  # Integrations API (external tools)
-app.include_router(integration_api.router, prefix=settings.API_V1_PREFIX)  # External CRM Integration API
+app.include_router(
+    integration_api.router, prefix=settings.API_V1_PREFIX
+)  # External CRM Integration API
 app.include_router(oauth.router)  # OAuth flows for Google Calendar, Calendly, etc.
 app.include_router(embed.router)  # Public embed API (unauthenticated)
 app.include_router(embed.ws_router)  # Public embed WebSocket

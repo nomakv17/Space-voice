@@ -555,7 +555,7 @@ class TelnyxService(TelephonyProvider):
         new_data = response.json()
         return str(new_data.get("data", {}).get("id", ""))
 
-    def generate_answer_response(self, websocket_url: str, agent_id: str | None = None) -> str:  # noqa: ARG002
+    def generate_answer_response(self, websocket_url: str, agent_id: str | None = None) -> str:
         """Generate TeXML response to answer a call and stream to WebSocket.
 
         Args:

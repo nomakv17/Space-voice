@@ -26,6 +26,7 @@ from app.services.tools.registry import ToolRegistry
 
 router = APIRouter(prefix="/ws", tags=["realtime"])
 webrtc_router = APIRouter(prefix="/api/v1/realtime", tags=["realtime-webrtc"])
+retell_router = APIRouter(prefix="/api/v1/retell", tags=["retell-webrtc"])
 logger = structlog.get_logger()
 
 
@@ -723,9 +724,10 @@ async def save_transcript(
     if not agent:
         raise HTTPException(status_code=404, detail=f"Agent {agent_id} not found")
 
-    # Verify user owns this agent
+    # Verify user owns this agent or is admin
     user_uuid = user_id_to_uuid(user_id)
-    if agent.user_id != user_uuid:
+    is_admin = current_user.is_superuser
+    if agent.user_id != user_uuid and not is_admin:
         raise HTTPException(status_code=403, detail="Not authorized to access this agent")
 
     # Skip if transcript is empty
@@ -774,3 +776,117 @@ async def save_transcript(
         "success": True,
         "call_id": str(call_record.id),
     }
+
+
+# =============================================================================
+# Retell Web Call Endpoints (for budget/balanced tier agents)
+# =============================================================================
+
+
+@retell_router.get("/web-call/{agent_id}")
+async def create_retell_web_call(
+    agent_id: str,
+    current_user: CurrentUser,
+    db: AsyncSession = Depends(get_db),
+    workspace_id: str | None = None,
+) -> dict[str, Any]:
+    """Create a Retell web call for browser-based voice interaction.
+
+    This endpoint is for budget/balanced tier agents that use Retell AI.
+    It returns an access_token that can be used with the Retell Web SDK.
+
+    Args:
+        agent_id: Agent UUID
+        current_user: Authenticated user
+        db: Database session
+        workspace_id: Optional workspace UUID
+
+    Returns:
+        Dict with call_id, access_token, and agent info
+    """
+    from app.services.retell.retell_service import RetellService
+
+    user_id = current_user.id
+    retell_logger = logger.bind(
+        endpoint="retell_web_call",
+        agent_id=agent_id,
+        user_id=user_id,
+    )
+
+    retell_logger.info("retell_web_call_requested")
+
+    # Load agent configuration
+    result = await db.execute(select(Agent).where(Agent.id == uuid.UUID(agent_id)))
+    agent = result.scalar_one_or_none()
+
+    if not agent:
+        raise HTTPException(status_code=404, detail=f"Agent {agent_id} not found")
+
+    if not agent.is_active:
+        raise HTTPException(status_code=400, detail="Agent is not active")
+
+    # Verify this is a Retell agent (has retell_agent_id)
+    if not agent.retell_agent_id:
+        raise HTTPException(
+            status_code=400,
+            detail="Agent is not configured for Retell. Please set up a Retell agent ID.",
+        )
+
+    retell_logger.info(
+        "agent_loaded",
+        agent_name=agent.name,
+        tier=agent.pricing_tier,
+        retell_agent_id=agent.retell_agent_id,
+    )
+
+    # Initialize Retell service
+    if not settings.RETELL_API_KEY:
+        retell_logger.error("retell_api_key_missing")
+        raise HTTPException(
+            status_code=500,
+            detail="Retell API key not configured. Please add RETELL_API_KEY to settings.",
+        )
+
+    try:
+        retell_service = RetellService(api_key=settings.RETELL_API_KEY)
+    except ValueError as e:
+        retell_logger.error("retell_service_init_failed", error=str(e))
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to initialize Retell service: {e}",
+        ) from e
+
+    # Create web call
+    try:
+        call_data = await retell_service.create_web_call(
+            agent_id=agent.retell_agent_id,
+            metadata={
+                "user_id": str(user_id),
+                "agent_uuid": agent_id,
+                "workspace_id": workspace_id,
+                "source": "test_page",
+            },
+        )
+
+        retell_logger.info(
+            "retell_web_call_created",
+            call_id=call_data.get("call_id"),
+        )
+
+        return {
+            "call_id": call_data.get("call_id"),
+            "access_token": call_data.get("access_token"),
+            "agent": {
+                "id": str(agent.id),
+                "name": agent.name,
+                "tier": agent.pricing_tier,
+                "retell_agent_id": agent.retell_agent_id,
+            },
+        }
+
+    except Exception as e:
+        retell_logger.exception("retell_web_call_error", error=str(e))
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to create Retell web call: {e!s}",
+        ) from e

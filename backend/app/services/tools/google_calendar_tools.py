@@ -85,16 +85,16 @@ class GoogleCalendarTools:
 
         # Validate we have all required credentials for refresh
         if not self.refresh_token:
-            print("[CALENDAR ERROR] Token expired but no refresh_token available", flush=True)  # noqa: T201
+            print("[CALENDAR ERROR] Token expired but no refresh_token available", flush=True)
             logger.error("google_calendar_no_refresh_token")
             return False
 
         if not self.client_id or not self.client_secret:
-            print("[CALENDAR ERROR] Token expired but missing client_id/client_secret", flush=True)  # noqa: T201
+            print("[CALENDAR ERROR] Token expired but missing client_id/client_secret", flush=True)
             logger.error("google_calendar_missing_oauth_credentials")
             return False
 
-        print("[CALENDAR] Attempting to refresh Google Calendar token...", flush=True)  # noqa: T201
+        print("[CALENDAR] Attempting to refresh Google Calendar token...", flush=True)
 
         try:
             async with httpx.AsyncClient(timeout=10.0) as refresh_client:
@@ -117,19 +117,19 @@ class GoogleCalendarTools:
                         await self._client.aclose()
                         self._client = None
 
-                    print("[CALENDAR] Token refreshed successfully", flush=True)  # noqa: T201
+                    print("[CALENDAR] Token refreshed successfully", flush=True)
                     logger.info("google_calendar_token_refreshed")
                     return True
                 print(
                     f"[CALENDAR ERROR] Token refresh failed: {refresh_response.status_code} - {refresh_response.text}",
                     flush=True,
-                )  # noqa: T201
+                )
                 logger.error(
                     "google_calendar_token_refresh_http_error", status=refresh_response.status_code
                 )
 
         except Exception as e:
-            print(f"[CALENDAR ERROR] Token refresh exception: {type(e).__name__}: {e}", flush=True)  # noqa: T201
+            print(f"[CALENDAR ERROR] Token refresh exception: {type(e).__name__}: {e}", flush=True)
             logger.warning("google_calendar_token_refresh_failed", error=str(e))
 
         return False

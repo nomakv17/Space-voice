@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import {
   Plus,
   Bot,
@@ -231,12 +230,13 @@ export default function AgentsPage() {
 
   return (
     <div className="space-y-6">
+      {/* Header Section */}
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-semibold">Voice Agents</h1>
+        <div className="space-y-1">
+          <h1 className="text-2xl font-bold tracking-tight">Voice Agents</h1>
           <p className="text-sm text-muted-foreground">Manage and configure your AI voice agents</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
           {workspaces.length > 0 && (
             <Select
               value={selectedWorkspaceId}
@@ -249,8 +249,8 @@ export default function AgentsPage() {
                 toast.info(`Switched to ${wsName}`);
               }}
             >
-              <SelectTrigger className="h-8 w-[220px] text-sm">
-                <FolderOpen className="mr-2 h-3.5 w-3.5" />
+              <SelectTrigger className="h-9 w-[220px] border-white/[0.1] bg-white/[0.02] text-sm backdrop-blur-sm">
+                <FolderOpen className="mr-2 h-3.5 w-3.5 text-muted-foreground" />
                 <SelectValue placeholder="All Workspaces" />
               </SelectTrigger>
               <SelectContent>
@@ -264,14 +264,14 @@ export default function AgentsPage() {
             </Select>
           )}
           {workspaces.length > 0 ? (
-            <Button size="sm" asChild>
+            <Button size="sm" className="shadow-lg shadow-primary/20" asChild>
               <Link href="/dashboard/agents/create-agent">
                 <Plus className="mr-2 h-4 w-4" />
                 Create Agent
               </Link>
             </Button>
           ) : (
-            <Button size="sm" asChild>
+            <Button size="sm" className="shadow-lg shadow-primary/20" asChild>
               <Link href="/dashboard/workspaces">
                 <Plus className="mr-2 h-4 w-4" />
                 Create Workspace
@@ -283,16 +283,21 @@ export default function AgentsPage() {
 
       {isLoading ? (
         <Card>
-          <CardContent className="flex items-center justify-center py-16">
-            <p className="text-muted-foreground">Loading agents...</p>
+          <CardContent className="flex items-center justify-center py-20">
+            <div className="flex flex-col items-center gap-3">
+              <div className="h-8 w-8 animate-spin rounded-full border-2 border-indigo-500/30 border-t-indigo-500" />
+              <p className="text-sm text-muted-foreground">Loading agents...</p>
+            </div>
           </CardContent>
         </Card>
       ) : error ? (
-        <Card className="border-destructive">
+        <Card className="border-red-500/30">
           <CardContent className="flex flex-col items-center justify-center py-16">
-            <AlertCircle className="mb-4 h-16 w-16 text-destructive" />
+            <div className="mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-red-500/20 to-red-600/10">
+              <AlertCircle className="h-8 w-8 text-red-400" />
+            </div>
             <h3 className="mb-2 text-lg font-semibold">Failed to load agents</h3>
-            <p className="mb-4 text-center text-sm text-muted-foreground">
+            <p className="mb-5 max-w-sm text-center text-sm text-muted-foreground">
               {error instanceof Error ? error.message : "An unexpected error occurred"}
             </p>
             <Button variant="outline" onClick={() => window.location.reload()}>
@@ -302,23 +307,25 @@ export default function AgentsPage() {
         </Card>
       ) : agents.length === 0 ? (
         <Card>
-          <CardContent className="flex flex-col items-center justify-center py-16">
-            <Bot className="mb-4 h-16 w-16 text-muted-foreground/50" />
+          <CardContent className="flex flex-col items-center justify-center py-20">
+            <div className="mb-5 flex h-20 w-20 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500/20 to-purple-500/10">
+              <Bot className="h-10 w-10 text-indigo-400" />
+            </div>
             <h3 className="mb-2 text-lg font-semibold">No voice agents yet</h3>
-            <p className="mb-4 max-w-sm text-center text-sm text-muted-foreground">
+            <p className="mb-6 max-w-sm text-center text-sm text-muted-foreground">
               {workspaces.length === 0
                 ? "Create a workspace first, then create your voice agent"
                 : "Create your first voice agent to handle inbound and outbound calls with AI"}
             </p>
             {workspaces.length > 0 ? (
-              <Button size="sm" asChild>
+              <Button size="sm" className="shadow-lg shadow-primary/20" asChild>
                 <Link href="/dashboard/agents/create-agent">
                   <Plus className="mr-2 h-4 w-4" />
                   Create Your First Agent
                 </Link>
               </Button>
             ) : (
-              <Button size="sm" asChild>
+              <Button size="sm" className="shadow-lg shadow-primary/20" asChild>
                 <Link href="/dashboard/workspaces">
                   <Plus className="mr-2 h-4 w-4" />
                   Create Workspace
@@ -328,23 +335,24 @@ export default function AgentsPage() {
           </CardContent>
         </Card>
       ) : (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {agents
             .filter((agent) => !deletingAgentIds.has(agent.id))
-            .map((agent) => (
+            .map((agent, index) => (
               <Card
                 key={agent.id}
-                className="group cursor-pointer transition-all hover:border-primary/50"
+                className="group cursor-pointer hover:-translate-y-0.5 hover:border-indigo-500/20 hover:shadow-card-hover"
                 onClick={() => router.push(`/dashboard/agents/${agent.id}`)}
+                style={{ animationDelay: `${index * 50}ms` }}
               >
                 <CardContent className="p-4">
                   <div className="flex items-start justify-between gap-2">
-                    <div className="flex items-center gap-2.5 overflow-hidden">
-                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-primary/10">
-                        <Bot className="h-4 w-4 text-primary" />
+                    <div className="flex items-center gap-3 overflow-hidden">
+                      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500/20 to-purple-500/10 shadow-inner-glow transition-transform group-hover:scale-105">
+                        <Bot className="h-5 w-5 text-indigo-400" />
                       </div>
                       <div className="min-w-0">
-                        <h3 className="truncate text-sm font-medium">{agent.name}</h3>
+                        <h3 className="truncate text-sm font-semibold">{agent.name}</h3>
                         <p className="text-xs text-muted-foreground">
                           {agent.pricing_tier.charAt(0).toUpperCase() + agent.pricing_tier.slice(1)}
                         </p>
@@ -355,10 +363,10 @@ export default function AgentsPage() {
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="h-7 w-7 shrink-0"
+                          className="h-8 w-8 shrink-0 rounded-lg opacity-0 transition-opacity group-hover:opacity-100"
                           onClick={(e) => e.stopPropagation()}
                         >
-                          <MoreVertical className="h-3.5 w-3.5" />
+                          <MoreVertical className="h-4 w-4" />
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
@@ -395,32 +403,37 @@ export default function AgentsPage() {
                     </DropdownMenu>
                   </div>
 
-                  <div className="mt-3 flex flex-wrap items-center gap-1.5">
-                    <Badge
-                      variant={agent.is_active ? "default" : "secondary"}
-                      className="h-5 px-1.5 text-[10px]"
+                  <div className="mt-3.5 flex flex-wrap items-center gap-2">
+                    <span
+                      className={`inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-[11px] font-medium ${agent.is_active ? "status-active" : "status-inactive"}`}
                     >
+                      <span
+                        className={`h-1.5 w-1.5 rounded-full ${agent.is_active ? "bg-emerald-400" : "bg-gray-500"}`}
+                      />
                       {agent.is_active ? "Active" : "Inactive"}
-                    </Badge>
+                    </span>
                     {agent.phone_number ? (
-                      <Badge variant="outline" className="h-5 px-1.5 text-[10px]">
-                        <Phone className="mr-0.5 h-2.5 w-2.5 text-green-500" />
+                      <span className="inline-flex items-center gap-1 rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-2 py-1 text-[11px] font-medium text-emerald-400">
+                        <Phone className="h-3 w-3" />
                         {agent.phone_number}
-                      </Badge>
+                      </span>
                     ) : null}
                     {agent.enabled_tools.length > 0 && (
-                      <Badge variant="outline" className="h-5 px-1.5 text-[10px]">
-                        <Wrench className="mr-0.5 h-2.5 w-2.5" />
-                        {agent.enabled_tools.length}
-                      </Badge>
+                      <span className="inline-flex items-center gap-1 rounded-lg border border-amber-500/20 bg-amber-500/10 px-2 py-1 text-[11px] font-medium text-amber-400">
+                        <Wrench className="h-3 w-3" />
+                        {agent.enabled_tools.length} tools
+                      </span>
                     )}
                   </div>
 
-                  <div className="mt-2.5 flex items-center justify-between border-t border-border/50 pt-2.5 text-xs text-muted-foreground">
-                    <span>{agent.total_calls} calls</span>
+                  <div className="mt-3.5 flex items-center justify-between border-t border-white/[0.06] pt-3.5 text-xs text-muted-foreground">
+                    <span className="flex items-center gap-1.5">
+                      <div className="h-1.5 w-1.5 rounded-full bg-blue-500/50" />
+                      {agent.total_calls} calls
+                    </span>
                     {agent.last_call_at && (
-                      <span className="flex items-center">
-                        <Clock className="mr-1 h-3 w-3" />
+                      <span className="flex items-center gap-1">
+                        <Clock className="h-3 w-3" />
                         {formatRelativeTime(agent.last_call_at)}
                       </span>
                     )}

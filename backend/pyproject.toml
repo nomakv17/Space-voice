@@ -134,17 +134,27 @@ ignore = [
     "C901",    # too complex
     "COM812",  # trailing comma, conflicts with formatter
     "PLR0913", # too many arguments
+    "PLR2004", # magic values (HTTP status codes 200/400 are standard)
+    "PLR0911", # too many return statements (complex handlers OK)
+    "PLR0912", # too many branches (complex handlers OK)
+    "PLR0915", # too many statements (complex handlers OK)
     "S101",    # use of assert
     "S104",    # hardcoded bind all interfaces (intentional for dev)
     "S105",    # hardcoded password (only in defaults/examples)
     "TRY003",  # long messages outside exception class
     "TRY300",  # consider else block (prefer explicit return)
+    "TRY301",  # abstract raise to inner function (HTTPException raise OK)
+    "TRY400",  # use exception() instead of error() (intentional, no traceback needed)
     "EM101",   # raw string in exception
     "EM102",   # f-string in exception
     "RET504",  # unnecessary assignment (prefer readability)
     "PLW0603", # global statement (intentional for module-level state)
     "PLC0415", # import outside top level (conditional imports OK)
     "ARG001",  # unused function argument (FastAPI lifespan signature)
+    "ARG002",  # unused method argument (API design consistency)
+    "SIM102",  # nested if statements (token refresh pattern clearer)
+    "ERA001",  # commented code (documentation comments OK)
+    "T201",    # print statements (intentional WebSocket debugging)
 ]
 
 [tool.ruff.lint.per-file-ignores]

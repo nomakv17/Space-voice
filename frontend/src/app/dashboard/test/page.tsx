@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { updateAgent } from "@/lib/api/agents";
 import { api } from "@/lib/api";
 import { getWhisperCode, getLanguagesForTier } from "@/lib/languages";
+import { RetellWebClient } from "retell-client-js-sdk";
 import { Button } from "@/components/ui/button";
 import { Play, Square, Loader2, Save, FolderOpen } from "lucide-react";
 import {
@@ -293,6 +294,13 @@ export default function TestAgentPage() {
     audioElement: null,
   });
 
+  // Retell client ref for budget/balanced tier agents
+  const retellClientRef = useRef<RetellWebClient | null>(null);
+
+  // Track Retell transcript items by index to avoid duplicates during streaming
+  const retellTranscriptMapRef = useRef<Map<number, string>>(new Map());
+  const retellLastDisplayedIndexRef = useRef<number>(-1);
+
   // Batch transcript updates to reduce re-renders
   const pendingTranscriptsRef = useRef<TranscriptItem[]>([]);
   const flushTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -485,6 +493,16 @@ export default function TestAgentPage() {
       audioStream: null,
       audioElement: null,
     };
+
+    // Clean up Retell client
+    if (retellClientRef.current) {
+      try {
+        retellClientRef.current.stopCall();
+      } catch (e) {
+        console.error("[Cleanup] Error stopping Retell call:", e);
+      }
+      retellClientRef.current = null;
+    }
   }, [flushTranscripts]);
 
   // Cleanup on unmount
@@ -577,6 +595,149 @@ export default function TestAgentPage() {
   // Use batched version for high-frequency updates (history_updated handler)
   const addTranscript = addTranscriptBatched;
 
+  // Connect using Retell Web SDK (for budget/balanced tier agents)
+  const connectWithRetell = async (
+    apiBase: string,
+    authToken: string | null,
+    isAdminMode: boolean
+  ) => {
+    console.log("[Retell] Starting Retell web call connection...");
+
+    // Clear transcript tracking for new call
+    retellTranscriptMapRef.current = new Map();
+    retellLastDisplayedIndexRef.current = -1;
+
+    // Get Retell web call token from our backend
+    const webCallUrl = isAdminMode
+      ? `${apiBase}/api/v1/retell/web-call/${selectedAgentId}`
+      : `${apiBase}/api/v1/retell/web-call/${selectedAgentId}?workspace_id=${selectedWorkspaceId}`;
+
+    const response = await fetch(webCallUrl, {
+      headers: authToken ? { Authorization: `Bearer ${authToken}` } : {},
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Failed to create Retell web call: ${errorText}`);
+    }
+
+    const webCallData = await response.json();
+    const accessToken = webCallData.access_token;
+
+    if (!accessToken) {
+      throw new Error("No access token received from Retell");
+    }
+
+    console.log("[Retell] Got access token, initializing client...");
+
+    // Initialize Retell Web Client
+    const retellClient = new RetellWebClient();
+    retellClientRef.current = retellClient;
+
+    // Set up event handlers
+    retellClient.on("call_started", () => {
+      console.log("[Retell] Call started");
+      setConnectionStatus("connected");
+      addTranscriptImmediate("system", "Connected to agent");
+
+      // Start call timer
+      setCallDuration(0);
+      callTimerRef.current = setInterval(() => {
+        setCallDuration((prev) => prev + 1);
+      }, 1000);
+    });
+
+    retellClient.on("call_ended", () => {
+      console.log("[Retell] Call ended");
+
+      // Display any remaining transcript item that was still streaming
+      const currentMap = retellTranscriptMapRef.current;
+      const lastDisplayedIndex = retellLastDisplayedIndexRef.current;
+      const keys = Array.from(currentMap.keys());
+      const maxIndex = keys.length > 0 ? Math.max(...keys) : -1;
+
+      if (maxIndex > lastDisplayedIndex) {
+        const finalContent = currentMap.get(maxIndex);
+        if (finalContent) {
+          // Determine speaker based on pattern (odd/even or track separately)
+          // For now, just use the last known content
+          addTranscriptImmediate("assistant", finalContent);
+          transcriptEntriesRef.current.push({
+            role: "assistant",
+            content: finalContent,
+          });
+        }
+      }
+
+      // Clear the transcript tracking for next call
+      retellTranscriptMapRef.current = new Map();
+      retellLastDisplayedIndexRef.current = -1;
+
+      void saveTranscript();
+      cleanup();
+      setConnectionStatus("idle");
+      setAudioStream(null);
+      setCallDuration(0);
+      addTranscript("system", "Session ended");
+    });
+
+    retellClient.on("error", (error) => {
+      console.error("[Retell] Error:", error);
+      addTranscript("system", `Error: ${error.message ?? "Unknown error"}`);
+      toast.error(`Retell error: ${error.message ?? "Unknown error"}`);
+    });
+
+    retellClient.on("update", (update) => {
+      // Handle transcript updates from Retell
+      // Retell sends the full transcript array with each update, items grow word-by-word
+      // We only display items when they're "complete" (a new item has started after them)
+      if (update.transcript && update.transcript.length > 0) {
+        const currentMap = retellTranscriptMapRef.current;
+        const lastDisplayedIndex = retellLastDisplayedIndexRef.current;
+
+        // Update all items in our tracking map
+        update.transcript.forEach((item: { role?: string; content?: string }, index: number) => {
+          if (item.content) {
+            currentMap.set(index, item.content);
+          }
+        });
+
+        // Display any completed items (all items except the last one, which may still be streaming)
+        for (let i = lastDisplayedIndex + 1; i < update.transcript.length - 1; i++) {
+          const item = update.transcript[i] as {
+            role?: string;
+            content?: string;
+          };
+          if (item?.content) {
+            const speaker: "user" | "assistant" = item.role === "agent" ? "assistant" : "user";
+            addTranscriptImmediate(speaker, item.content);
+            transcriptEntriesRef.current.push({
+              role: speaker,
+              content: item.content,
+            });
+            retellLastDisplayedIndexRef.current = i; // Update last displayed index
+          }
+        }
+      }
+    });
+
+    // Start the call
+    console.log("[Retell] Starting call with access token...");
+    await retellClient.startCall({
+      accessToken: accessToken,
+      sampleRate: 24000,
+      emitRawAudioSamples: false,
+    });
+
+    // Get microphone stream for visualizer
+    try {
+      const micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      setAudioStream(micStream);
+    } catch (micError) {
+      console.warn("[Retell] Could not get mic stream for visualizer:", micError);
+    }
+  };
+
   const handleConnect = async () => {
     if (connectionStatus === "connected") {
       // Save transcript before cleanup (fire and forget)
@@ -620,11 +781,37 @@ export default function TestAgentPage() {
     try {
       addTranscriptImmediate("system", `Connecting to ${selectedAgent.name}...`);
 
-      // Fetch ephemeral token from our backend
-      // - For specific workspace: include workspace_id to use workspace API keys
-      // - For "all" (admin mode): no workspace_id, uses user-level API keys
       const apiBase = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
       const authToken = localStorage.getItem("access_token");
+
+      // Check agent tier to determine connection method
+      const isPremiumTier =
+        selectedAgent.pricing_tier === "premium" || selectedAgent.pricing_tier === "premium-mini";
+      const hasRetellAgentId = !!selectedAgent.retell_agent_id;
+
+      console.log(
+        "[Test] Agent tier:",
+        selectedAgent.pricing_tier,
+        "Retell ID:",
+        selectedAgent.retell_agent_id
+      );
+
+      // Use Retell for budget/balanced agents with retell_agent_id
+      if (!isPremiumTier && hasRetellAgentId) {
+        await connectWithRetell(apiBase, authToken, isAdminMode);
+        return;
+      }
+
+      // Use OpenAI WebRTC for premium agents
+      if (!isPremiumTier) {
+        throw new Error(
+          "This agent requires a Retell Agent ID to test in browser. Budget/Balanced agents use Retell for voice calls."
+        );
+      }
+
+      // Fetch ephemeral token from our backend for OpenAI
+      // - For specific workspace: include workspace_id to use workspace API keys
+      // - For "all" (admin mode): no workspace_id, uses user-level API keys
       const tokenUrl = isAdminMode
         ? `${apiBase}/api/v1/realtime/token/${selectedAgentId}`
         : `${apiBase}/api/v1/realtime/token/${selectedAgentId}?workspace_id=${selectedWorkspaceId}`;
@@ -891,15 +1078,22 @@ export default function TestAgentPage() {
       };
     } catch (error: unknown) {
       const err = error as Error;
-      console.error("[WebRTC] Connection error:", err);
+      console.error("[Connection] Error:", err);
       addTranscript("system", `Error: ${err.message}`);
       cleanup();
       setConnectionStatus("idle");
       setAudioStream(null);
 
-      if (err.name === "NotAllowedError") {
+      // Check for microphone permission errors (both native and SDK-wrapped)
+      const isMicPermissionError =
+        err.name === "NotAllowedError" ||
+        err.message?.toLowerCase().includes("permission") ||
+        err.message?.toLowerCase().includes("microphone") ||
+        err.message?.toLowerCase().includes("not allowed");
+
+      if (isMicPermissionError) {
         toast.error(
-          "Microphone access denied. Please allow microphone access in your browser settings."
+          "Microphone access required. Please allow microphone access in your browser and try again."
         );
       } else {
         toast.error(`Connection failed: ${err.message}`);
@@ -1070,11 +1264,26 @@ export default function TestAgentPage() {
                   />
                 </SelectTrigger>
                 <SelectContent>
-                  {availableAgents.map((agent) => (
-                    <SelectItem key={agent.agent_id} value={agent.agent_id}>
-                      {agent.agent_name}
-                    </SelectItem>
-                  ))}
+                  {availableAgents.map((agent) => {
+                    const tier = (agent as { pricing_tier?: string }).pricing_tier;
+                    const isRetell = tier === "budget" || tier === "balanced";
+                    return (
+                      <SelectItem key={agent.agent_id} value={agent.agent_id}>
+                        <div className="flex items-center gap-2">
+                          <span>{agent.agent_name}</span>
+                          <span
+                            className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${
+                              isRetell
+                                ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
+                                : "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
+                            }`}
+                          >
+                            {isRetell ? "Retell" : "WebRTC"}
+                          </span>
+                        </div>
+                      </SelectItem>
+                    );
+                  })}
                 </SelectContent>
               </Select>
               {selectedWorkspaceId &&
@@ -1087,6 +1296,25 @@ export default function TestAgentPage() {
                     </Link>
                   </p>
                 )}
+              {selectedAgent && (
+                <div className="rounded-md bg-muted/50 px-3 py-2 text-xs">
+                  <span className="font-medium">Connection: </span>
+                  {selectedAgent.pricing_tier === "premium" ||
+                  selectedAgent.pricing_tier === "premium-mini" ? (
+                    <span className="text-green-600 dark:text-green-400">
+                      OpenAI WebRTC (GPT-4o Realtime)
+                    </span>
+                  ) : selectedAgent.retell_agent_id ? (
+                    <span className="text-blue-600 dark:text-blue-400">
+                      Retell Web SDK (Claude)
+                    </span>
+                  ) : (
+                    <span className="text-yellow-600 dark:text-yellow-400">
+                      No Retell ID configured
+                    </span>
+                  )}
+                </div>
+              )}
             </div>
 
             <Separator />
@@ -1124,26 +1352,39 @@ export default function TestAgentPage() {
 
             <Separator />
 
-            {/* Voice */}
+            {/* Voice - Show different UI based on agent tier */}
             <div className="space-y-2">
               <Label className="text-sm font-medium">Voice</Label>
-              <Select value={voice} onValueChange={setVoice}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="marin">Marin (Recommended)</SelectItem>
-                  <SelectItem value="cedar">Cedar (Recommended)</SelectItem>
-                  <SelectItem value="shimmer">Shimmer</SelectItem>
-                  <SelectItem value="alloy">Alloy</SelectItem>
-                  <SelectItem value="coral">Coral</SelectItem>
-                  <SelectItem value="echo">Echo</SelectItem>
-                  <SelectItem value="sage">Sage</SelectItem>
-                  <SelectItem value="verse">Verse</SelectItem>
-                  <SelectItem value="ash">Ash</SelectItem>
-                  <SelectItem value="ballad">Ballad</SelectItem>
-                </SelectContent>
-              </Select>
+              {selectedAgent &&
+              (selectedAgent.pricing_tier === "budget" ||
+                selectedAgent.pricing_tier === "balanced") &&
+              selectedAgent.retell_agent_id ? (
+                <div className="rounded-md border bg-muted/50 p-3 text-sm">
+                  <p className="font-medium text-muted-foreground">Retell Agent</p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Voice is configured in the Retell dashboard for this agent. Current voice
+                    setting: <span className="font-mono">{selectedAgent.voice ?? "default"}</span>
+                  </p>
+                </div>
+              ) : (
+                <Select value={voice} onValueChange={setVoice}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="marin">Marin (Recommended)</SelectItem>
+                    <SelectItem value="cedar">Cedar (Recommended)</SelectItem>
+                    <SelectItem value="shimmer">Shimmer</SelectItem>
+                    <SelectItem value="alloy">Alloy</SelectItem>
+                    <SelectItem value="coral">Coral</SelectItem>
+                    <SelectItem value="echo">Echo</SelectItem>
+                    <SelectItem value="sage">Sage</SelectItem>
+                    <SelectItem value="verse">Verse</SelectItem>
+                    <SelectItem value="ash">Ash</SelectItem>
+                    <SelectItem value="ballad">Ballad</SelectItem>
+                  </SelectContent>
+                </Select>
+              )}
             </div>
 
             <div className="space-y-2">

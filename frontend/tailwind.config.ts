@@ -74,11 +74,44 @@ const config: Config = {
   			'pulse-glow': {
   				'0%, 100%': { opacity: '0.4' },
   				'50%': { opacity: '1' }
+  			},
+  			'fade-in': {
+  				'0%': { opacity: '0' },
+  				'100%': { opacity: '1' }
+  			},
+  			'fade-in-up': {
+  				'0%': { opacity: '0', transform: 'translateY(10px)' },
+  				'100%': { opacity: '1', transform: 'translateY(0)' }
+  			},
+  			'scale-in': {
+  				'0%': { opacity: '0', transform: 'scale(0.95)' },
+  				'100%': { opacity: '1', transform: 'scale(1)' }
+  			},
+  			'slide-in-right': {
+  				'0%': { opacity: '0', transform: 'translateX(10px)' },
+  				'100%': { opacity: '1', transform: 'translateX(0)' }
+  			},
+  			'glow-pulse': {
+  				'0%, 100%': { boxShadow: '0 0 20px rgba(99, 102, 241, 0.3)' },
+  				'50%': { boxShadow: '0 0 30px rgba(99, 102, 241, 0.5)' }
   			}
   		},
   		animation: {
   			'shimmer-flow': 'shimmer-flow 2s ease-in-out infinite',
-  			'pulse-glow': 'pulse-glow 2s ease-in-out infinite'
+  			'pulse-glow': 'pulse-glow 2s ease-in-out infinite',
+  			'fade-in': 'fade-in 0.3s ease-out',
+  			'fade-in-up': 'fade-in-up 0.4s ease-out',
+  			'scale-in': 'scale-in 0.2s ease-out',
+  			'slide-in-right': 'slide-in-right 0.3s ease-out',
+  			'glow-pulse': 'glow-pulse 2s ease-in-out infinite'
+  		},
+  		boxShadow: {
+  			'glass': '0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.05)',
+  			'glass-hover': '0 12px 40px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.08)',
+  			'card-premium': '0 4px 20px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(255, 255, 255, 0.05)',
+  			'card-hover': '0 8px 30px rgba(0, 0, 0, 0.35), 0 0 0 1px rgba(255, 255, 255, 0.1)',
+  			'inner-glow': 'inset 0 1px 0 rgba(255, 255, 255, 0.1)',
+  			'status-glow': '0 0 12px currentColor'
   		}
   	}
   },
