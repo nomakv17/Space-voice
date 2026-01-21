@@ -36,6 +36,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // Track when we're transitioning from onboarding to prevent redirect loops
   const justCompletedOnboardingRef = useRef(false);
+  // Track last redirect time to prevent rapid redirects (navigation flooding)
+  const lastRedirectTimeRef = useRef(0);
 
   // Check for existing token on mount
   useEffect(() => {
@@ -69,19 +71,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => window.removeEventListener("storage", handleStorageChange);
   }, [token]);
 
-  // Redirect logic
+  // Redirect logic with debouncing to prevent navigation flooding
   useEffect(() => {
     // Don't redirect while loading or refetching user data
     if (isLoading || isRefetching) return;
 
+    // Debounce redirects - prevent more than one redirect per second
+    const now = Date.now();
+    if (now - lastRedirectTimeRef.current < 1000) {
+      return;
+    }
+
     const isAuthPage = pathname === "/login";
     const isPublicPage = pathname.startsWith("/embed"); // Embed pages are public, no auth required
     const isOnboardingPage = pathname.startsWith("/onboarding");
+    const isDashboardPage = pathname.startsWith("/dashboard");
+
+    // Check sessionStorage for recent onboarding completion (survives state issues)
+    const recentlyCompletedOnboarding = sessionStorage.getItem("onboarding_completed_at");
+    const completedWithinLastMinute = recentlyCompletedOnboarding &&
+      (now - parseInt(recentlyCompletedOnboarding, 10)) < 60000;
 
     if (!token && !isAuthPage && !isPublicPage) {
+      lastRedirectTimeRef.current = now;
       router.push("/login");
     } else if (token && isAuthPage) {
       // Admins always go to dashboard, clients check onboarding
+      lastRedirectTimeRef.current = now;
       if (user?.is_superuser || user?.onboarding_completed) {
         router.push("/dashboard");
       } else if (user && !user.onboarding_completed) {
@@ -91,12 +107,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     } else if (token && user && !user.is_superuser && !user.onboarding_completed && !isOnboardingPage && !isPublicPage) {
       // Force onboarding for non-admin users who haven't completed it
-      // BUT don't redirect if we just completed onboarding (state may not have updated yet)
-      if (!justCompletedOnboardingRef.current) {
+      // BUT don't redirect if we just completed onboarding OR if on dashboard and completed recently
+      const skipRedirect = justCompletedOnboardingRef.current ||
+        (isDashboardPage && completedWithinLastMinute);
+      if (!skipRedirect) {
+        lastRedirectTimeRef.current = now;
         router.push("/onboarding");
       }
     } else if (token && user?.is_superuser && isOnboardingPage) {
       // Admins should never see onboarding - redirect to dashboard
+      lastRedirectTimeRef.current = now;
       router.push("/dashboard");
     }
   }, [token, isLoading, isRefetching, pathname, router, user]);

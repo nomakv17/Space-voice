@@ -21,6 +21,8 @@ export default function OnboardingCompletePage() {
       return response.data;
     },
     onSuccess: async () => {
+      // Mark completion time in sessionStorage to prevent redirect loops
+      sessionStorage.setItem("onboarding_completed_at", Date.now().toString());
       void queryClient.invalidateQueries({ queryKey: ["onboarding-status"] });
       void queryClient.invalidateQueries({ queryKey: ["user"] });
       // Refetch user to update onboarding_completed status in auth context
