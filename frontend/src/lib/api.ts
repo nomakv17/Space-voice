@@ -56,21 +56,11 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
-    // Log authentication failures
+    // Log authentication failures but DON'T clear token - let auth context handle that
     if (error.response?.status === 401) {
       const endpoint = error.config?.url ?? "unknown";
-      // Don't clear token for auth endpoints - the auth context manages those
-      const isAuthEndpoint = endpoint.includes("/auth/");
-
-      if (!isAuthEndpoint) {
-        console.warn("Authentication failed:", {
-          endpoint,
-          status: error.response.status,
-        });
-        // Clear the token - the auth context will detect this and redirect
-        // Don't do a hard redirect here to avoid competing with React router
-        safeRemoveItem("access_token");
-      }
+      console.warn("Authentication failed:", { endpoint, status: error.response.status });
+      // DON'T clear token here - auth context is the single source of truth for auth state
     } else if (error.response) {
       // Log API errors with details
       console.error("API error:", {

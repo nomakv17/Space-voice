@@ -20,13 +20,12 @@ export default function OnboardingCompletePage() {
       const response = await api.post("/api/v1/onboarding/complete");
       return response.data;
     },
-    onSuccess: async () => {
-      // Mark completion time in sessionStorage to prevent redirect loops
-      sessionStorage.setItem("onboarding_completed_at", Date.now().toString());
+    onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["onboarding-status"] });
-      void queryClient.invalidateQueries({ queryKey: ["user"] });
-      // Refetch user to update onboarding_completed status in auth context
-      await refetchUser();
+      // Try to refetch user, but don't block on it - user can navigate regardless
+      refetchUser().catch(() => {
+        console.warn("Failed to refetch user after onboarding - user can still navigate");
+      });
     },
     onError: (error: Error) => {
       toast.error(error.message || "Failed to complete onboarding");

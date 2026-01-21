@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState, useRef, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import { useRouter, usePathname } from "next/navigation";
 
 interface User {
@@ -30,96 +30,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [isRefetching, setIsRefetching] = useState(false);
   const router = useRouter();
   const pathname = usePathname();
-
-  // Track when we're transitioning from onboarding to prevent redirect loops
-  const justCompletedOnboardingRef = useRef(false);
-  // Track last redirect time to prevent rapid redirects (navigation flooding)
-  const lastRedirectTimeRef = useRef(0);
 
   // Check for existing token on mount
   useEffect(() => {
     const storedToken = localStorage.getItem("access_token");
     if (storedToken) {
       setToken(storedToken);
-      // Validate token by fetching user info
       void fetchUser(storedToken);
     } else {
       setIsLoading(false);
     }
   }, []);
 
-  // Listen for storage changes (e.g., token cleared by axios interceptor or another tab)
+  // SIMPLIFIED redirect logic - only handle: no token → login, login page with token → dashboard
   useEffect(() => {
-    const handleStorageChange = (event: StorageEvent) => {
-      if (event.key === "access_token") {
-        if (event.newValue === null && token) {
-          // Token was removed - clear state and redirect
-          console.warn("Auth token cleared from storage, logging out");
-          setToken(null);
-          setUser(null);
-        } else if (event.newValue && !token) {
-          // Token was added - validate it
-          void fetchUser(event.newValue);
-        }
-      }
-    };
-
-    window.addEventListener("storage", handleStorageChange);
-    return () => window.removeEventListener("storage", handleStorageChange);
-  }, [token]);
-
-  // Redirect logic with debouncing to prevent navigation flooding
-  useEffect(() => {
-    // Don't redirect while loading or refetching user data
-    if (isLoading || isRefetching) return;
-
-    // Debounce redirects - prevent more than one redirect per second
-    const now = Date.now();
-    if (now - lastRedirectTimeRef.current < 1000) {
-      return;
-    }
+    if (isLoading) return;
 
     const isAuthPage = pathname === "/login";
-    const isPublicPage = pathname.startsWith("/embed"); // Embed pages are public, no auth required
-    const isOnboardingPage = pathname.startsWith("/onboarding");
-    const isDashboardPage = pathname.startsWith("/dashboard");
-
-    // Check sessionStorage for recent onboarding completion (survives state issues)
-    const recentlyCompletedOnboarding = sessionStorage.getItem("onboarding_completed_at");
-    const completedWithinLastMinute = recentlyCompletedOnboarding &&
-      (now - parseInt(recentlyCompletedOnboarding, 10)) < 60000;
+    const isPublicPage = pathname.startsWith("/embed");
 
     if (!token && !isAuthPage && !isPublicPage) {
-      lastRedirectTimeRef.current = now;
+      // No token and not on login/public page → go to login
       router.push("/login");
     } else if (token && isAuthPage) {
-      // Admins always go to dashboard, clients check onboarding
-      lastRedirectTimeRef.current = now;
-      if (user?.is_superuser || user?.onboarding_completed) {
-        router.push("/dashboard");
-      } else if (user && !user.onboarding_completed) {
-        router.push("/onboarding");
-      } else {
-        router.push("/dashboard");
-      }
-    } else if (token && user && !user.is_superuser && !user.onboarding_completed && !isOnboardingPage && !isPublicPage) {
-      // Force onboarding for non-admin users who haven't completed it
-      // BUT don't redirect if we just completed onboarding OR if on dashboard and completed recently
-      const skipRedirect = justCompletedOnboardingRef.current ||
-        (isDashboardPage && completedWithinLastMinute);
-      if (!skipRedirect) {
-        lastRedirectTimeRef.current = now;
-        router.push("/onboarding");
-      }
-    } else if (token && user?.is_superuser && isOnboardingPage) {
-      // Admins should never see onboarding - redirect to dashboard
-      lastRedirectTimeRef.current = now;
+      // Has token and on login page → go to dashboard
       router.push("/dashboard");
     }
-  }, [token, isLoading, isRefetching, pathname, router, user]);
+    // REMOVED: Force redirect to onboarding - users can navigate where they want
+  }, [token, isLoading, pathname, router]);
 
   const fetchUser = async (accessToken: string) => {
     try {
@@ -217,7 +157,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const refetchUser = async () => {
     const storedToken = localStorage.getItem("access_token");
     if (storedToken) {
-      setIsRefetching(true);
       try {
         const response = await fetch(`${API_BASE}/api/v1/auth/me`, {
           headers: {
@@ -226,24 +165,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         });
         if (response.ok) {
           const userData = await response.json();
-          // If onboarding just completed, set the flag to prevent redirect loops
-          if (userData.onboarding_completed && user && !user.onboarding_completed) {
-            justCompletedOnboardingRef.current = true;
-            // Clear the flag after a short delay to allow state to settle
-            setTimeout(() => {
-              justCompletedOnboardingRef.current = false;
-            }, 2000);
-          }
           setUser(userData);
         } else {
-          // Log the error but don't clear the token - let the user retry
-          console.warn("Failed to refetch user:", response.status, response.statusText);
+          console.warn("Failed to refetch user:", response.status);
         }
       } catch (error) {
-        // Network error - log but don't clear token
         console.warn("Network error during refetch:", error);
-      } finally {
-        setIsRefetching(false);
       }
     }
   };
