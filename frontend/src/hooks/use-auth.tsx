@@ -30,6 +30,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isRefetching, setIsRefetching] = useState(false);
   const router = useRouter();
   const pathname = usePathname();
 
@@ -47,7 +48,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // Redirect logic
   useEffect(() => {
-    if (isLoading) return;
+    // Don't redirect while loading or refetching user data
+    if (isLoading || isRefetching) return;
 
     const isAuthPage = pathname === "/login";
     const isPublicPage = pathname.startsWith("/embed"); // Embed pages are public, no auth required
@@ -71,7 +73,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Admins should never see onboarding - redirect to dashboard
       router.push("/dashboard");
     }
-  }, [token, isLoading, pathname, router, user]);
+  }, [token, isLoading, isRefetching, pathname, router, user]);
 
   const fetchUser = async (accessToken: string) => {
     try {
@@ -169,7 +171,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const refetchUser = async () => {
     const storedToken = localStorage.getItem("access_token");
     if (storedToken) {
-      await fetchUser(storedToken);
+      setIsRefetching(true);
+      try {
+        const response = await fetch(`${API_BASE}/api/v1/auth/me`, {
+          headers: {
+            Authorization: `Bearer ${storedToken}`,
+          },
+        });
+        if (response.ok) {
+          const userData = await response.json();
+          setUser(userData);
+        }
+      } finally {
+        setIsRefetching(false);
+      }
     }
   };
 
