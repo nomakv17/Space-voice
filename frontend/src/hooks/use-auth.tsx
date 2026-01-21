@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useState, useRef, type ReactNode } from "react";
 import { useRouter, usePathname } from "next/navigation";
 
 interface User {
@@ -34,6 +34,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
 
+  // Track when we're transitioning from onboarding to prevent redirect loops
+  const justCompletedOnboardingRef = useRef(false);
+
   // Check for existing token on mount
   useEffect(() => {
     const storedToken = localStorage.getItem("access_token");
@@ -45,6 +48,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setIsLoading(false);
     }
   }, []);
+
+  // Listen for storage changes (e.g., token cleared by axios interceptor or another tab)
+  useEffect(() => {
+    const handleStorageChange = (event: StorageEvent) => {
+      if (event.key === "access_token") {
+        if (event.newValue === null && token) {
+          // Token was removed - clear state and redirect
+          console.warn("Auth token cleared from storage, logging out");
+          setToken(null);
+          setUser(null);
+        } else if (event.newValue && !token) {
+          // Token was added - validate it
+          void fetchUser(event.newValue);
+        }
+      }
+    };
+
+    window.addEventListener("storage", handleStorageChange);
+    return () => window.removeEventListener("storage", handleStorageChange);
+  }, [token]);
 
   // Redirect logic
   useEffect(() => {
@@ -68,7 +91,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     } else if (token && user && !user.is_superuser && !user.onboarding_completed && !isOnboardingPage && !isPublicPage) {
       // Force onboarding for non-admin users who haven't completed it
-      router.push("/onboarding");
+      // BUT don't redirect if we just completed onboarding (state may not have updated yet)
+      if (!justCompletedOnboardingRef.current) {
+        router.push("/onboarding");
+      }
     } else if (token && user?.is_superuser && isOnboardingPage) {
       // Admins should never see onboarding - redirect to dashboard
       router.push("/dashboard");
@@ -180,8 +206,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         });
         if (response.ok) {
           const userData = await response.json();
+          // If onboarding just completed, set the flag to prevent redirect loops
+          if (userData.onboarding_completed && user && !user.onboarding_completed) {
+            justCompletedOnboardingRef.current = true;
+            // Clear the flag after a short delay to allow state to settle
+            setTimeout(() => {
+              justCompletedOnboardingRef.current = false;
+            }, 2000);
+          }
           setUser(userData);
+        } else {
+          // Log the error but don't clear the token - let the user retry
+          console.warn("Failed to refetch user:", response.status, response.statusText);
         }
+      } catch (error) {
+        // Network error - log but don't clear token
+        console.warn("Network error during refetch:", error);
       } finally {
         setIsRefetching(false);
       }
