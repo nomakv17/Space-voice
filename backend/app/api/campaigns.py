@@ -9,7 +9,7 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.core.auth import CurrentUser, user_id_to_uuid
+from app.core.auth import CurrentUser
 from app.db.session import get_db
 from app.models.agent import Agent
 from app.models.campaign import (
@@ -364,7 +364,7 @@ async def get_campaign_or_404(campaign_id: str, user_id: int, db: AsyncSession) 
     result = await db.execute(
         select(Campaign)
         .options(selectinload(Campaign.agent))
-        .where(Campaign.id == campaign_uuid, Campaign.user_id == user_id_to_uuid(user_id))
+        .where(Campaign.id == campaign_uuid, Campaign.user_id == user_id)
     )
     campaign = result.scalar_one_or_none()
 
@@ -390,7 +390,7 @@ async def list_campaigns(
     query = (
         select(Campaign)
         .options(selectinload(Campaign.agent))
-        .where(Campaign.user_id == user_id_to_uuid(current_user.id))
+        .where(Campaign.user_id == current_user.id)
         .order_by(Campaign.created_at.desc())
     )
 
@@ -428,12 +428,10 @@ async def create_campaign(
     db: AsyncSession = Depends(get_db),
 ) -> CampaignResponse:
     """Create a new campaign."""
-    user_uuid = user_id_to_uuid(current_user.id)
-
     # Verify agent exists and belongs to user
     agent_uuid = uuid.UUID(data.agent_id)
     result = await db.execute(
-        select(Agent).where(Agent.id == agent_uuid, Agent.user_id == user_uuid)
+        select(Agent).where(Agent.id == agent_uuid, Agent.user_id == current_user.id)
     )
     agent = result.scalar_one_or_none()
     if not agent:
@@ -441,7 +439,7 @@ async def create_campaign(
 
     # Create campaign
     campaign = Campaign(
-        user_id=user_uuid,
+        user_id=current_user.id,
         workspace_id=uuid.UUID(data.workspace_id),
         agent_id=agent_uuid,
         name=data.name,
@@ -468,7 +466,7 @@ async def create_campaign(
         result = await db.execute(
             select(Contact).where(
                 Contact.id.in_(data.contact_ids),
-                Contact.user_id == user_uuid,  # Ensure user owns contacts
+                Contact.user_id == current_user.id,  # Ensure user owns contacts
             )
         )
         contacts = result.scalars().all()

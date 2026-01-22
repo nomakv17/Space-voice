@@ -45,8 +45,8 @@ class CallRecord(Base):
     __tablename__ = "call_records"
 
     id: Mapped[uuid.UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    user_id: Mapped[uuid.UUID] = mapped_column(
-        Uuid(as_uuid=True), nullable=False, index=True, comment="Owner user ID"
+    user_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("users.id"), nullable=False, index=True, comment="Owner user ID"
     )
 
     # Provider call identifiers

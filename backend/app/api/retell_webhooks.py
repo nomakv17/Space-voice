@@ -24,7 +24,6 @@ from pydantic import BaseModel
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.auth import user_id_to_uuid
 from app.core.config import settings
 from app.db.session import get_db
 from app.models.agent import Agent
@@ -352,7 +351,7 @@ async def _handle_call_started(
 
         # Create call record
         call_record = CallRecord(
-            user_id=user_id_to_uuid(user_id) if user_id else uuid.uuid4(),
+            user_id=user_id,
             provider="retell",
             provider_call_id=call.call_id,
             agent_id=agent.id if agent else None,
@@ -430,7 +429,7 @@ async def _handle_call_ended(
                 )
 
             call_record = CallRecord(
-                user_id=user_id_to_uuid(user_id) if user_id else uuid.uuid4(),
+                user_id=user_id,
                 provider="retell",
                 provider_call_id=call.call_id,
                 agent_id=agent.id if agent else None,
@@ -606,9 +605,8 @@ async def retell_call_started(
             )
 
         # Create call record
-        # Use user_id_to_uuid to convert integer user_id to UUID consistently
         call_record = CallRecord(
-            user_id=user_id_to_uuid(user_id) if user_id else uuid.uuid4(),  # Fallback for now
+            user_id=user_id,
             provider="retell",
             provider_call_id=call.call_id,
             agent_id=agent.id if agent else None,

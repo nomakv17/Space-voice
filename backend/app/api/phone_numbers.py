@@ -9,7 +9,7 @@ from pydantic import BaseModel
 from sqlalchemy import desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.auth import CurrentUser, user_id_to_uuid
+from app.core.auth import CurrentUser
 from app.core.limiter import limiter
 from app.db.session import get_db
 from app.models.phone_number import PhoneNumber
@@ -145,8 +145,7 @@ async def list_phone_numbers(
     log.info("listing_phone_numbers", page=page, page_size=page_size)
 
     # Build query
-    user_uuid = user_id_to_uuid(current_user.id)
-    query = select(PhoneNumber).where(PhoneNumber.user_id == user_uuid)
+    query = select(PhoneNumber).where(PhoneNumber.user_id == current_user.id)
 
     # Apply filters
     if workspace_id:
@@ -155,7 +154,7 @@ async def list_phone_numbers(
         query = query.where(PhoneNumber.status == status)
 
     # Get total count
-    count_query = select(PhoneNumber.id).where(PhoneNumber.user_id == user_uuid)
+    count_query = select(PhoneNumber.id).where(PhoneNumber.user_id == current_user.id)
     if workspace_id:
         count_query = count_query.where(PhoneNumber.workspace_id == uuid.UUID(workspace_id))
     if status:
@@ -236,11 +235,10 @@ async def get_phone_number(
     log = logger.bind(user_id=current_user.id, phone_number_id=phone_number_id)
     log.info("getting_phone_number")
 
-    user_uuid = user_id_to_uuid(current_user.id)
     result = await db.execute(
         select(PhoneNumber).where(
             PhoneNumber.id == uuid.UUID(phone_number_id),
-            PhoneNumber.user_id == user_uuid,
+            PhoneNumber.user_id == current_user.id,
         )
     )
     record = result.scalar_one_or_none()
@@ -299,8 +297,6 @@ async def create_phone_number(
     log = logger.bind(user_id=current_user.id)
     log.info("creating_phone_number", phone_number=create_request.phone_number)
 
-    user_uuid = user_id_to_uuid(current_user.id)
-
     # Validate workspace access if workspace_id is provided
     workspace_uuid: uuid.UUID | None = None
     if create_request.workspace_id:
@@ -309,7 +305,7 @@ async def create_phone_number(
         )
 
     phone_number = PhoneNumber(
-        user_id=user_uuid,
+        user_id=current_user.id,
         phone_number=create_request.phone_number,
         friendly_name=create_request.friendly_name,
         provider=create_request.provider,
@@ -371,11 +367,10 @@ async def update_phone_number(
     log = logger.bind(user_id=current_user.id, phone_number_id=phone_number_id)
     log.info("updating_phone_number")
 
-    user_uuid = user_id_to_uuid(current_user.id)
     result = await db.execute(
         select(PhoneNumber).where(
             PhoneNumber.id == uuid.UUID(phone_number_id),
-            PhoneNumber.user_id == user_uuid,
+            PhoneNumber.user_id == current_user.id,
         )
     )
     phone_number = result.scalar_one_or_none()
@@ -458,11 +453,10 @@ async def delete_phone_number(
     log = logger.bind(user_id=current_user.id, phone_number_id=phone_number_id)
     log.info("deleting_phone_number")
 
-    user_uuid = user_id_to_uuid(current_user.id)
     result = await db.execute(
         select(PhoneNumber).where(
             PhoneNumber.id == uuid.UUID(phone_number_id),
-            PhoneNumber.user_id == user_uuid,
+            PhoneNumber.user_id == current_user.id,
         )
     )
     phone_number = result.scalar_one_or_none()

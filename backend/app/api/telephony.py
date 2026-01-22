@@ -611,11 +611,10 @@ async def initiate_call(
         raise HTTPException(status_code=400, detail="Invalid workspace_id format") from e
 
     # Load agent to get provider preference (verify user owns agent)
-    user_uuid = user_id_to_uuid(current_user.id)
     result = await db.execute(
         select(Agent).where(
             Agent.id == uuid.UUID(call_request.agent_id),
-            Agent.user_id == user_uuid,  # Ensure user owns the agent
+            Agent.user_id == current_user.id,  # Ensure user owns the agent
         )
     )
     agent = result.scalar_one_or_none()
@@ -664,7 +663,7 @@ async def initiate_call(
 
     # Create call record for outbound call (workspace_uuid already available from query param)
     call_record = CallRecord(
-        user_id=user_id_to_uuid(current_user.id),
+        user_id=current_user.id,
         workspace_id=workspace_uuid,
         provider=provider,
         provider_call_id=call_info.call_id,

@@ -10,7 +10,7 @@ from sqlalchemy import desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.core.auth import CurrentUser, user_id_to_uuid
+from app.core.auth import CurrentUser
 from app.db.session import get_db
 from app.models.call_record import CallRecord
 
@@ -95,10 +95,9 @@ async def list_calls(
     log.info("listing_calls", page=page, page_size=page_size)
 
     # Build query with eager loading to prevent N+1 queries
-    user_uuid = user_id_to_uuid(current_user.id)
     query = (
         select(CallRecord)
-        .where(CallRecord.user_id == user_uuid)
+        .where(CallRecord.user_id == current_user.id)
         .options(
             selectinload(CallRecord.agent),
             selectinload(CallRecord.contact),
@@ -117,7 +116,7 @@ async def list_calls(
         query = query.where(CallRecord.status == status)
 
     # Get total count
-    count_query = select(CallRecord.id).where(CallRecord.user_id == user_uuid)
+    count_query = select(CallRecord.id).where(CallRecord.user_id == current_user.id)
     if agent_id:
         count_query = count_query.where(CallRecord.agent_id == uuid.UUID(agent_id))
     if workspace_id:
@@ -205,11 +204,10 @@ async def get_call(
     log = logger.bind(user_id=current_user.id, call_id=call_id)
     log.info("getting_call")
 
-    user_uuid = user_id_to_uuid(current_user.id)
     result = await db.execute(
         select(CallRecord).where(
             CallRecord.id == uuid.UUID(call_id),
-            CallRecord.user_id == user_uuid,
+            CallRecord.user_id == current_user.id,
         )
     )
     record = result.scalar_one_or_none()
@@ -270,12 +268,11 @@ async def get_agent_call_stats(
     log = logger.bind(user_id=current_user.id, agent_id=agent_id)
     log.info("getting_agent_call_stats")
 
-    user_uuid = user_id_to_uuid(current_user.id)
     # Get all calls for this agent
     result = await db.execute(
         select(CallRecord).where(
             CallRecord.agent_id == uuid.UUID(agent_id),
-            CallRecord.user_id == user_uuid,
+            CallRecord.user_id == current_user.id,
         )
     )
     records = result.scalars().all()

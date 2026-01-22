@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.auth import CurrentUser, user_id_to_uuid
+from app.core.auth import CurrentUser
 from app.db.session import get_db
 from app.models.user_integration import UserIntegration
 from app.models.workspace import Workspace
@@ -99,10 +99,8 @@ async def list_integrations(
     Returns:
         List of connected integrations with masked credentials
     """
-    user_uuid = user_id_to_uuid(current_user.id)
-
     # Build query
-    query = select(UserIntegration).where(UserIntegration.user_id == user_uuid)
+    query = select(UserIntegration).where(UserIntegration.user_id == current_user.id)
 
     if workspace_id:
         try:
@@ -155,11 +153,9 @@ async def get_integration(
     Returns:
         Integration details with masked credentials
     """
-    user_uuid = user_id_to_uuid(current_user.id)
-
     # Build query conditions
     conditions = [
-        UserIntegration.user_id == user_uuid,
+        UserIntegration.user_id == current_user.id,
         UserIntegration.integration_id == integration_id,
     ]
 
@@ -214,7 +210,6 @@ async def connect_integration(
     Returns:
         Connected integration details
     """
-    user_uuid = user_id_to_uuid(current_user.id)
     workspace_uuid: uuid.UUID | None = None
 
     # Validate workspace if provided
@@ -230,7 +225,7 @@ async def connect_integration(
         # Verify workspace belongs to user
         ws_result = await db.execute(
             select(Workspace).where(
-                and_(Workspace.id == workspace_uuid, Workspace.user_id == user_uuid)
+                and_(Workspace.id == workspace_uuid, Workspace.user_id == current_user.id)
             )
         )
         workspace = ws_result.scalar_one_or_none()
@@ -242,7 +237,7 @@ async def connect_integration(
 
     # Check if integration already exists for this user/workspace combo
     conditions = [
-        UserIntegration.user_id == user_uuid,
+        UserIntegration.user_id == current_user.id,
         UserIntegration.integration_id == request.integration_id,
     ]
     if workspace_uuid:
@@ -259,7 +254,7 @@ async def connect_integration(
 
     # Create new integration
     integration = UserIntegration(
-        user_id=user_uuid,
+        user_id=current_user.id,
         workspace_id=workspace_uuid,
         integration_id=request.integration_id,
         integration_name=request.integration_name,
@@ -306,11 +301,9 @@ async def update_integration(
     Returns:
         Updated integration details
     """
-    user_uuid = user_id_to_uuid(current_user.id)
-
     # Build query conditions
     conditions = [
-        UserIntegration.user_id == user_uuid,
+        UserIntegration.user_id == current_user.id,
         UserIntegration.integration_id == integration_id,
     ]
 
@@ -385,11 +378,9 @@ async def disconnect_integration(
         current_user: Authenticated user
         db: Database session
     """
-    user_uuid = user_id_to_uuid(current_user.id)
-
     # Build query conditions
     conditions = [
-        UserIntegration.user_id == user_uuid,
+        UserIntegration.user_id == current_user.id,
         UserIntegration.integration_id == integration_id,
     ]
 

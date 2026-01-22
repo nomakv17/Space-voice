@@ -10,7 +10,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.auth import CurrentUser, user_id_to_uuid
+from app.core.auth import CurrentUser
 from app.core.config import settings
 from app.core.limiter import limiter
 from app.db.session import get_db
@@ -208,7 +208,6 @@ async def purchase_phone_number(
     log = logger.bind(user_id=current_user.id, phone_number=purchase_request.phone_number)
     log.info("purchasing_phone_number")
 
-    user_uuid = user_id_to_uuid(current_user.id)
     workspace_uuid = (
         uuid.UUID(purchase_request.workspace_id) if purchase_request.workspace_id else None
     )
@@ -259,7 +258,7 @@ async def purchase_phone_number(
 
     # Step 2: Save to database
     phone_number = PhoneNumber(
-        user_id=user_uuid,
+        user_id=current_user.id,
         phone_number=actual_number,
         friendly_name=purchase_request.friendly_name or f"Number {actual_number[-4:]}",
         provider="telnyx",
@@ -311,13 +310,11 @@ async def release_phone_number(
     log = logger.bind(user_id=current_user.id, phone_number_id=phone_number_id)
     log.info("releasing_phone_number")
 
-    user_uuid = user_id_to_uuid(current_user.id)
-
     # Get the phone number from database
     result = await db.execute(
         select(PhoneNumber).where(
             PhoneNumber.id == uuid.UUID(phone_number_id),
-            PhoneNumber.user_id == user_uuid,
+            PhoneNumber.user_id == current_user.id,
         )
     )
     phone_number = result.scalar_one_or_none()
