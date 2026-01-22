@@ -31,6 +31,7 @@ import {
   PanelLeft,
   LogOut,
   Key,
+  DollarSign,
 } from "lucide-react";
 import { useSidebarStore } from "@/lib/sidebar-store";
 import { useAuth } from "@/hooks/use-auth";
@@ -106,6 +107,12 @@ const adminNavigation = [
     icon: UserPlus,
     color: "text-indigo-400",
   },
+  {
+    name: "Pricing",
+    href: "/dashboard/pricing",
+    icon: DollarSign,
+    color: "text-emerald-400",
+  },
 ];
 
 export function AppSidebar() {
@@ -130,10 +137,15 @@ export function AppSidebar() {
   return (
     <div
       className="relative flex h-screen flex-col bg-sidebar"
-      style={{ width: effectiveSidebarOpen ? 220 : 64, transition: hasHydrated ? 'width 0.2s ease' : 'none' }}
+      style={{
+        width: effectiveSidebarOpen ? 220 : 64,
+        transition: hasHydrated ? "width 0.2s ease" : "none",
+      }}
     >
       {/* Logo */}
-      <div className={cn("flex h-12 items-center", effectiveSidebarOpen ? "px-4" : "justify-center")}>
+      <div
+        className={cn("flex h-12 items-center", effectiveSidebarOpen ? "px-4" : "justify-center")}
+      >
         <Link href="/dashboard" className="relative block overflow-hidden">
           <motion.span
             className="animate-gradient-flow block whitespace-nowrap bg-clip-text text-lg font-bold tracking-tight text-transparent"
@@ -155,14 +167,16 @@ export function AppSidebar() {
       <nav className="flex-1 overflow-y-auto px-2 py-2">
         <div className="flex flex-col gap-1">
           {/* Admin-only navigation */}
-          {user?.is_superuser && adminNavigation.map((item) => {
-            const active = isActive(item.href);
-            return (
-              <Link key={item.name} href={item.href} prefetch={true}>
-                <Button
-                  variant="ghost"
+          {user?.is_superuser &&
+            adminNavigation.map((item) => {
+              const active = isActive(item.href);
+              return (
+                <Link
+                  key={item.name}
+                  href={item.href}
+                  prefetch={true}
                   className={cn(
-                    "relative h-9 w-full justify-start gap-3 px-3 font-normal",
+                    "relative inline-flex h-9 w-full items-center justify-start gap-3 rounded-md px-3 text-sm font-normal transition-colors",
                     !effectiveSidebarOpen && "justify-center gap-0 px-0",
                     active
                       ? "bg-sidebar-accent text-sidebar-foreground"
@@ -170,9 +184,7 @@ export function AppSidebar() {
                   )}
                 >
                   {active && (
-                    <div
-                      className="absolute inset-y-0 left-0 my-auto h-5 w-0.5 rounded-r-full bg-indigo-400"
-                    />
+                    <div className="absolute inset-y-0 left-0 my-auto h-5 w-0.5 rounded-r-full bg-indigo-400" />
                   )}
                   <item.icon className={cn("h-[18px] w-[18px] shrink-0", active && item.color)} />
                   <AnimatePresence>
@@ -182,57 +194,52 @@ export function AppSidebar() {
                         animate={{ opacity: 1, width: "auto" }}
                         exit={{ opacity: 0, width: 0 }}
                         transition={{ duration: 0.15 }}
-                        className="truncate text-sm"
+                        className="truncate"
                       >
                         {item.name}
                       </motion.span>
                     )}
                   </AnimatePresence>
-                </Button>
-              </Link>
-            );
-          })}
+                </Link>
+              );
+            })}
 
           {/* Divider for admin section */}
-          {user?.is_superuser && (
-            <div className="my-2 border-t border-sidebar-border" />
-          )}
+          {user?.is_superuser && <div className="my-2 border-t border-sidebar-border" />}
 
           {/* Regular navigation */}
           {navigation.map((item) => {
             const active = isActive(item.href);
             return (
-              <Link key={item.name} href={item.href} prefetch={true}>
-                <Button
-                  variant="ghost"
-                  className={cn(
-                    "relative h-9 w-full justify-start gap-3 px-3 font-normal",
-                    !effectiveSidebarOpen && "justify-center gap-0 px-0",
-                    active
-                      ? "bg-sidebar-accent text-sidebar-foreground"
-                      : "text-sidebar-foreground/60 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
+              <Link
+                key={item.name}
+                href={item.href}
+                prefetch={true}
+                className={cn(
+                  "relative inline-flex h-9 w-full items-center justify-start gap-3 rounded-md px-3 text-sm font-normal transition-colors",
+                  !effectiveSidebarOpen && "justify-center gap-0 px-0",
+                  active
+                    ? "bg-sidebar-accent text-sidebar-foreground"
+                    : "text-sidebar-foreground/60 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
+                )}
+              >
+                {active && (
+                  <div className="absolute inset-y-0 left-0 my-auto h-5 w-0.5 rounded-r-full bg-sidebar-foreground" />
+                )}
+                <item.icon className={cn("h-[18px] w-[18px] shrink-0", active && item.color)} />
+                <AnimatePresence>
+                  {effectiveSidebarOpen && (
+                    <motion.span
+                      initial={{ opacity: 0, width: 0 }}
+                      animate={{ opacity: 1, width: "auto" }}
+                      exit={{ opacity: 0, width: 0 }}
+                      transition={{ duration: 0.15 }}
+                      className="truncate"
+                    >
+                      {item.name}
+                    </motion.span>
                   )}
-                >
-                  {active && (
-                    <div
-                      className="absolute inset-y-0 left-0 my-auto h-5 w-0.5 rounded-r-full bg-sidebar-foreground"
-                    />
-                  )}
-                  <item.icon className={cn("h-[18px] w-[18px] shrink-0", active && item.color)} />
-                  <AnimatePresence>
-                    {effectiveSidebarOpen && (
-                      <motion.span
-                        initial={{ opacity: 0, width: 0 }}
-                        animate={{ opacity: 1, width: "auto" }}
-                        exit={{ opacity: 0, width: 0 }}
-                        transition={{ duration: 0.15 }}
-                        className="truncate text-sm"
-                      >
-                        {item.name}
-                      </motion.span>
-                    )}
-                  </AnimatePresence>
-                </Button>
+                </AnimatePresence>
               </Link>
             );
           })}
@@ -306,7 +313,11 @@ export function AppSidebar() {
               </AnimatePresence>
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align={effectiveSidebarOpen ? "end" : "center"} side="top" className="w-56">
+          <DropdownMenuContent
+            align={effectiveSidebarOpen ? "end" : "center"}
+            side="top"
+            className="w-56"
+          >
             <DropdownMenuLabel>My Account</DropdownMenuLabel>
             <DropdownMenuSeparator />
             <DropdownMenuItem asChild>
