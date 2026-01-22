@@ -29,30 +29,14 @@ export function middleware(request: NextRequest) {
         new URL(`https://dashboard.spacevoice.ai${pathname}`, request.url)
       );
     }
-    // Serve landing page - add debug headers
-    const response = NextResponse.next();
-    response.headers.set("x-debug-hostname", rawHostname);
-    response.headers.set("x-debug-matched", "main-domain");
-    return response;
   }
 
   // Dashboard subdomain - redirect root to /dashboard
-  if (hostname === "dashboard.spacevoice.ai") {
-    if (pathname === "/") {
-      return NextResponse.redirect(new URL("/dashboard", request.url));
-    }
-    // Continue to dashboard pages - add debug headers
-    const response = NextResponse.next();
-    response.headers.set("x-debug-hostname", rawHostname);
-    response.headers.set("x-debug-matched", "dashboard-subdomain");
-    return response;
+  if (hostname === "dashboard.spacevoice.ai" && pathname === "/") {
+    return NextResponse.redirect(new URL("/dashboard", request.url));
   }
 
-  // Unknown domain (localhost, preview URLs, etc.) - add debug headers
-  const response = NextResponse.next();
-  response.headers.set("x-debug-hostname", rawHostname);
-  response.headers.set("x-debug-matched", "no-match-fallthrough");
-  return response;
+  return NextResponse.next();
 }
 
 export const config = {
