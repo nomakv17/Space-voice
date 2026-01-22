@@ -124,8 +124,8 @@ export function AppSidebar() {
   const effectiveSidebarOpen = hasHydrated ? sidebarOpen : true;
 
   // Only show user info when authenticated - never show placeholders
-  const displayName = user?.username || user?.email?.split("@")[0] || "";
-  const displayEmail = user?.email || "";
+  const displayName = user?.username ?? user?.email?.split("@")[0] ?? "";
+  const displayEmail = user?.email ?? "";
   const initials = displayName ? displayName.slice(0, 2).toUpperCase() : "?";
 
   const isActive = (href: string) => {
