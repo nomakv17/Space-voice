@@ -1,7 +1,8 @@
-"""Admin API routes for managing clients."""
+"""Admin API routes for managing clients and pricing."""
 
 import secrets
 import string
+from decimal import Decimal
 
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -12,6 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.auth import get_password_hash
 from app.core.auth import CurrentUser
 from app.db.session import get_db
+from app.models.pricing_config import PricingConfig
 from app.models.user import User
 
 router = APIRouter(prefix="/api/v1/admin", tags=["admin"])
@@ -209,3 +211,373 @@ async def delete_client(
 
     log.info("client_deleted")
     return {"message": "Client deleted successfully"}
+
+
+# =============================================================================
+# Pricing Pydantic Models
+# =============================================================================
+
+
+class PricingConfigResponse(BaseModel):
+    """Pricing configuration response."""
+
+    id: int
+    tier_id: str
+    tier_name: str
+    description: str | None = None
+
+    # Base costs (what SpaceVoice pays)
+    base_llm_cost_per_minute: float
+    base_stt_cost_per_minute: float
+    base_tts_cost_per_minute: float
+    base_telephony_cost_per_minute: float
+    total_base_cost_per_minute: float
+
+    # Markups
+    ai_markup_percentage: float
+    telephony_markup_percentage: float
+
+    # Final prices (what clients pay)
+    final_ai_price_per_minute: float
+    final_telephony_price_per_minute: float
+    final_total_price_per_minute: float
+
+    # Computed profit metrics
+    profit_per_minute: float
+    profit_margin_percentage: float
+
+    updated_at: str
+
+    model_config = {"from_attributes": True}
+
+    @classmethod
+    def from_model(cls, config: PricingConfig) -> "PricingConfigResponse":
+        """Create response from PricingConfig model."""
+        return cls(
+            id=config.id,
+            tier_id=config.tier_id,
+            tier_name=config.tier_name,
+            description=config.description,
+            base_llm_cost_per_minute=float(config.base_llm_cost_per_minute),
+            base_stt_cost_per_minute=float(config.base_stt_cost_per_minute),
+            base_tts_cost_per_minute=float(config.base_tts_cost_per_minute),
+            base_telephony_cost_per_minute=float(config.base_telephony_cost_per_minute),
+            total_base_cost_per_minute=float(config.total_base_cost_per_minute),
+            ai_markup_percentage=float(config.ai_markup_percentage),
+            telephony_markup_percentage=float(config.telephony_markup_percentage),
+            final_ai_price_per_minute=float(config.final_ai_price_per_minute),
+            final_telephony_price_per_minute=float(config.final_telephony_price_per_minute),
+            final_total_price_per_minute=float(config.final_total_price_per_minute),
+            profit_per_minute=float(config.profit_per_minute),
+            profit_margin_percentage=float(config.profit_margin_percentage),
+            updated_at=config.updated_at.isoformat() if config.updated_at else "",
+        )
+
+
+class PricingConfigCreate(BaseModel):
+    """Request to create a pricing configuration."""
+
+    tier_id: str = Field(..., min_length=1, max_length=50)
+    tier_name: str = Field(..., min_length=1, max_length=100)
+    description: str | None = None
+
+    base_llm_cost_per_minute: float = Field(..., ge=0)
+    base_stt_cost_per_minute: float = Field(..., ge=0)
+    base_tts_cost_per_minute: float = Field(..., ge=0)
+    base_telephony_cost_per_minute: float = Field(..., ge=0)
+
+    ai_markup_percentage: float = Field(default=30.0, ge=0, le=500)
+    telephony_markup_percentage: float = Field(default=20.0, ge=0, le=500)
+
+
+class PricingConfigUpdate(BaseModel):
+    """Request to update pricing configuration (mainly markups)."""
+
+    tier_name: str | None = Field(None, min_length=1, max_length=100)
+    description: str | None = None
+
+    base_llm_cost_per_minute: float | None = Field(None, ge=0)
+    base_stt_cost_per_minute: float | None = Field(None, ge=0)
+    base_tts_cost_per_minute: float | None = Field(None, ge=0)
+    base_telephony_cost_per_minute: float | None = Field(None, ge=0)
+
+    ai_markup_percentage: float | None = Field(None, ge=0, le=500)
+    telephony_markup_percentage: float | None = Field(None, ge=0, le=500)
+
+
+# =============================================================================
+# Pricing Admin Endpoints
+# =============================================================================
+
+
+@router.get("/pricing", response_model=list[PricingConfigResponse])
+async def list_pricing_configs(
+    current_user: CurrentUser,
+    db: AsyncSession = Depends(get_db),
+) -> list[PricingConfigResponse]:
+    """List all pricing configurations."""
+    require_admin(current_user)
+
+    result = await db.execute(select(PricingConfig).order_by(PricingConfig.tier_id))
+    configs = result.scalars().all()
+
+    return [PricingConfigResponse.from_model(config) for config in configs]
+
+
+@router.post("/pricing", response_model=PricingConfigResponse)
+async def create_pricing_config(
+    body: PricingConfigCreate,
+    current_user: CurrentUser,
+    db: AsyncSession = Depends(get_db),
+) -> PricingConfigResponse:
+    """Create a new pricing configuration."""
+    require_admin(current_user)
+
+    log = logger.bind(admin_id=current_user.id, tier_id=body.tier_id)
+    log.info("creating_pricing_config")
+
+    # Check if tier_id already exists
+    result = await db.execute(
+        select(PricingConfig).where(PricingConfig.tier_id == body.tier_id)
+    )
+    if result.scalar_one_or_none():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Pricing config for tier '{body.tier_id}' already exists",
+        )
+
+    # Create the config
+    config = PricingConfig(
+        tier_id=body.tier_id,
+        tier_name=body.tier_name,
+        description=body.description,
+        base_llm_cost_per_minute=Decimal(str(body.base_llm_cost_per_minute)),
+        base_stt_cost_per_minute=Decimal(str(body.base_stt_cost_per_minute)),
+        base_tts_cost_per_minute=Decimal(str(body.base_tts_cost_per_minute)),
+        base_telephony_cost_per_minute=Decimal(str(body.base_telephony_cost_per_minute)),
+        ai_markup_percentage=Decimal(str(body.ai_markup_percentage)),
+        telephony_markup_percentage=Decimal(str(body.telephony_markup_percentage)),
+        # These will be recalculated
+        final_ai_price_per_minute=Decimal("0"),
+        final_telephony_price_per_minute=Decimal("0"),
+        final_total_price_per_minute=Decimal("0"),
+    )
+    config.recalculate_prices()
+
+    db.add(config)
+    await db.commit()
+    await db.refresh(config)
+
+    log.info("pricing_config_created", config_id=config.id)
+    return PricingConfigResponse.from_model(config)
+
+
+@router.get("/pricing/{tier_id}", response_model=PricingConfigResponse)
+async def get_pricing_config(
+    tier_id: str,
+    current_user: CurrentUser,
+    db: AsyncSession = Depends(get_db),
+) -> PricingConfigResponse:
+    """Get a specific pricing configuration by tier ID."""
+    require_admin(current_user)
+
+    result = await db.execute(
+        select(PricingConfig).where(PricingConfig.tier_id == tier_id)
+    )
+    config = result.scalar_one_or_none()
+
+    if not config:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Pricing config for tier '{tier_id}' not found",
+        )
+
+    return PricingConfigResponse.from_model(config)
+
+
+@router.put("/pricing/{tier_id}", response_model=PricingConfigResponse)
+async def update_pricing_config(
+    tier_id: str,
+    body: PricingConfigUpdate,
+    current_user: CurrentUser,
+    db: AsyncSession = Depends(get_db),
+) -> PricingConfigResponse:
+    """Update a pricing configuration (base costs and/or markups)."""
+    require_admin(current_user)
+
+    log = logger.bind(admin_id=current_user.id, tier_id=tier_id)
+    log.info("updating_pricing_config")
+
+    result = await db.execute(
+        select(PricingConfig).where(PricingConfig.tier_id == tier_id)
+    )
+    config = result.scalar_one_or_none()
+
+    if not config:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Pricing config for tier '{tier_id}' not found",
+        )
+
+    # Update fields if provided
+    if body.tier_name is not None:
+        config.tier_name = body.tier_name
+    if body.description is not None:
+        config.description = body.description
+    if body.base_llm_cost_per_minute is not None:
+        config.base_llm_cost_per_minute = Decimal(str(body.base_llm_cost_per_minute))
+    if body.base_stt_cost_per_minute is not None:
+        config.base_stt_cost_per_minute = Decimal(str(body.base_stt_cost_per_minute))
+    if body.base_tts_cost_per_minute is not None:
+        config.base_tts_cost_per_minute = Decimal(str(body.base_tts_cost_per_minute))
+    if body.base_telephony_cost_per_minute is not None:
+        config.base_telephony_cost_per_minute = Decimal(str(body.base_telephony_cost_per_minute))
+    if body.ai_markup_percentage is not None:
+        config.ai_markup_percentage = Decimal(str(body.ai_markup_percentage))
+    if body.telephony_markup_percentage is not None:
+        config.telephony_markup_percentage = Decimal(str(body.telephony_markup_percentage))
+
+    # Recalculate final prices
+    config.recalculate_prices()
+
+    await db.commit()
+    await db.refresh(config)
+
+    log.info("pricing_config_updated", config_id=config.id)
+    return PricingConfigResponse.from_model(config)
+
+
+@router.delete("/pricing/{tier_id}")
+async def delete_pricing_config(
+    tier_id: str,
+    current_user: CurrentUser,
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, str]:
+    """Delete a pricing configuration."""
+    require_admin(current_user)
+
+    log = logger.bind(admin_id=current_user.id, tier_id=tier_id)
+
+    result = await db.execute(
+        select(PricingConfig).where(PricingConfig.tier_id == tier_id)
+    )
+    config = result.scalar_one_or_none()
+
+    if not config:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Pricing config for tier '{tier_id}' not found",
+        )
+
+    await db.delete(config)
+    await db.commit()
+
+    log.info("pricing_config_deleted")
+    return {"message": f"Pricing config for tier '{tier_id}' deleted successfully"}
+
+
+@router.post("/pricing/seed-defaults")
+async def seed_default_pricing_configs(
+    current_user: CurrentUser,
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, str]:
+    """Seed default pricing configurations for all tiers.
+
+    This creates pricing configs with estimated base costs and default markups.
+    Costs are approximate based on provider pricing as of 2025.
+    """
+    require_admin(current_user)
+
+    log = logger.bind(admin_id=current_user.id)
+    log.info("seeding_default_pricing_configs")
+
+    # Default tier configurations - base costs + markups to achieve target prices
+    # Target prices: Premium=$0.10, Premium Mini=$0.07, Balanced=$0.07, Budget=$0.05
+    default_configs = [
+        {
+            "tier_id": "premium",
+            "tier_name": "Premium",
+            "description": "Best quality with OpenAI's latest gpt-realtime model",
+            # Base costs (what we pay providers)
+            "base_llm_cost_per_minute": Decimal("0.024"),  # OpenAI Realtime
+            "base_stt_cost_per_minute": Decimal("0.003"),  # Built into realtime
+            "base_tts_cost_per_minute": Decimal("0.003"),  # Built into realtime
+            "base_telephony_cost_per_minute": Decimal("0.008"),  # Telnyx
+            # Markups: 200% AI = 3x, 25% telephony = 1.25x → Final: $0.10/min
+            "ai_markup_percentage": Decimal("200.00"),
+            "telephony_markup_percentage": Decimal("25.00"),
+        },
+        {
+            "tier_id": "premium-mini",
+            "tier_name": "Premium Mini",
+            "description": "OpenAI Realtime at a fraction of the cost",
+            "base_llm_cost_per_minute": Decimal("0.011"),  # GPT-4o-mini realtime
+            "base_stt_cost_per_minute": Decimal("0.002"),
+            "base_tts_cost_per_minute": Decimal("0.002"),
+            "base_telephony_cost_per_minute": Decimal("0.008"),
+            # Markups: 300% AI = 4x → Final: $0.07/min
+            "ai_markup_percentage": Decimal("300.00"),
+            "telephony_markup_percentage": Decimal("25.00"),
+        },
+        {
+            "tier_id": "balanced",
+            "tier_name": "Balanced",
+            "description": "Best performance-to-cost ratio with multimodal capabilities",
+            "base_llm_cost_per_minute": Decimal("0.014"),  # Gemini
+            "base_stt_cost_per_minute": Decimal("0.003"),
+            "base_tts_cost_per_minute": Decimal("0.003"),
+            "base_telephony_cost_per_minute": Decimal("0.008"),
+            # Markups: 200% AI = 3x → Final: $0.07/min
+            "ai_markup_percentage": Decimal("200.00"),
+            "telephony_markup_percentage": Decimal("25.00"),
+        },
+        {
+            "tier_id": "budget",
+            "tier_name": "Budget",
+            "description": "Maximum cost savings - perfect for high-volume operations",
+            "base_llm_cost_per_minute": Decimal("0.007"),  # Cerebras/Llama
+            "base_stt_cost_per_minute": Decimal("0.003"),  # Deepgram
+            "base_tts_cost_per_minute": Decimal("0.003"),  # ElevenLabs
+            "base_telephony_cost_per_minute": Decimal("0.008"),
+            # Markups: 200% AI = 3x → Final: $0.05/min
+            "ai_markup_percentage": Decimal("200.00"),
+            "telephony_markup_percentage": Decimal("25.00"),
+        },
+    ]
+
+    created_count = 0
+    skipped_count = 0
+
+    for config_data in default_configs:
+        # Check if already exists
+        result = await db.execute(
+            select(PricingConfig).where(PricingConfig.tier_id == config_data["tier_id"])
+        )
+        if result.scalar_one_or_none():
+            skipped_count += 1
+            continue
+
+        config = PricingConfig(
+            tier_id=config_data["tier_id"],
+            tier_name=config_data["tier_name"],
+            description=config_data["description"],
+            base_llm_cost_per_minute=config_data["base_llm_cost_per_minute"],
+            base_stt_cost_per_minute=config_data["base_stt_cost_per_minute"],
+            base_tts_cost_per_minute=config_data["base_tts_cost_per_minute"],
+            base_telephony_cost_per_minute=config_data["base_telephony_cost_per_minute"],
+            ai_markup_percentage=config_data["ai_markup_percentage"],
+            telephony_markup_percentage=config_data["telephony_markup_percentage"],
+            final_ai_price_per_minute=Decimal("0"),
+            final_telephony_price_per_minute=Decimal("0"),
+            final_total_price_per_minute=Decimal("0"),
+        )
+        config.recalculate_prices()
+        db.add(config)
+        created_count += 1
+
+    await db.commit()
+
+    log.info("pricing_configs_seeded", created=created_count, skipped=skipped_count)
+    return {
+        "message": f"Seeded {created_count} pricing configs, skipped {skipped_count} existing"
+    }

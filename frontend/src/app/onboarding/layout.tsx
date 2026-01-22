@@ -13,6 +13,8 @@ interface OnboardingStatus {
   phone_number: string | null;
   has_workspace: boolean;
   has_telephony: boolean;
+  use_platform_ai: boolean;
+  has_ai_config: boolean;
 }
 
 export default function OnboardingLayout({ children }: { children: React.ReactNode }) {

@@ -32,6 +32,9 @@ class User(Base, TimestampMixin):
     industry: Mapped[str | None] = mapped_column(String(100), nullable=True)
     phone_number: Mapped[str | None] = mapped_column(String(50), nullable=True)
 
+    # AI Configuration
+    use_platform_ai: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+
     # Relationships
     workspaces: Mapped[list["Workspace"]] = relationship(
         "Workspace", back_populates="user", cascade="all, delete-orphan"

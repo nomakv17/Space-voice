@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.auth import CurrentUser
 from app.db.session import get_db
+from app.models.user_settings import UserSettings
 from app.models.workspace import Workspace
 
 router = APIRouter(prefix="/api/v1/onboarding", tags=["onboarding"])
@@ -31,6 +32,8 @@ class OnboardingStatusResponse(BaseModel):
     phone_number: str | None = None
     has_workspace: bool = False
     has_telephony: bool = False
+    use_platform_ai: bool = True
+    has_ai_config: bool = False
 
 
 class ProfileUpdateRequest(BaseModel):
@@ -93,8 +96,28 @@ async def get_onboarding_status(
     has_workspace = result.scalar_one_or_none() is not None
 
     # Check if user has telephony configured (via user_settings)
-    # For now, we'll assume no telephony until they configure it
-    has_telephony = False  # Will be updated when we add telephony config storage
+    settings_result = await db.execute(
+        select(UserSettings).where(
+            UserSettings.user_id == current_user.id,
+            UserSettings.workspace_id.is_(None),  # User-level settings
+        ).limit(1)
+    )
+    user_settings = settings_result.scalar_one_or_none()
+
+    # Determine if telephony is configured (has Telnyx or Twilio credentials)
+    has_telephony = False
+    has_ai_config = False
+    if user_settings:
+        has_telephony = bool(
+            user_settings.telnyx_api_key or user_settings.twilio_account_sid
+        )
+        has_ai_config = bool(
+            user_settings.openai_api_key or user_settings.deepgram_api_key
+        )
+
+    # If using platform AI, AI config is always considered "set up"
+    if current_user.use_platform_ai:
+        has_ai_config = True
 
     return OnboardingStatusResponse(
         onboarding_completed=current_user.onboarding_completed,
@@ -105,6 +128,8 @@ async def get_onboarding_status(
         phone_number=current_user.phone_number,
         has_workspace=has_workspace,
         has_telephony=has_telephony,
+        use_platform_ai=current_user.use_platform_ai,
+        has_ai_config=has_ai_config,
     )
 
 
@@ -190,8 +215,27 @@ async def configure_ai(
     log = logger.bind(user_id=current_user.id, use_platform=request.use_platform_ai)
     log.info("configuring_ai")
 
-    # TODO: Store AI API keys securely if user brings their own
-    # For now, we just advance the onboarding step
+    # Save the AI configuration choice
+    current_user.use_platform_ai = request.use_platform_ai
+
+    # If bringing own keys, store them in UserSettings
+    if not request.use_platform_ai and (request.openai_api_key or request.anthropic_api_key):
+        # Get or create user settings
+        settings_result = await db.execute(
+            select(UserSettings).where(
+                UserSettings.user_id == current_user.id,
+                UserSettings.workspace_id.is_(None),
+            ).limit(1)
+        )
+        user_settings = settings_result.scalar_one_or_none()
+
+        if not user_settings:
+            user_settings = UserSettings(user_id=current_user.id)
+            db.add(user_settings)
+
+        if request.openai_api_key:
+            user_settings.openai_api_key = request.openai_api_key
+        # Note: anthropic_api_key would need to be added to UserSettings model if needed
 
     # Advance to step 4 if on step 3
     if current_user.onboarding_step == 3:
@@ -200,7 +244,7 @@ async def configure_ai(
     await db.commit()
     await db.refresh(current_user)
 
-    log.info("ai_configured", step=current_user.onboarding_step)
+    log.info("ai_configured", step=current_user.onboarding_step, use_platform=request.use_platform_ai)
 
     return await get_onboarding_status(current_user, db)
 

@@ -2,7 +2,7 @@
 
 import { useRef } from "react";
 import { useRouter } from "next/navigation";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
@@ -16,14 +16,34 @@ import {
   Phone,
   ArrowRight,
   Sparkles,
+  SkipForward,
 } from "lucide-react";
 import { toast } from "sonner";
+
+interface OnboardingStatus {
+  onboarding_completed: boolean;
+  onboarding_step: number;
+  company_name: string | null;
+  has_workspace: boolean;
+  has_telephony: boolean;
+  use_platform_ai: boolean;
+  has_ai_config: boolean;
+}
 
 export default function OnboardingCompletePage() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const { refetchUser } = useAuth();
   const isNavigatingRef = useRef(false);
+
+  // Fetch the actual onboarding status to show what was configured
+  const { data: status } = useQuery<OnboardingStatus>({
+    queryKey: ["onboarding-status"],
+    queryFn: async () => {
+      const response = await api.get("/api/v1/onboarding/status");
+      return response.data;
+    },
+  });
 
   const completeOnboarding = useMutation({
     mutationFn: async () => {
@@ -90,26 +110,63 @@ export default function OnboardingCompletePage() {
       </CardHeader>
 
       <CardContent className="space-y-6">
-        {/* Completion Summary */}
+        {/* Completion Summary - Dynamic based on actual configuration */}
         <div className="space-y-3 rounded-xl border border-white/10 bg-white/[0.02] p-4">
           <h3 className="font-medium">What&apos;s been set up:</h3>
           <div className="space-y-2">
+            {/* Profile is always set up if user reached this page */}
             <div className="flex items-center gap-3 text-sm">
               <CheckCircle className="h-4 w-4 text-emerald-500" />
               <span>Your profile is configured</span>
             </div>
-            <div className="flex items-center gap-3 text-sm">
-              <CheckCircle className="h-4 w-4 text-emerald-500" />
-              <span>Telephony provider connected</span>
-            </div>
-            <div className="flex items-center gap-3 text-sm">
-              <CheckCircle className="h-4 w-4 text-emerald-500" />
-              <span>AI configuration set up</span>
-            </div>
-            <div className="flex items-center gap-3 text-sm">
-              <CheckCircle className="h-4 w-4 text-emerald-500" />
-              <span>Your workspace is ready</span>
-            </div>
+
+            {/* Telephony status - show different message based on platform AI choice */}
+            {status?.use_platform_ai ? (
+              <div className="flex items-center gap-3 text-sm">
+                <CheckCircle className="h-4 w-4 text-emerald-500" />
+                <span>Using SpaceVoice AI (telephony included)</span>
+              </div>
+            ) : status?.has_telephony ? (
+              <div className="flex items-center gap-3 text-sm">
+                <CheckCircle className="h-4 w-4 text-emerald-500" />
+                <span>Telephony provider connected</span>
+              </div>
+            ) : (
+              <div className="flex items-center gap-3 text-sm text-muted-foreground">
+                <SkipForward className="h-4 w-4" />
+                <span>Telephony setup skipped (configure in settings)</span>
+              </div>
+            )}
+
+            {/* AI configuration status */}
+            {status?.has_ai_config ? (
+              <div className="flex items-center gap-3 text-sm">
+                <CheckCircle className="h-4 w-4 text-emerald-500" />
+                <span>
+                  {status?.use_platform_ai
+                    ? "AI powered by SpaceVoice"
+                    : "AI configuration set up"}
+                </span>
+              </div>
+            ) : (
+              <div className="flex items-center gap-3 text-sm text-muted-foreground">
+                <SkipForward className="h-4 w-4" />
+                <span>AI setup skipped (configure in settings)</span>
+              </div>
+            )}
+
+            {/* Workspace status */}
+            {status?.has_workspace ? (
+              <div className="flex items-center gap-3 text-sm">
+                <CheckCircle className="h-4 w-4 text-emerald-500" />
+                <span>Your workspace is ready</span>
+              </div>
+            ) : (
+              <div className="flex items-center gap-3 text-sm text-muted-foreground">
+                <SkipForward className="h-4 w-4" />
+                <span>Workspace creation skipped (create in dashboard)</span>
+              </div>
+            )}
           </div>
         </div>
 
