@@ -12,10 +12,11 @@ import type { NextRequest } from "next/server";
  * landing page and the authenticated dashboard on different domains.
  */
 export function middleware(request: NextRequest) {
-  const hostname = request.headers.get("host") ?? "";
+  const rawHostname = request.headers.get("host") ?? "";
+  const hostname = rawHostname.split(":")[0].toLowerCase().trim(); // Normalize: remove port, lowercase
   const pathname = request.nextUrl.pathname;
 
-  // Main domain (spacevoice.ai) - redirect dashboard routes to subdomain
+  // Main domain (spacevoice.ai) - serve landing page, redirect dashboard routes
   if (hostname === "spacevoice.ai" || hostname === "www.spacevoice.ai") {
     if (pathname.startsWith("/dashboard")) {
       return NextResponse.redirect(
@@ -28,14 +29,30 @@ export function middleware(request: NextRequest) {
         new URL(`https://dashboard.spacevoice.ai${pathname}`, request.url)
       );
     }
+    // Serve landing page - add debug headers
+    const response = NextResponse.next();
+    response.headers.set("x-debug-hostname", rawHostname);
+    response.headers.set("x-debug-matched", "main-domain");
+    return response;
   }
 
   // Dashboard subdomain - redirect root to /dashboard
-  if (hostname === "dashboard.spacevoice.ai" && pathname === "/") {
-    return NextResponse.redirect(new URL("/dashboard", request.url));
+  if (hostname === "dashboard.spacevoice.ai") {
+    if (pathname === "/") {
+      return NextResponse.redirect(new URL("/dashboard", request.url));
+    }
+    // Continue to dashboard pages - add debug headers
+    const response = NextResponse.next();
+    response.headers.set("x-debug-hostname", rawHostname);
+    response.headers.set("x-debug-matched", "dashboard-subdomain");
+    return response;
   }
 
-  return NextResponse.next();
+  // Unknown domain (localhost, preview URLs, etc.) - add debug headers
+  const response = NextResponse.next();
+  response.headers.set("x-debug-hostname", rawHostname);
+  response.headers.set("x-debug-matched", "no-match-fallthrough");
+  return response;
 }
 
 export const config = {
