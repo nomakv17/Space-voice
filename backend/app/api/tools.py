@@ -10,7 +10,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.integrations import get_workspace_integrations
-from app.core.auth import CurrentUser, user_id_to_uuid
+from app.core.auth import CurrentUser
 from app.db.session import get_db
 from app.models.workspace import AgentWorkspace
 from app.services.tools.registry import ToolRegistry
@@ -75,8 +75,7 @@ async def execute_tool(
         # Get integration credentials for the workspace
         integrations: dict[str, dict[str, Any]] = {}
         if workspace_id:
-            user_uuid = user_id_to_uuid(user_id)
-            integrations = await get_workspace_integrations(user_uuid, workspace_id, db)
+            integrations = await get_workspace_integrations(user_id, workspace_id, db)
 
         # Create tool registry and execute tool
         tool_registry = ToolRegistry(

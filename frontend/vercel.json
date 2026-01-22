@@ -5,6 +5,32 @@
   "installCommand": "npm install",
   "devCommand": "npm run dev",
   "regions": ["iad1"],
+  "redirects": [
+    {
+      "source": "/dashboard/:path*",
+      "destination": "https://dashboard.spacevoice.ai/dashboard/:path*",
+      "has": [{ "type": "host", "value": "spacevoice.ai" }],
+      "permanent": false
+    },
+    {
+      "source": "/dashboard/:path*",
+      "destination": "https://dashboard.spacevoice.ai/dashboard/:path*",
+      "has": [{ "type": "host", "value": "www.spacevoice.ai" }],
+      "permanent": false
+    },
+    {
+      "source": "/login",
+      "destination": "https://dashboard.spacevoice.ai/login",
+      "has": [{ "type": "host", "value": "spacevoice.ai" }],
+      "permanent": false
+    },
+    {
+      "source": "/login",
+      "destination": "https://dashboard.spacevoice.ai/login",
+      "has": [{ "type": "host", "value": "www.spacevoice.ai" }],
+      "permanent": false
+    }
+  ],
   "headers": [
     {
       "source": "/(.*)",

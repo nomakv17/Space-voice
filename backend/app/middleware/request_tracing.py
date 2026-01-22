@@ -42,11 +42,14 @@ class RequestTracingMiddleware(BaseHTTPMiddleware):
             client_ip=self._get_client_ip(request),
         )
 
-        # Log request start
-        logger.info(
-            "request_started",
-            query_params=dict(request.query_params) if request.query_params else None,
-        )
+        # Log request start (handle BrokenPipeError when stdout is unavailable)
+        try:
+            logger.info(
+                "request_started",
+                query_params=dict(request.query_params) if request.query_params else None,
+            )
+        except BrokenPipeError:
+            pass  # Ignore logging errors when stdout is broken
 
         try:
             response: Response = await call_next(request)
@@ -54,12 +57,15 @@ class RequestTracingMiddleware(BaseHTTPMiddleware):
             # Calculate duration
             duration_ms = (time.perf_counter() - start_time) * 1000
 
-            # Log request completion
-            logger.info(
-                "request_completed",
-                status_code=response.status_code,
-                duration_ms=round(duration_ms, 2),
-            )
+            # Log request completion (handle BrokenPipeError)
+            try:
+                logger.info(
+                    "request_completed",
+                    status_code=response.status_code,
+                    duration_ms=round(duration_ms, 2),
+                )
+            except BrokenPipeError:
+                pass
 
             # Add correlation ID to response headers
             response.headers["X-Correlation-ID"] = correlation_id
@@ -71,12 +77,15 @@ class RequestTracingMiddleware(BaseHTTPMiddleware):
             # Calculate duration even on error
             duration_ms = (time.perf_counter() - start_time) * 1000
 
-            logger.exception(
-                "request_failed",
-                error=str(e),
-                error_type=type(e).__name__,
-                duration_ms=round(duration_ms, 2),
-            )
+            try:
+                logger.exception(
+                    "request_failed",
+                    error=str(e),
+                    error_type=type(e).__name__,
+                    duration_ms=round(duration_ms, 2),
+                )
+            except BrokenPipeError:
+                pass
             raise
 
     def _get_client_ip(self, request: Request) -> str:

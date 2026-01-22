@@ -20,7 +20,6 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.integrations import get_workspace_integrations
-from app.core.auth import user_id_to_uuid
 from app.core.config import settings
 from app.db.session import get_db
 from app.models.agent import Agent
@@ -213,8 +212,7 @@ async def retell_llm_websocket(
         log = log.bind(workspace_id=str(workspace_id) if workspace_id else None)
 
         # Load integrations for tools
-        # Convert int user_id to UUID using the same function used when storing integrations
-        user_id_uuid = user_id_to_uuid(agent.user_id)
+        # agent.user_id is an integer (matches User.id type)
         integrations: dict[str, dict[str, Any]] = {}
 
         # Load user-level integrations (workspace_id is NULL)
@@ -225,7 +223,7 @@ async def retell_llm_websocket(
         user_integrations_result = await db.execute(
             select(UserIntegration).where(
                 and_(
-                    UserIntegration.user_id == user_id_uuid,
+                    UserIntegration.user_id == agent.user_id,
                     UserIntegration.workspace_id.is_(None),
                     UserIntegration.is_active.is_(True),
                 )
@@ -238,7 +236,7 @@ async def retell_llm_websocket(
         # Load workspace-level integrations (if workspace exists)
         if workspace_id:
             workspace_integrations = await get_workspace_integrations(
-                user_id_uuid, workspace_id, db
+                agent.user_id, workspace_id, db
             )
             integrations.update(workspace_integrations)
 

@@ -59,9 +59,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     const isAuthPage = pathname === "/login";
+    const isLandingPage = pathname === "/";
     const isPublicPage = pathname.startsWith("/embed");
 
-    if (!token && !isAuthPage && !isPublicPage) {
+    if (!token && !isAuthPage && !isLandingPage && !isPublicPage) {
       // No token and not on login/public page → go to login
       hasNavigatedRef.current = true;
       lastNavigationRef.current = now;

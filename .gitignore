@@ -72,3 +72,5 @@ frontend/.env.local
 # OS
 .DS_Store
 Thumbs.db
+.env.vercel
+frontend/.env.vercel

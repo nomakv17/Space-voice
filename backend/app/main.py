@@ -29,6 +29,7 @@ from app.api import (
     campaigns,
     compliance,
     crm,
+    demo,
     embed,
     health,
     integration_api,
@@ -247,6 +248,7 @@ app.include_router(
 app.include_router(oauth.router)  # OAuth flows for Google Calendar, Calendly, etc.
 app.include_router(embed.router)  # Public embed API (unauthenticated)
 app.include_router(embed.ws_router)  # Public embed WebSocket
+app.include_router(demo.router)  # Public demo call API (landing page)
 
 
 @app.get("/")

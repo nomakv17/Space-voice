@@ -4,9 +4,12 @@ import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 
+const PRELOADER_SHOWN_KEY = "spacevoice_preloader_shown";
+
 export function Preloader() {
   const pathname = usePathname();
-  const [isVisible, setIsVisible] = useState(true);
+  // Start hidden to avoid flash, will show if needed after checking sessionStorage
+  const [isVisible, setIsVisible] = useState(false);
 
   // Skip preloader for embed routes
   const isEmbedRoute = pathname?.startsWith("/embed");
@@ -14,9 +17,18 @@ export function Preloader() {
   useEffect(() => {
     // Don't show preloader for embed routes
     if (isEmbedRoute) {
-      setIsVisible(false);
       return;
     }
+
+    // Check if preloader was already shown this session
+    const alreadyShown = sessionStorage.getItem(PRELOADER_SHOWN_KEY);
+    if (alreadyShown) {
+      return;
+    }
+
+    // Mark as shown and display preloader
+    sessionStorage.setItem(PRELOADER_SHOWN_KEY, "true");
+    setIsVisible(true);
 
     // Show preloader for minimum time then fade out
     const timer = setTimeout(() => {

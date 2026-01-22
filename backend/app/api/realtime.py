@@ -17,7 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.integrations import get_workspace_integrations
 from app.api.settings import get_user_api_keys
-from app.core.auth import CurrentUser, user_id_to_uuid
+from app.core.auth import CurrentUser
 from app.core.config import settings
 from app.db.session import get_db
 from app.models.agent import Agent
@@ -31,7 +31,7 @@ logger = structlog.get_logger()
 
 
 async def get_openai_api_key_for_workspace(
-    user_uuid: uuid.UUID,
+    user_id: int,
     workspace_uuid: uuid.UUID | None,
     db: AsyncSession,
     log: structlog.BoundLogger,
@@ -39,7 +39,7 @@ async def get_openai_api_key_for_workspace(
     """Get OpenAI API key for a workspace - strictly isolated, no fallback.
 
     Args:
-        user_uuid: User UUID
+        user_id: User ID (int - matches User.id type)
         workspace_uuid: Workspace UUID (required for workspace-scoped operations)
         db: Database session
         log: Logger instance
@@ -50,7 +50,7 @@ async def get_openai_api_key_for_workspace(
     Raises:
         HTTPException: If no API key is configured for the workspace
     """
-    user_settings = await get_user_api_keys(user_uuid, db, workspace_id=workspace_uuid)
+    user_settings = await get_user_api_keys(user_id, db, workspace_id=workspace_uuid)
     if user_settings and user_settings.openai_api_key:
         if workspace_uuid:
             log.info("using_workspace_openai_key", workspace_id=str(workspace_uuid))
@@ -396,7 +396,6 @@ async def create_webrtc_session(
         SDP answer from OpenAI
     """
     user_id = current_user.id
-    user_uuid = user_id_to_uuid(user_id)
     session_logger = logger.bind(
         endpoint="webrtc_session",
         agent_id=agent_id,
@@ -436,12 +435,12 @@ async def create_webrtc_session(
         tools_count=len(agent.enabled_tools),
     )
 
-    # Get OpenAI API key (user_uuid for UserSettings lookup)
+    # Get OpenAI API key (user_id int for UserSettings lookup)
     workspace_uuid = uuid.UUID(workspace_id)
-    api_key = await get_openai_api_key_for_workspace(user_uuid, workspace_uuid, db, session_logger)
+    api_key = await get_openai_api_key_for_workspace(user_id, workspace_uuid, db, session_logger)
 
     # Get integration credentials for the workspace
-    integrations = await get_workspace_integrations(user_uuid, workspace_uuid, db)
+    integrations = await get_workspace_integrations(user_id, workspace_uuid, db)
 
     # Build tool definitions (user_id int for Contact queries, workspace_uuid for scoping)
     tool_registry = ToolRegistry(
@@ -544,7 +543,6 @@ async def get_ephemeral_token(
         Ephemeral token response with client_secret value and session config
     """
     user_id = current_user.id
-    user_uuid = user_id_to_uuid(user_id)
     token_logger = logger.bind(
         endpoint="ephemeral_token",
         agent_id=agent_id,
@@ -571,9 +569,9 @@ async def get_ephemeral_token(
     # Determine which model to use based on tier
     realtime_model = get_realtime_model_for_tier(agent.pricing_tier)
 
-    # Get OpenAI API key (user_uuid for UserSettings lookup)
+    # Get OpenAI API key (user_id int for UserSettings lookup)
     workspace_uuid = uuid.UUID(workspace_id) if workspace_id else None
-    api_key = await get_openai_api_key_for_workspace(user_uuid, workspace_uuid, db, token_logger)
+    api_key = await get_openai_api_key_for_workspace(user_id, workspace_uuid, db, token_logger)
 
     # Build minimal session configuration for ephemeral token request
     # The SDK will configure instructions, voice, tools etc. after connection via data channel
@@ -620,7 +618,7 @@ async def get_ephemeral_token(
             # Get integration credentials for the workspace
             integrations: dict[str, dict[str, Any]] = {}
             if workspace_uuid:
-                integrations = await get_workspace_integrations(user_uuid, workspace_uuid, db)
+                integrations = await get_workspace_integrations(user_id, workspace_uuid, db)
 
             # Build tool definitions for the agent
             tool_registry = ToolRegistry(
@@ -725,9 +723,8 @@ async def save_transcript(
         raise HTTPException(status_code=404, detail=f"Agent {agent_id} not found")
 
     # Verify user owns this agent or is admin
-    user_uuid = user_id_to_uuid(user_id)
     is_admin = current_user.is_superuser
-    if agent.user_id != user_uuid and not is_admin:
+    if agent.user_id != user_id and not is_admin:
         raise HTTPException(status_code=403, detail="Not authorized to access this agent")
 
     # Skip if transcript is empty
@@ -747,7 +744,7 @@ async def save_transcript(
     started_at = ended_at - timedelta(seconds=request.duration_seconds)
 
     call_record = CallRecord(
-        user_id=user_uuid,
+        user_id=user_id,
         workspace_id=agent_workspace_id,
         agent_id=uuid.UUID(agent_id),
         provider="test",

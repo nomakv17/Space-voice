@@ -12,7 +12,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.integrations import get_workspace_integrations
 from app.api.settings import get_user_api_keys
-from app.core.auth import user_id_to_uuid
 from app.services.tools.registry import ToolRegistry
 
 logger = structlog.get_logger()
@@ -144,8 +143,7 @@ class GPTRealtimeSession:
             workspace_id: Workspace UUID (required for API key isolation)
         """
         self.db = db
-        self.user_id = user_id  # int for ToolRegistry (Contact queries)
-        self.user_id_uuid = user_id_to_uuid(user_id)  # UUID for UserSettings queries
+        self.user_id = user_id  # int - matches User.id type (used for all queries)
         self.workspace_id = workspace_id  # For workspace-isolated API key lookup
         self.agent_config = agent_config
         self.session_id = session_id or str(uuid.uuid4())
@@ -169,10 +167,10 @@ class GPTRealtimeSession:
         """Initialize the Realtime session with internal tools."""
         self.logger.info("gpt_realtime_session_initializing")
 
-        # Get user's API keys from settings (uses UUID)
+        # Get user's API keys from settings
         # Workspace isolation: only use workspace-specific API keys, no fallback
         user_settings = await get_user_api_keys(
-            self.user_id_uuid, self.db, workspace_id=self.workspace_id
+            self.user_id, self.db, workspace_id=self.workspace_id
         )
 
         # Strictly use workspace API key - no fallback to global key for billing isolation
@@ -191,7 +189,7 @@ class GPTRealtimeSession:
         integrations: dict[str, Any] = {}
         if self.workspace_id:
             integrations = await get_workspace_integrations(
-                self.user_id_uuid, self.workspace_id, self.db
+                self.user_id, self.workspace_id, self.db
             )
 
         # Initialize tool registry with enabled tools and workspace context

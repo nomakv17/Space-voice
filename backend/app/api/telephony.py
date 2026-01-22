@@ -21,7 +21,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.api.settings import get_user_api_keys
-from app.core.auth import CurrentUser, user_id_to_uuid
+from app.core.auth import CurrentUser
 from app.core.config import settings
 from app.core.limiter import limiter
 from app.core.webhook_security import verify_telnyx_webhook, verify_twilio_webhook
@@ -111,8 +111,7 @@ async def get_twilio_service(
         db: Database session
         workspace_id: Workspace UUID (required for workspace-specific API keys)
     """
-    user_uuid = user_id_to_uuid(user_id)
-    user_settings = await get_user_api_keys(user_uuid, db, workspace_id=workspace_id)
+    user_settings = await get_user_api_keys(user_id, db, workspace_id=workspace_id)
 
     if (
         not user_settings
@@ -137,8 +136,7 @@ async def get_telnyx_service(
         db: Database session
         workspace_id: Workspace UUID (required for workspace-specific API keys)
     """
-    user_uuid = user_id_to_uuid(user_id)
-    user_settings = await get_user_api_keys(user_uuid, db, workspace_id=workspace_id)
+    user_settings = await get_user_api_keys(user_id, db, workspace_id=workspace_id)
 
     if not user_settings or not user_settings.telnyx_api_key:
         return None

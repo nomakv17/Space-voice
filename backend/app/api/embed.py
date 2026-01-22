@@ -485,7 +485,6 @@ async def get_embed_ephemeral_token(
     import httpx
 
     from app.api.settings import get_user_api_keys
-    from app.core.auth import user_id_to_uuid
     from app.models.workspace import AgentWorkspace
     from app.services.gpt_realtime import build_instructions_with_language
 
@@ -526,10 +525,9 @@ async def get_embed_ephemeral_token(
         log.warning("no_workspace_for_agent")
         raise HTTPException(status_code=500, detail="Agent not configured properly")
 
-    # Get OpenAI API key - agent.user_id is now directly the integer user ID
-    user_uuid = user_id_to_uuid(agent.user_id)
+    # Get OpenAI API key - agent.user_id is the integer user ID
     user_settings = await get_user_api_keys(
-        user_uuid, db, workspace_id=agent_workspace.workspace_id
+        agent.user_id, db, workspace_id=agent_workspace.workspace_id
     )
 
     # Strictly use workspace API key - no fallback to global key for billing isolation
@@ -612,7 +610,7 @@ async def get_embed_ephemeral_token(
             # Get integration credentials for the workspace
             workspace_id = agent_workspace.workspace_id
             integrations = await get_workspace_integrations(
-                user_id_to_uuid(agent.user_id), workspace_id, db
+                agent.user_id, workspace_id, db
             )
 
             tool_registry = ToolRegistry(
@@ -683,7 +681,6 @@ async def execute_embed_tool_call(
     - Origin validation against allowed domains
     - Only tools enabled for the agent are executed
     """
-    from app.core.auth import user_id_to_uuid
 
     log = logger.bind(
         endpoint="embed_tool_call",
@@ -723,7 +720,7 @@ async def execute_embed_tool_call(
     integrations: dict[str, dict[str, Any]] = {}
     if workspace_id:
         integrations = await get_workspace_integrations(
-            user_id_to_uuid(agent.user_id), workspace_id, db
+            agent.user_id, workspace_id, db
         )
 
     # Create tool registry with workspace context

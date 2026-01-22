@@ -28,7 +28,7 @@ export default function RootLayout({
   );
 
   return (
-    <html lang="en" className="dark" suppressHydrationWarning>
+    <html lang="en" suppressHydrationWarning>
       <head>
         <title>SpaceVoice</title>
         <meta name="description" content="SpaceVoice - AI-powered HVAC voice agent platform" />

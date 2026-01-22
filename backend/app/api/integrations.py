@@ -451,15 +451,15 @@ async def get_integration_credentials(
 
 
 async def get_workspace_integrations(
-    user_id: uuid.UUID,
+    user_id: int,
     workspace_id: uuid.UUID,
     db: AsyncSession,
 ) -> dict[str, dict[str, Any]]:
     """Get all active integration credentials for a workspace.
 
     Args:
-        user_id: User ID
-        workspace_id: Workspace ID
+        user_id: User ID (int - matches User.id type)
+        workspace_id: Workspace ID (UUID)
         db: Database session
 
     Returns:

@@ -123,9 +123,10 @@ export function AppSidebar() {
   // Use default width until hydrated to prevent layout shift
   const effectiveSidebarOpen = hasHydrated ? sidebarOpen : true;
 
-  const displayName = user?.username ?? "User";
-  const displayEmail = user?.email ?? "user@example.com";
-  const initials = displayName.slice(0, 2).toUpperCase();
+  // Only show user info when authenticated - never show placeholders
+  const displayName = user?.username || user?.email?.split("@")[0] || "";
+  const displayEmail = user?.email || "";
+  const initials = displayName ? displayName.slice(0, 2).toUpperCase() : "?";
 
   const isActive = (href: string) => {
     if (href === "/dashboard") {

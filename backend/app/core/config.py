@@ -134,6 +134,10 @@ class Settings(BaseSettings):
     TWILIO_ACCOUNT_SID: str | None = None
     TWILIO_AUTH_TOKEN: str | None = None
 
+    # Demo Call Configuration
+    DEMO_AGENT_ID: str | None = None  # UUID of the demo agent for landing page calls
+    DEMO_FROM_NUMBER: str | None = None  # Phone number to use for demo outbound calls (E.164 format)
+
     # External Service Timeouts (seconds)
     # These are critical for preventing hung connections during voice calls
     OPENAI_TIMEOUT: float = 30.0  # LLM inference can be slow

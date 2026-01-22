@@ -183,7 +183,7 @@ async def update_settings(
 
 
 async def get_user_api_keys(
-    user_id: uuid.UUID,
+    user_id: int,
     db: AsyncSession,
     workspace_id: uuid.UUID | None = None,
 ) -> UserSettings | None:
@@ -194,7 +194,7 @@ async def get_user_api_keys(
     not shared with workspaces.
 
     Args:
-        user_id: User ID (UUID)
+        user_id: User ID (int - matches User.id type)
         db: Database session
         workspace_id: Optional workspace ID for workspace-specific settings
 
