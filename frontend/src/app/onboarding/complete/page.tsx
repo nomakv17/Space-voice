@@ -42,18 +42,30 @@ export default function OnboardingCompletePage() {
   });
 
   // Complete onboarding and navigate - called when user clicks any navigation button
-  const handleNavigate = (destination: string) => {
+  // IMPORTANT: Must wait for mutation + refetchUser to complete before navigating
+  // Otherwise user arrives at dashboard with onboarding_completed: false → redirect loop
+  const handleNavigate = async (destination: string) => {
     // Prevent double navigation
     if (isNavigatingRef.current) return;
     isNavigatingRef.current = true;
 
-    // Fire the complete API call (let it complete in background)
-    if (!completeOnboarding.isSuccess && !completeOnboarding.isPending) {
-      completeOnboarding.mutate();
-    }
+    try {
+      // Wait for onboarding to complete in backend
+      if (!completeOnboarding.isSuccess && !completeOnboarding.isPending) {
+        await completeOnboarding.mutateAsync();
+      }
 
-    // Navigate immediately so user sees instant feedback
-    router.push(destination);
+      // Wait for user data to refresh (ensures onboarding_completed: true in auth context)
+      await refetchUser();
+
+      // NOW navigate - auth context is updated, no redirect loop
+      router.push(destination);
+    } catch (error) {
+      // On error, still try to navigate - user can retry from dashboard
+      console.error("Failed to complete onboarding:", error);
+      isNavigatingRef.current = false;
+      router.push(destination);
+    }
   };
 
   return (
@@ -106,8 +118,9 @@ export default function OnboardingCompletePage() {
           <h3 className="font-medium">Get started:</h3>
           <div className="grid gap-3">
             <button
-              onClick={() => handleNavigate("/dashboard/agents")}
-              className="flex items-center gap-4 rounded-xl border border-white/10 bg-white/[0.02] p-4 text-left transition-all hover:border-violet-500/50 hover:bg-violet-500/5"
+              onClick={() => void handleNavigate("/dashboard/agents")}
+              disabled={completeOnboarding.isPending}
+              className="flex items-center gap-4 rounded-xl border border-white/10 bg-white/[0.02] p-4 text-left transition-all hover:border-violet-500/50 hover:bg-violet-500/5 disabled:cursor-not-allowed disabled:opacity-50"
             >
               <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-violet-500/20">
                 <Bot className="h-5 w-5 text-violet-400" />
@@ -127,8 +140,9 @@ export default function OnboardingCompletePage() {
             </button>
 
             <button
-              onClick={() => handleNavigate("/dashboard/crm")}
-              className="flex items-center gap-4 rounded-xl border border-white/10 bg-white/[0.02] p-4 text-left transition-all hover:border-blue-500/50 hover:bg-blue-500/5"
+              onClick={() => void handleNavigate("/dashboard/crm")}
+              disabled={completeOnboarding.isPending}
+              className="flex items-center gap-4 rounded-xl border border-white/10 bg-white/[0.02] p-4 text-left transition-all hover:border-blue-500/50 hover:bg-blue-500/5 disabled:cursor-not-allowed disabled:opacity-50"
             >
               <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-blue-500/20">
                 <Users className="h-5 w-5 text-blue-400" />
@@ -143,8 +157,9 @@ export default function OnboardingCompletePage() {
             </button>
 
             <button
-              onClick={() => handleNavigate("/dashboard/calls")}
-              className="flex items-center gap-4 rounded-xl border border-white/10 bg-white/[0.02] p-4 text-left transition-all hover:border-emerald-500/50 hover:bg-emerald-500/5"
+              onClick={() => void handleNavigate("/dashboard/calls")}
+              disabled={completeOnboarding.isPending}
+              className="flex items-center gap-4 rounded-xl border border-white/10 bg-white/[0.02] p-4 text-left transition-all hover:border-emerald-500/50 hover:bg-emerald-500/5 disabled:cursor-not-allowed disabled:opacity-50"
             >
               <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-emerald-500/20">
                 <Phone className="h-5 w-5 text-emerald-400" />
@@ -176,7 +191,7 @@ export default function OnboardingCompletePage() {
 
         {/* Go to Dashboard Button */}
         <Button
-          onClick={() => handleNavigate("/dashboard")}
+          onClick={() => void handleNavigate("/dashboard")}
           size="lg"
           disabled={completeOnboarding.isPending}
           className="w-full gap-2 bg-gradient-to-r from-violet-600 to-blue-600 text-white hover:from-violet-700 hover:to-blue-700"
