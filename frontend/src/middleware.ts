@@ -13,7 +13,7 @@ import type { NextRequest } from "next/server";
  */
 export function middleware(request: NextRequest) {
   const rawHostname = request.headers.get("host") ?? "";
-  const hostname = rawHostname.split(":")[0].toLowerCase().trim(); // Normalize: remove port, lowercase
+  const hostname = (rawHostname.split(":")[0] ?? "").toLowerCase().trim(); // Normalize: remove port, lowercase
   const pathname = request.nextUrl.pathname;
 
   // Main domain (spacevoice.ai) - serve landing page, redirect dashboard routes
