@@ -103,7 +103,8 @@ async def verify_retell_signature(request: Request) -> None:
     """
     import os
 
-    from retell import Retell
+    # Import verify function from Retell SDK's webhook_auth module
+    from retell.lib.webhook_auth import verify as retell_verify
 
     # Allow bypassing signature verification for debugging
     if os.environ.get("RETELL_SKIP_SIGNATURE", "").lower() == "true":
@@ -130,14 +131,14 @@ async def verify_retell_signature(request: Request) -> None:
     body_str = body.decode("utf-8")
 
     # Log signature info for debugging
-    print("[WEBHOOK] Verifying signature using Retell SDK", flush=True)
+    print("[WEBHOOK] Verifying signature using Retell SDK verify()", flush=True)
     print(f"[WEBHOOK] Body length: {len(body_str)} chars", flush=True)
     print(f"[WEBHOOK] Signature: {signature[:50]}...", flush=True)
 
-    # Use Retell SDK's built-in verify method
+    # Use Retell SDK's built-in verify function
     # This handles all the HMAC computation correctly
     try:
-        is_valid = Retell.verify(  # type: ignore[has-type]
+        is_valid = retell_verify(  # type: ignore[no-untyped-call]
             body_str,
             settings.RETELL_API_KEY,
             signature,
