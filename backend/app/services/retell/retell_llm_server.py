@@ -628,6 +628,14 @@ CRITICAL: When customer says a day name (Monday, Tuesday, etc.), use the EXACT d
                     error_msg = event.get("error", "unknown error")
                     print(f"[LLM ERROR] Generation error: {error_msg}", flush=True)
                     print(f"[LLM ERROR] Full event: {event}", flush=True)
+                    # AGGRESSIVE STDERR LOGGING - Railway buffers stdout
+                    import sys
+
+                    sys.stderr.write(f"[LLM ERROR] Generation error: {error_msg}\n")
+                    sys.stderr.write(f"[LLM ERROR] Full event: {event}\n")
+                    sys.stderr.write(f"[LLM ERROR] Transcript len: {len(transcript)}\n")
+                    sys.stderr.write(f"[LLM ERROR] Tools count: {len(self.openai_tools)}\n")
+                    sys.stderr.flush()
                     self.logger.error("llm_generation_error", error=error_msg, full_event=event)
                     await self._send_response(
                         response_id=response_id,

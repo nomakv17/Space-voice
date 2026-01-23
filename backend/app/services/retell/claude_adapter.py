@@ -83,6 +83,7 @@ class ClaudeAdapter:
             tool_count=len(claude_tools) if claude_tools else 0,
         )
 
+        import json
         import sys
 
         print(
@@ -100,6 +101,30 @@ class ClaudeAdapter:
                 f"[CLAUDE] Last message: role={messages[-1].get('role')}, content_preview={str(messages[-1].get('content', ''))[:100]}",
                 flush=True,
             )
+
+        # CRITICAL: Log converted tools to debug 297ms instant rejection
+        if claude_tools:
+            sys.stderr.write(f"[CLAUDE TOOLS] Sending {len(claude_tools)} tools:\n")
+            for i, tool in enumerate(claude_tools):
+                tool_name = tool.get("name", "unknown")
+                has_description = bool(tool.get("description"))
+                input_schema = tool.get("input_schema")
+                schema_valid = (
+                    isinstance(input_schema, dict) and input_schema.get("type") == "object"
+                )
+                sys.stderr.write(
+                    f"  Tool {i}: {tool_name}, desc={has_description}, schema_valid={schema_valid}\n"
+                )
+                if not schema_valid:
+                    sys.stderr.write(f"  INVALID SCHEMA: {json.dumps(input_schema)}\n")
+            sys.stderr.flush()
+
+        # Log full messages for debugging
+        sys.stderr.write("[CLAUDE MESSAGES] Full messages list:\n")
+        for i, msg in enumerate(messages):
+            sys.stderr.write(f"  Msg {i}: role={msg.get('role')}, content_len={len(str(msg.get('content', '')))}\n")
+        sys.stderr.flush()
+
         sys.stdout.flush()
         sys.stderr.flush()
 
@@ -201,13 +226,48 @@ class ClaudeAdapter:
                         yield {"type": "message_end"}
 
         except Exception as e:
-            print(f"[CLAUDE ERROR] Generation failed: {type(e).__name__}: {e}", flush=True)
-            sys.stdout.flush()
+            # AGGRESSIVE ERROR LOGGING - Railway buffers stdout, so use stderr
+            error_msg = f"[CLAUDE ERROR] Generation failed: {type(e).__name__}: {e}"
+            print(error_msg, flush=True)
+            sys.stderr.write(f"{error_msg}\n")
             sys.stderr.flush()
+
+            # Log full exception details
             import traceback
 
-            traceback.print_exc()
+            tb_str = traceback.format_exc()
+            sys.stderr.write(f"[CLAUDE TRACEBACK]\n{tb_str}\n")
             sys.stderr.flush()
+
+            # Check for Anthropic-specific error details
+            if hasattr(e, "response"):
+                try:
+                    resp = e.response
+                    sys.stderr.write(f"[CLAUDE API RESPONSE] Status: {resp.status_code}\n")
+                    sys.stderr.write(f"[CLAUDE API RESPONSE] Body: {resp.text}\n")
+                    sys.stderr.flush()
+                except Exception:
+                    pass
+
+            if hasattr(e, "body"):
+                sys.stderr.write(f"[CLAUDE API BODY] {e.body}\n")
+                sys.stderr.flush()
+
+            if hasattr(e, "message"):
+                sys.stderr.write(f"[CLAUDE API MESSAGE] {e.message}\n")
+                sys.stderr.flush()
+
+            # Log what we tried to send (truncated for readability)
+            sys.stderr.write(f"[CLAUDE REQUEST] Messages count: {len(messages)}\n")
+            sys.stderr.write(f"[CLAUDE REQUEST] Tools count: {len(claude_tools) if claude_tools else 0}\n")
+            sys.stderr.write(f"[CLAUDE REQUEST] System prompt len: {len(system_prompt)}\n")
+            if messages:
+                sys.stderr.write(f"[CLAUDE REQUEST] First msg role: {messages[0].get('role')}\n")
+                sys.stderr.write(
+                    f"[CLAUDE REQUEST] Last msg: {str(messages[-1])[:200]}\n"
+                )
+            sys.stderr.flush()
+
             self.logger.exception("claude_generation_error", error=str(e))
             yield {
                 "type": "error",
@@ -399,10 +459,34 @@ class ClaudeAdapter:
                     self.logger.warning("claude_stream_no_events")
 
         except Exception as e:
-            print(f"[CLAUDE ERROR] Tool continuation failed: {type(e).__name__}: {e}", flush=True)
+            # AGGRESSIVE ERROR LOGGING for tool continuation
+            import sys
+
+            error_msg = f"[CLAUDE ERROR] Tool continuation failed: {type(e).__name__}: {e}"
+            print(error_msg, flush=True)
+            sys.stderr.write(f"{error_msg}\n")
+            sys.stderr.flush()
+
             import traceback
 
-            traceback.print_exc()
+            tb_str = traceback.format_exc()
+            sys.stderr.write(f"[CLAUDE TRACEBACK]\n{tb_str}\n")
+            sys.stderr.flush()
+
+            # Check for Anthropic-specific error details
+            if hasattr(e, "response"):
+                try:
+                    resp = e.response
+                    sys.stderr.write(f"[CLAUDE API RESPONSE] Status: {resp.status_code}\n")
+                    sys.stderr.write(f"[CLAUDE API RESPONSE] Body: {resp.text}\n")
+                    sys.stderr.flush()
+                except Exception:
+                    pass
+
+            if hasattr(e, "body"):
+                sys.stderr.write(f"[CLAUDE API BODY] {e.body}\n")
+                sys.stderr.flush()
+
             self.logger.exception("claude_continuation_error", error=str(e))
             yield {
                 "type": "error",
