@@ -419,6 +419,7 @@ class RetellLLMServer:
         Args:
             data: Call details including call_id, metadata, etc.
         """
+        print("[CALL DETAILS] Processing call details...", flush=True)
         call = data.get("call", {})
         self.call_id = call.get("call_id")
         self.caller_phone = call.get("from_number")  # Store caller's phone number
@@ -486,6 +487,7 @@ CRITICAL: When customer says a day name (Monday, Tuesday, etc.), use the EXACT d
 
         Uses the agent's configured initial_greeting if set, otherwise a default.
         """
+        print("[GREETING] Sending initial greeting...", flush=True)
         self.logger.info("sending_initial_greeting")
 
         # Use custom greeting from agent config (initial_greeting field)
@@ -494,11 +496,14 @@ CRITICAL: When customer says a day name (Monday, Tuesday, etc.), use the EXACT d
             # Default greeting if none configured
             greeting = "Hello, thanks for calling! How can I help you today?"
 
+        print(f"[GREETING] Greeting text: {greeting[:50]}...", flush=True)
+
         await self._send_response(
             response_id=0,
             content=greeting,
             content_complete=True,
         )
+        print("[GREETING] Greeting sent successfully!", flush=True)
         self.logger.info("initial_greeting_sent", greeting_length=len(greeting))
 
     async def _handle_response_required(self, data: dict[str, Any]) -> None:
