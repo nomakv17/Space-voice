@@ -140,12 +140,19 @@ async def verify_retell_signature(request: Request) -> None:
     timestamp_str = match.group(1)
     received_digest = match.group(2)
 
-    # Validate timestamp is within 5 minutes (300 seconds)
+    # Validate timestamp is within 30 minutes (1800 seconds)
+    # Using longer window to handle clock skew between Railway and Retell
     try:
         timestamp = int(timestamp_str)
         current_time = int(time.time())
         time_diff = abs(current_time - timestamp)
-        max_time_diff = 300  # 5 minutes
+        max_time_diff = 1800  # 30 minutes (tolerant of clock skew)
+
+        # Log time info for debugging clock skew
+        print(
+            f"[WEBHOOK] Signature timestamp={timestamp}, server_time={current_time}, diff={time_diff}s",
+            flush=True,
+        )
 
         if time_diff > max_time_diff:
             logger.warning(
