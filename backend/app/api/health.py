@@ -1,6 +1,7 @@
 """Health check endpoints."""
 
 import logging
+from typing import Any
 
 from fastapi import APIRouter, Depends, Response, status
 from sqlalchemy import text
@@ -110,3 +111,97 @@ async def test_llm(response: Response) -> dict[str, str]:
         logger.exception("LLM test failed")
         response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
         return {"status": "error", "error": f"{type(e).__name__}: {e!s}"}
+
+
+@router.get("/test-voice-claude")
+async def test_voice_claude(response: Response) -> dict[str, Any]:
+    """Test Claude with EXACT voice call parameters.
+
+    Simulates what happens when a user speaks during a voice call.
+    Returns detailed error info if Claude rejects the request.
+    """
+    from anthropic import AsyncAnthropic
+
+    result: dict[str, Any] = {"test": "voice_claude_simulation"}
+
+    if not settings.ANTHROPIC_API_KEY:
+        response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
+        return {"status": "error", "error": "ANTHROPIC_API_KEY not set"}
+
+    # Simulate EXACT voice call scenario
+    system_prompt = """You are a professional voice AI assistant currently on a phone call.
+
+CRITICAL VOICE RULES:
+1. Keep responses SHORT - 1-2 sentences maximum per turn
+2. Speak naturally as if on a phone call - no lists, bullets, or markdown
+3. Never say "I cannot" or "I'm unable" - find helpful alternatives
+
+CONTEXT:
+- Current time: Friday, January 23, 2026 at 10:05 AM (CST)
+- Language: en-US
+
+YOUR INSTRUCTIONS:
+You are Sarah, a friendly receptionist for Jobber HVAC. Help customers with HVAC issues."""
+
+    # Exact message format from voice call
+    messages = [
+        {"role": "user", "content": "[Call connected]"},
+        {
+            "role": "assistant",
+            "content": "Hello, thank you for calling Jobber HVAC. My name is Sarah. How can I help you today?",
+        },
+        {"role": "user", "content": "My cooling system isn't working."},
+    ]
+
+    # Include tools to match real scenario (empty list like in logs)
+    tools: list[dict[str, Any]] = []
+
+    try:
+        client = AsyncAnthropic(api_key=settings.ANTHROPIC_API_KEY)
+
+        result["system_prompt_len"] = len(system_prompt)
+        result["message_count"] = len(messages)
+        result["tool_count"] = len(tools)
+
+        # Call Claude with streaming (like voice does)
+        collected_text = ""
+        async with client.messages.stream(
+            model="claude-sonnet-4-20250514",
+            max_tokens=1024,
+            system=system_prompt,
+            messages=messages,  # type: ignore[arg-type]
+            tools=tools if tools else None,  # type: ignore[arg-type]
+            temperature=0.7,
+        ) as stream:
+            async for event in stream:
+                if event.type == "content_block_delta":
+                    if hasattr(event.delta, "text"):
+                        collected_text += event.delta.text
+
+        result["status"] = "ok"
+        result["response"] = collected_text
+        return result
+
+    except Exception as e:
+        # Capture FULL error details
+        error_info: dict[str, Any] = {
+            "status": "error",
+            "error_type": type(e).__name__,
+            "error_message": str(e),
+        }
+
+        # Extract Anthropic-specific error details
+        if hasattr(e, "status_code"):
+            error_info["status_code"] = e.status_code
+        if hasattr(e, "body"):
+            error_info["api_body"] = e.body
+        if hasattr(e, "response"):
+            try:
+                resp = e.response
+                error_info["response_status"] = resp.status_code
+                error_info["response_text"] = resp.text[:500]
+            except Exception:
+                pass
+
+        response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
+        return error_info
