@@ -83,6 +83,8 @@ class ClaudeAdapter:
             tool_count=len(claude_tools) if claude_tools else 0,
         )
 
+        print(f"[CLAUDE] Starting API call with {len(messages)} messages, {len(claude_tools) if claude_tools else 0} tools", flush=True)
+
         try:
             # Stream response from Claude
             # Note: type ignores are needed because we dynamically construct messages/tools

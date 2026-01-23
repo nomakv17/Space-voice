@@ -530,7 +530,12 @@ CRITICAL: When customer says a day name (Monday, Tuesday, etc.), use the EXACT d
             transcript_turns=len(transcript),
         )
 
-        # Stream response from Claude
+        # Log user's message for debugging
+        if transcript:
+            last_utterance = transcript[-1] if transcript else {}
+            print(f"[LLM] User said: {last_utterance.get('content', '')[:100]}", flush=True)
+
+        # Stream response from Claude/OpenAI
         accumulated_content = ""
         pending_tool_calls: list[dict[str, Any]] = []
 
@@ -556,6 +561,8 @@ CRITICAL: When customer says a day name (Monday, Tuesday, etc.), use the EXACT d
                     last_activity_time[0] = asyncio.get_event_loop().time()
 
         keepalive_task = asyncio.create_task(send_keepalives())
+
+        print("[LLM] Starting response generation...", flush=True)
 
         try:
             async for event in self.llm.generate_response(
@@ -586,7 +593,8 @@ CRITICAL: When customer says a day name (Monday, Tuesday, etc.), use the EXACT d
                 elif event_type == "error":
                     error_msg = event.get("error", "unknown error")
                     print(f"[LLM ERROR] Generation error: {error_msg}", flush=True)
-                    self.logger.error("claude_error", error=error_msg)
+                    print(f"[LLM ERROR] Full event: {event}", flush=True)
+                    self.logger.error("llm_generation_error", error=error_msg, full_event=event)
                     await self._send_response(
                         response_id=response_id,
                         content="I apologize, I'm having trouble processing that. Could you repeat?",
