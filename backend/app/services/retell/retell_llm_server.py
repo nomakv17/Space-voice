@@ -1486,13 +1486,19 @@ CRITICAL: When customer says a day name (Monday, Tuesday, etc.), use the EXACT d
         Raises:
             Exception: Re-raised to signal connection is dead
         """
+        import sys
+
         # Don't send if shutdown is in progress (connection already closed)
         if self._shutdown.is_set():
             self.logger.debug("skipping_send_shutdown", data_type=data.get("response_type"))
             return
 
         try:
-            await self.websocket.send_text(json.dumps(data))
+            json_str = json.dumps(data)
+            # Log what we're sending to Retell
+            print(f"[WS RAW] >>> {json_str[:300]}", flush=True)
+            sys.stdout.flush()
+            await self.websocket.send_text(json_str)
             # Update activity time to prevent redundant keepalives
             self._last_activity_time = asyncio.get_event_loop().time()
         except Exception as e:
