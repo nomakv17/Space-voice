@@ -89,6 +89,17 @@ class ClaudeAdapter:
             f"[CLAUDE] Starting API call with {len(messages)} messages, {len(claude_tools) if claude_tools else 0} tools",
             flush=True,
         )
+        # Diagnostic info for debugging
+        print(f"[CLAUDE] System prompt length: {len(system_prompt)} chars", flush=True)
+        if messages:
+            print(
+                f"[CLAUDE] First message: role={messages[0].get('role')}, content_len={len(str(messages[0].get('content', '')))}",
+                flush=True,
+            )
+            print(
+                f"[CLAUDE] Last message: role={messages[-1].get('role')}, content_preview={str(messages[-1].get('content', ''))[:100]}",
+                flush=True,
+            )
         sys.stdout.flush()
         sys.stderr.flush()
 

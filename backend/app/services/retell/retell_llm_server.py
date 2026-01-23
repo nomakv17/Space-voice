@@ -286,12 +286,20 @@ class RetellLLMServer:
         CRITICAL: This method NEVER blocks on tool execution.
         Tools are spawned as background tasks so ping_pong always gets answered.
         """
+        import sys
+
         from starlette.websockets import WebSocketDisconnect
 
         try:
             async for message in self.websocket.iter_text():
                 if self._shutdown.is_set():
                     break
+
+                # LOG RAW MESSAGE - Critical for debugging
+                # Show first 300 chars to catch response_required
+                print(f"[WS RAW] <<< {message[:300]}", flush=True)
+                sys.stdout.flush()
+                sys.stderr.flush()
 
                 # Update activity time on every received message
                 self._last_activity_time = asyncio.get_event_loop().time()
@@ -300,6 +308,7 @@ class RetellLLMServer:
                     data = json.loads(message)
                     interaction_type = data.get("interaction_type", "unknown")
                     print(f"[LLM SERVER] Received: {interaction_type}", flush=True)
+                    sys.stdout.flush()
                     await self._handle_message(data)
                 except json.JSONDecodeError as e:
                     self.logger.warning("invalid_json", error=str(e))
