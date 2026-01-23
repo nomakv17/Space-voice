@@ -96,7 +96,7 @@ async def verify_retell_signature(request: Request) -> None:
 
     Retell signs webhooks using HMAC-SHA256 with a specific format:
     - Signature format: "v={timestamp},d={hmac_digest}"
-    - HMAC is computed over: body + timestamp (concatenated)
+    - HMAC is computed over: timestamp + "." + body (with dot separator)
     - Timestamp must be within 5 minutes of current time
 
     Reference: https://github.com/RetellAI/retell-python-sdk/blob/main/src/retell/lib/webhook_auth.py
@@ -107,6 +107,13 @@ async def verify_retell_signature(request: Request) -> None:
     Raises:
         HTTPException: If signature verification fails
     """
+    import os
+
+    # Allow bypassing signature verification for debugging
+    if os.environ.get("RETELL_SKIP_SIGNATURE", "").lower() == "true":
+        logger.warning("retell_webhook_signature_bypassed_for_debugging")
+        return
+
     # Require API key configuration - fail secure
     if not settings.RETELL_API_KEY:
         logger.error("retell_api_key_not_configured")
@@ -175,8 +182,10 @@ async def verify_retell_signature(request: Request) -> None:
             detail="Invalid webhook timestamp",
         ) from None
 
-    # Compute expected HMAC: HMAC-SHA256(api_key, body + timestamp)
-    message = body + timestamp_str.encode("utf-8")
+    # Compute expected HMAC: HMAC-SHA256(api_key, timestamp + "." + body)
+    # CRITICAL: Retell SDK uses timestamp.body format with a DOT separator
+    # Reference: https://github.com/RetellAI/retell-python-sdk
+    message = timestamp_str.encode("utf-8") + b"." + body
     hmac_obj = hmac.new(
         settings.RETELL_API_KEY.encode("utf-8"),
         message,
