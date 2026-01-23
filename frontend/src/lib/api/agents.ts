@@ -68,6 +68,10 @@ export interface Agent {
   temperature: number;
   max_tokens: number;
   initial_greeting: string | null;
+  // Retell response timing settings
+  responsiveness: number; // 0-1, higher = faster responses
+  interruption_sensitivity: number; // 0-1, higher = easier to interrupt
+  enable_backchannel: boolean; // Enable "uh-huh" responses
   is_active: boolean;
   is_published: boolean;
   total_calls: number;
@@ -92,6 +96,10 @@ export interface CreateAgentRequest {
   initial_greeting?: string;
   temperature?: number;
   max_tokens?: number;
+  // Retell response timing settings
+  responsiveness?: number; // 0-1, higher = faster responses (default: 0.9)
+  interruption_sensitivity?: number; // 0-1, higher = easier to interrupt (default: 0.8)
+  enable_backchannel?: boolean; // Enable "uh-huh" responses (default: true)
 }
 
 /**
@@ -157,6 +165,10 @@ export interface UpdateAgentRequest {
   temperature?: number;
   max_tokens?: number;
   initial_greeting?: string | null;
+  // Retell response timing settings
+  responsiveness?: number; // 0-1, higher = faster responses
+  interruption_sensitivity?: number; // 0-1, higher = easier to interrupt
+  enable_backchannel?: boolean; // Enable "uh-huh" responses
 }
 
 /**
@@ -191,6 +203,28 @@ export async function deleteAgent(agentId: string): Promise<void> {
     const error = await response.json().catch(() => ({ detail: response.statusText }));
     throw new Error(error.detail ?? "Failed to delete agent");
   }
+}
+
+/**
+ * Publish/sync an agent to Retell AI with optimized voice settings
+ * This creates or updates the Retell agent with responsiveness settings
+ */
+export async function publishAgentToRetell(
+  agentId: string
+): Promise<{ status: string; retell_agent_id: string; settings: Record<string, unknown> }> {
+  const response = await fetchWithTimeout(`${API_BASE}/api/v1/retell/publish/${agentId}`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ detail: response.statusText }));
+    throw new Error(error.detail ?? "Failed to publish agent to Retell");
+  }
+
+  return response.json();
 }
 
 // Embed Settings Types

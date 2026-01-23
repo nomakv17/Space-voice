@@ -184,6 +184,11 @@ const agentFormSchema = z.object({
   turnDetectionMode: z.enum(["server-vad", "pushToTalk"]).default("server-vad"),
   isActive: z.boolean().default(true),
 
+  // Retell Response Timing (for natural conversation flow)
+  responsiveness: z.number().min(0).max(1).default(0.9), // Higher = faster responses
+  interruptionSensitivity: z.number().min(0).max(1).default(0.8), // Higher = easier to interrupt
+  enableBackchannel: z.boolean().default(true), // Enable "uh-huh" responses
+
   // Tools & Integrations
   enabledTools: z.array(z.string()).default([]),
   enabledToolIds: z.record(z.string(), z.array(z.string())).default({}),
@@ -217,6 +222,9 @@ const TAB_FIELDS: Record<string, (keyof AgentFormValues)[]> = {
     "telephonyProvider",
     "phoneNumberId",
     "enableRecording",
+    "responsiveness",
+    "interruptionSensitivity",
+    "enableBackchannel",
     "enableTranscript",
     "turnDetectionMode",
     "widgetButtonText",
@@ -346,6 +354,10 @@ export default function EditAgentPage({ params }: EditAgentPageProps) {
       enabledToolIds: {},
       selectedWorkspaces: [],
       widgetButtonText: "Talk to us",
+      // Retell response timing defaults (optimized for conversation)
+      responsiveness: 0.9,
+      interruptionSensitivity: 0.8,
+      enableBackchannel: true,
     },
   });
 
@@ -383,6 +395,10 @@ export default function EditAgentPage({ params }: EditAgentPageProps) {
         enabledTools: agent.enabled_tools ?? [],
         enabledToolIds: agent.enabled_tool_ids ?? {},
         selectedWorkspaces: [],
+        // Retell response timing
+        responsiveness: agent.responsiveness ?? 0.9,
+        interruptionSensitivity: agent.interruption_sensitivity ?? 0.8,
+        enableBackchannel: agent.enable_backchannel ?? true,
       });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -587,6 +603,10 @@ export default function EditAgentPage({ params }: EditAgentPageProps) {
       is_active: data.isActive,
       temperature: data.temperature,
       max_tokens: data.maxTokens,
+      // Retell response timing settings
+      responsiveness: data.responsiveness,
+      interruption_sensitivity: data.interruptionSensitivity,
+      enable_backchannel: data.enableBackchannel,
     };
 
     // Update agent, workspaces, and embed settings
@@ -1745,6 +1765,100 @@ export default function EditAgentPage({ params }: EditAgentPageProps) {
                           How the agent detects when the user has finished speaking
                         </FormDescription>
                         <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm font-medium flex items-center gap-2">
+                    Response Timing
+                    <InfoTooltip content="Configure how quickly the AI responds and handles interruptions. Higher responsiveness = faster responses (2-3 seconds vs 5+ seconds). These settings are synced to Retell when you save." />
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <FormField
+                    control={form.control}
+                    name="responsiveness"
+                    render={({ field }) => (
+                      <FormItem>
+                        <div className="flex items-center justify-between">
+                          <FormLabel className="flex items-center gap-1.5">
+                            Responsiveness
+                            <InfoTooltip content="How quickly the AI responds after the user stops speaking. Higher values = faster responses, more natural conversation. Lower values = more thoughtful pauses." />
+                          </FormLabel>
+                          <span className="text-sm font-medium tabular-nums">
+                            {(field.value ?? 0.9).toFixed(1)}
+                          </span>
+                        </div>
+                        <FormControl>
+                          <Slider
+                            min={0}
+                            max={1}
+                            step={0.1}
+                            value={[field.value ?? 0.9]}
+                            onValueChange={([value]) => field.onChange(value)}
+                            className="py-2"
+                          />
+                        </FormControl>
+                        <div className="flex justify-between text-xs text-muted-foreground">
+                          <span>Slower (more pauses)</span>
+                          <span>Faster (conversational)</span>
+                        </div>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="interruptionSensitivity"
+                    render={({ field }) => (
+                      <FormItem>
+                        <div className="flex items-center justify-between">
+                          <FormLabel className="flex items-center gap-1.5">
+                            Interruption Sensitivity
+                            <InfoTooltip content="How easily the user can interrupt the AI while it's speaking. Higher values = easier to interrupt (more natural conversation). Lower values = AI completes its thought." />
+                          </FormLabel>
+                          <span className="text-sm font-medium tabular-nums">
+                            {(field.value ?? 0.8).toFixed(1)}
+                          </span>
+                        </div>
+                        <FormControl>
+                          <Slider
+                            min={0}
+                            max={1}
+                            step={0.1}
+                            value={[field.value ?? 0.8]}
+                            onValueChange={([value]) => field.onChange(value)}
+                            className="py-2"
+                          />
+                        </FormControl>
+                        <div className="flex justify-between text-xs text-muted-foreground">
+                          <span>Hard to interrupt</span>
+                          <span>Easy to interrupt</span>
+                        </div>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="enableBackchannel"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                        <div className="space-y-0.5">
+                          <FormLabel className="text-base">Enable Backchannel</FormLabel>
+                          <FormDescription>
+                            AI says &quot;uh-huh&quot;, &quot;mm-hmm&quot; while listening for natural flow
+                          </FormDescription>
+                        </div>
+                        <FormControl>
+                          <Switch checked={field.value} onCheckedChange={field.onChange} />
+                        </FormControl>
                       </FormItem>
                     )}
                   />

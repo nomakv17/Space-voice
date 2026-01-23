@@ -53,6 +53,23 @@ class CreateAgentRequest(BaseModel):
         default=None,
         description="Optional initial greeting the agent speaks when call starts",
     )
+    # Retell voice agent settings (for response timing and interruption handling)
+    responsiveness: float = Field(
+        default=0.9,
+        ge=0.0,
+        le=1.0,
+        description="How quickly the AI responds (0-1). Higher = faster, more conversational.",
+    )
+    interruption_sensitivity: float = Field(
+        default=0.8,
+        ge=0.0,
+        le=1.0,
+        description="How easily the user can interrupt the AI (0-1). Higher = easier to interrupt.",
+    )
+    enable_backchannel: bool = Field(
+        default=True,
+        description="Enable AI backchannel responses (uh-huh, mm-hmm) for natural conversation.",
+    )
 
 
 class UpdateAgentRequest(BaseModel):
@@ -86,6 +103,23 @@ class UpdateAgentRequest(BaseModel):
         default=None,
         description="Optional initial greeting the agent speaks when call starts",
     )
+    # Retell voice agent settings
+    responsiveness: float | None = Field(
+        None,
+        ge=0.0,
+        le=1.0,
+        description="How quickly the AI responds (0-1). Higher = faster.",
+    )
+    interruption_sensitivity: float | None = Field(
+        None,
+        ge=0.0,
+        le=1.0,
+        description="How easily the user can interrupt the AI (0-1).",
+    )
+    enable_backchannel: bool | None = Field(
+        None,
+        description="Enable AI backchannel responses for natural conversation.",
+    )
 
 
 class AgentResponse(BaseModel):
@@ -114,6 +148,10 @@ class AgentResponse(BaseModel):
     temperature: float
     max_tokens: int
     initial_greeting: str | None
+    # Retell voice agent settings
+    responsiveness: float
+    interruption_sensitivity: float
+    enable_backchannel: bool
     is_active: bool
     is_published: bool
     total_calls: int
@@ -165,6 +203,9 @@ async def create_agent(
         temperature=agent_request.temperature,
         max_tokens=agent_request.max_tokens,
         initial_greeting=agent_request.initial_greeting,
+        responsiveness=agent_request.responsiveness,
+        interruption_sensitivity=agent_request.interruption_sensitivity,
+        enable_backchannel=agent_request.enable_backchannel,
         provider_config=provider_config,
         is_active=True,
         is_published=False,
@@ -374,6 +415,9 @@ def _apply_agent_updates(agent: Agent, request: UpdateAgentRequest) -> None:
         "temperature",
         "max_tokens",
         "initial_greeting",
+        "responsiveness",
+        "interruption_sensitivity",
+        "enable_backchannel",
     ]
 
     for field in simple_fields:
@@ -505,6 +549,9 @@ def _agent_to_response(agent: Agent, phone_number: str | None = None) -> AgentRe
         temperature=agent.temperature,
         max_tokens=agent.max_tokens,
         initial_greeting=agent.initial_greeting,
+        responsiveness=agent.responsiveness,
+        interruption_sensitivity=agent.interruption_sensitivity,
+        enable_backchannel=agent.enable_backchannel,
         is_active=agent.is_active,
         is_published=agent.is_published,
         total_calls=agent.total_calls,

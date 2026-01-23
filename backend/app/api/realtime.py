@@ -887,3 +887,134 @@ async def create_retell_web_call(
             status_code=500,
             detail=f"Failed to create Retell web call: {e!s}",
         ) from e
+
+
+@retell_router.post("/publish/{agent_id}")
+async def publish_agent_to_retell(
+    agent_id: str,
+    current_user: CurrentUser,
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, Any]:
+    """Publish/sync an agent to Retell AI with optimized voice settings.
+
+    Creates or updates a Retell agent with:
+    - Custom LLM WebSocket URL pointing to our backend
+    - Optimized responsiveness (0.9 for 2-3 second responses)
+    - Interruption sensitivity (0.8 for natural conversation)
+    - Backchannel enabled for "uh-huh" responses
+
+    Args:
+        agent_id: Agent UUID
+        current_user: Authenticated user
+        db: Database session
+
+    Returns:
+        Dict with retell_agent_id and configuration
+    """
+    from app.services.retell.retell_service import RetellService
+
+    user_id = current_user.id
+    log = logger.bind(
+        endpoint="publish_agent_to_retell",
+        agent_id=agent_id,
+        user_id=user_id,
+    )
+
+    log.info("publish_agent_to_retell_requested")
+
+    # Load agent
+    result = await db.execute(select(Agent).where(Agent.id == uuid.UUID(agent_id)))
+    agent = result.scalar_one_or_none()
+
+    if not agent:
+        raise HTTPException(status_code=404, detail=f"Agent {agent_id} not found")
+
+    if agent.user_id != user_id:
+        raise HTTPException(status_code=403, detail="Not authorized to modify this agent")
+
+    # Initialize Retell service
+    if not settings.RETELL_API_KEY:
+        log.error("retell_api_key_missing")
+        raise HTTPException(
+            status_code=500,
+            detail="Retell API key not configured. Please add RETELL_API_KEY to settings.",
+        )
+
+    try:
+        retell_service = RetellService(api_key=settings.RETELL_API_KEY)
+    except ValueError as e:
+        log.error("retell_service_init_failed", error=str(e))
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to initialize Retell service: {e}",
+        ) from e
+
+    # Build Custom LLM WebSocket URL
+    # This points to our Retell LLM WebSocket endpoint
+    base_url = settings.PUBLIC_URL or "https://api.spacevoice.ai"
+    llm_websocket_url = f"{base_url.replace('https://', 'wss://').replace('http://', 'ws://')}/ws/retell/llm/{agent_id}"
+
+    # Map SpaceVoice voice to Retell voice ID
+    # TODO: Add proper voice mapping
+    voice_id = "11labs-Adrian"  # Default Retell voice
+
+    try:
+        if agent.retell_agent_id:
+            # Update existing Retell agent
+            log.info("updating_retell_agent", retell_agent_id=agent.retell_agent_id)
+
+            await retell_service.update_agent(
+                agent_id=agent.retell_agent_id,
+                agent_name=agent.name,
+                responsiveness=agent.responsiveness,
+                interruption_sensitivity=agent.interruption_sensitivity,
+                enable_backchannel=agent.enable_backchannel,
+            )
+
+            return {
+                "status": "updated",
+                "retell_agent_id": agent.retell_agent_id,
+                "settings": {
+                    "responsiveness": agent.responsiveness,
+                    "interruption_sensitivity": agent.interruption_sensitivity,
+                    "enable_backchannel": agent.enable_backchannel,
+                },
+            }
+        # Create new Retell agent
+        log.info("creating_retell_agent")
+
+        agent_data = await retell_service.create_agent(
+            agent_name=agent.name,
+            llm_websocket_url=llm_websocket_url,
+            voice_id=voice_id,
+            language=agent.language,
+            responsiveness=agent.responsiveness,
+            interruption_sensitivity=agent.interruption_sensitivity,
+            enable_backchannel=agent.enable_backchannel,
+        )
+
+        # Save Retell agent ID to our database
+        agent.retell_agent_id = agent_data["agent_id"]
+        agent.voice_provider = "retell_claude"
+        await db.commit()
+        await db.refresh(agent)
+
+        log.info("retell_agent_created", retell_agent_id=agent.retell_agent_id)
+
+        return {
+            "status": "created",
+            "retell_agent_id": agent.retell_agent_id,
+            "settings": {
+                "responsiveness": agent.responsiveness,
+                "interruption_sensitivity": agent.interruption_sensitivity,
+                "enable_backchannel": agent.enable_backchannel,
+                "llm_websocket_url": llm_websocket_url,
+            },
+        }
+
+    except Exception as e:
+        log.exception("publish_agent_error", error=str(e))
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to publish agent to Retell: {e!s}",
+        ) from e

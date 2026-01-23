@@ -38,6 +38,9 @@ class RetellService:
         llm_websocket_url: str,
         voice_id: str = "11labs-Adrian",
         language: str = "en-US",
+        responsiveness: float = 0.9,
+        interruption_sensitivity: float = 0.8,
+        enable_backchannel: bool = True,
         **kwargs: Any,
     ) -> dict[str, Any]:
         """Create a Retell agent with Custom LLM backend.
@@ -50,6 +53,9 @@ class RetellService:
             llm_websocket_url: Our Custom LLM WebSocket URL (e.g., wss://api.example.com/ws/retell/llm/{agent_id})
             voice_id: Retell voice ID (11labs-Adrian, 11labs-Rachel, etc.)
             language: Language code (en-US, es-ES, etc.)
+            responsiveness: How quickly agent responds (0-1). Higher = faster. Default 0.9.
+            interruption_sensitivity: How easily user can interrupt (0-1). Higher = easier. Default 0.8.
+            enable_backchannel: Enable "uh-huh", "mm-hmm" responses. Default True.
             **kwargs: Additional agent configuration
 
         Returns:
@@ -60,6 +66,8 @@ class RetellService:
             name=agent_name,
             voice_id=voice_id,
             language=language,
+            responsiveness=responsiveness,
+            interruption_sensitivity=interruption_sensitivity,
         )
 
         agent: AgentResponse = await self.client.agent.create(
@@ -70,6 +78,9 @@ class RetellService:
             voice_id=voice_id,
             agent_name=agent_name,
             language=language,  # type: ignore[arg-type]  # SDK has strict literal types
+            responsiveness=responsiveness,
+            interruption_sensitivity=interruption_sensitivity,
+            enable_backchannel=enable_backchannel,
             **kwargs,
         )
 
@@ -81,6 +92,9 @@ class RetellService:
             "voice_id": voice_id,
             "language": language,
             "llm_websocket_url": llm_websocket_url,
+            "responsiveness": responsiveness,
+            "interruption_sensitivity": interruption_sensitivity,
+            "enable_backchannel": enable_backchannel,
         }
 
     async def get_agent(self, agent_id: str) -> AgentResponse | None:

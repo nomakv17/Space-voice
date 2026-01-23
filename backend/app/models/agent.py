@@ -115,6 +115,26 @@ class Agent(Base):
         comment="Maximum response tokens",
     )
 
+    # Retell voice agent settings (for response timing and interruption handling)
+    responsiveness: Mapped[float] = mapped_column(
+        Float,
+        nullable=False,
+        default=0.9,
+        comment="Retell responsiveness (0.0-1.0). Higher = faster responses. Default 0.9 for conversational flow.",
+    )
+    interruption_sensitivity: Mapped[float] = mapped_column(
+        Float,
+        nullable=False,
+        default=0.8,
+        comment="Retell interruption sensitivity (0.0-1.0). Higher = easier to interrupt AI. Default 0.8 for natural conversation.",
+    )
+    enable_backchannel: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=True,
+        comment="Enable AI backchannel responses (uh-huh, mm-hmm) for natural conversation.",
+    )
+
     # Initial greeting (optional spoken greeting when call starts)
     initial_greeting: Mapped[str | None] = mapped_column(
         Text,
