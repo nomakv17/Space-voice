@@ -612,6 +612,10 @@ CRITICAL: When customer says a day name (Monday, Tuesday, etc.), use the EXACT d
             tool_names = [t.get("function", {}).get("name") or t.get("name") for t in self.openai_tools]
             print(f"[LLM] Tool names: {tool_names}", flush=True)
 
+        # Timeout for LLM generation - if no first token in 8s, send fallback
+        llm_timeout = 8.0
+        first_token_received = False
+
         try:
             async for event in self.llm.generate_response(
                 transcript=transcript,
@@ -624,6 +628,7 @@ CRITICAL: When customer says a day name (Monday, Tuesday, etc.), use the EXACT d
                 event_type = event.get("type")
 
                 if event_type == "text_delta":
+                    first_token_received = True
                     # Stream text content to Retell
                     delta = event.get("delta", "")
                     accumulated_content += delta
@@ -634,6 +639,7 @@ CRITICAL: When customer says a day name (Monday, Tuesday, etc.), use the EXACT d
                     )
 
                 elif event_type == "tool_use":
+                    first_token_received = True
                     # Tool call detected
                     tool_call = event.get("tool_call", {})
                     pending_tool_calls.append(tool_call)
@@ -657,6 +663,16 @@ CRITICAL: When customer says a day name (Monday, Tuesday, etc.), use the EXACT d
                         content_complete=True,
                     )
                     return
+        except asyncio.TimeoutError:
+            # LLM took too long - send fallback
+            print(f"[LLM TIMEOUT] No response in {llm_timeout}s, sending fallback", flush=True)
+            self.logger.warning("llm_timeout_fallback", timeout=llm_timeout)
+            await self._send_response(
+                response_id=response_id,
+                content="I'm sorry, could you repeat that?",
+                content_complete=True,
+            )
+            return
         except Exception as e:
             # CRITICAL: Catch any error during LLM generation and send a fallback response
             import sys
@@ -733,12 +749,24 @@ CRITICAL: When customer says a day name (Monday, Tuesday, etc.), use the EXACT d
             # Return immediately - don't block!
             return
 
-        # No tools - mark response complete
-        await self._send_response(
-            response_id=response_id,
-            content="",
-            content_complete=True,
-        )
+        # No tools - check if we have content, send fallback if empty
+        if not accumulated_content.strip():
+            # CRITICAL: Never send only empty content - Retell will disconnect
+            # This can happen on barge-in when transcript is incomplete
+            print("[LLM WARNING] No content generated, sending fallback", flush=True)
+            self.logger.warning("no_content_generated_sending_fallback", response_id=response_id)
+            await self._send_response(
+                response_id=response_id,
+                content="I'm here, how can I help you?",
+                content_complete=True,
+            )
+        else:
+            # Normal case - mark response complete
+            await self._send_response(
+                response_id=response_id,
+                content="",
+                content_complete=True,
+            )
 
     async def _handle_reminder_required(self, data: dict[str, Any]) -> None:
         """Handle reminder when user has been silent.
