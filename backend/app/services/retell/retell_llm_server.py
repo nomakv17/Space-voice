@@ -230,17 +230,22 @@ class RetellLLMServer:
         This is SEPARATE from the response-level keepalives and ensures the
         connection stays alive even between conversation turns.
         """
+        import sys
+
         keepalive_interval = 1.5  # Send every 1.5 seconds (more aggressive)
         retry_count = 0
         max_retries = 5  # More retries before giving up
+        keepalive_count = 0
 
-        self.logger.info("connection_keepalive_started", interval=keepalive_interval)
+        print("[KEEPALIVE] Connection keepalive task started", flush=True)
+        sys.stdout.flush()
 
         while not self._shutdown.is_set():
             try:
                 await asyncio.sleep(keepalive_interval)
 
                 if self._shutdown.is_set():
+                    print("[KEEPALIVE] Shutdown detected, stopping", flush=True)
                     break
 
                 # Check time since last activity
@@ -249,10 +254,14 @@ class RetellLLMServer:
 
                 # Only send keepalive if we haven't had recent activity
                 if time_since_activity >= keepalive_interval - 0.3:
-                    self.logger.debug(
-                        "connection_keepalive_sending",
-                        seconds_since_activity=round(time_since_activity, 1),
-                    )
+                    keepalive_count += 1
+                    # Log every 5th keepalive to avoid spam
+                    if keepalive_count <= 3 or keepalive_count % 5 == 0:
+                        print(
+                            f"[KEEPALIVE] Sending #{keepalive_count} (idle {time_since_activity:.1f}s)",
+                            flush=True,
+                        )
+                        sys.stdout.flush()
                     # Send empty response chunk as keepalive
                     await self._send_response(
                         response_id=self._current_response_id,
@@ -263,22 +272,20 @@ class RetellLLMServer:
                     retry_count = 0  # Reset retry count on success
 
             except asyncio.CancelledError:
-                self.logger.debug("connection_keepalive_cancelled")
+                print("[KEEPALIVE] Cancelled", flush=True)
                 break
             except Exception as e:
                 retry_count += 1
-                self.logger.warning(
-                    "connection_keepalive_failed",
-                    error=str(e),
-                    retry_count=retry_count,
+                print(
+                    f"[KEEPALIVE] Failed: {type(e).__name__}: {e} (retry {retry_count})", flush=True
                 )
+                sys.stdout.flush()
                 if retry_count >= max_retries:
-                    self.logger.error("connection_keepalive_max_retries_exceeded")
+                    print("[KEEPALIVE] Max retries exceeded, stopping", flush=True)
                     break
-                # Very short delay before retry
                 await asyncio.sleep(0.2)
 
-        self.logger.info("connection_keepalive_stopped")
+        print("[KEEPALIVE] Task stopped", flush=True)
 
     async def _message_receiver(self) -> None:
         """Read WebSocket messages and route to handlers.
