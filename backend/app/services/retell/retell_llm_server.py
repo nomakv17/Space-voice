@@ -124,6 +124,7 @@ class RetellLLMServer:
         self._said_one_moment: bool = False  # Only say "one moment" once per turn
         self._said_goodbye: bool = False  # Track if we've already said goodbye
         self._current_turn_text: str = ""  # Accumulate text for goodbye detection
+        self._keepalive_enabled: bool = False  # Only enable after first response_required
 
     def _is_goodbye_message(self, text: str) -> bool:
         """Check if text contains a goodbye/call-ending phrase.
@@ -251,6 +252,11 @@ class RetellLLMServer:
                 # Check time since last activity
                 current_time = asyncio.get_event_loop().time()
                 time_since_activity = current_time - self._last_activity_time
+
+                # Only send keepalive if enabled (after first response_required)
+                # This prevents reopening completed responses like the greeting
+                if not self._keepalive_enabled:
+                    continue
 
                 # Only send keepalive if we haven't had recent activity
                 if time_since_activity >= keepalive_interval - 0.3:
@@ -545,6 +551,10 @@ CRITICAL: When customer says a day name (Monday, Tuesday, etc.), use the EXACT d
 
         response_id = data.get("response_id", 0)
         transcript = data.get("transcript", [])
+
+        # Enable connection-level keepalives now that we're in active conversation
+        # This prevents keepalives from interrupting the initial greeting
+        self._keepalive_enabled = True
 
         # Track current response_id for stale response detection
         self._current_response_id = response_id
