@@ -77,7 +77,7 @@ def build_retell_system_prompt(agent: Agent, timezone: str = "UTC") -> str:
     # Compact prompt (~800 chars instead of ~2000) for faster first token
     return f"""Voice AI on phone call. Time: {current_time} ({timezone}). Language: {agent.language or "en-US"}.
 
-VOICE RULES: 1-2 sentences max. Natural speech, no markdown. Confirm before booking.
+VOICE RULES: 1-2 sentences max. Natural speech, no markdown. Confirm before booking. Fillers (hmm, ah) go between words, not after sentences. OK: "Let me check, hmm, the next slot." NOT OK: "Let me check. Hmm."
 
 CALL FLOW (ONE-WAY - NEVER GO BACKWARDS):
 1. SAFETY: First say "I'm sorry to hear that. I'm going to ask a couple quick safety questions first." Then ask: gas smell? anyone in danger? Do this ONCE only.
