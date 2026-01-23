@@ -94,6 +94,25 @@ def generate_speech(api_key: str, voice_id: str, text: str) -> bytes:
     return response.content
 
 
+def create_silence_mp3(duration_ms: int, output_path: Path) -> None:
+    """Create a silent MP3 file using a minimal valid MP3 frame repeated."""
+    # Minimal valid MP3 frame (silent, 128kbps, 44.1kHz, mono)
+    # This is a single valid MPEG Audio Layer 3 frame of silence
+    silent_frame = bytes([
+        0xFF, 0xFB, 0x90, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    ])
+    # Each frame is ~26ms at 128kbps, so repeat for duration
+    num_frames = max(1, duration_ms // 26)
+    with open(output_path, "wb") as f:
+        for _ in range(num_frames):
+            f.write(silent_frame)
+
+
 def generate_demo_audio(api_key: str, output_path: Path) -> None:
     """Generate the demo call audio file."""
 
@@ -102,6 +121,12 @@ def generate_demo_audio(api_key: str, output_path: Path) -> None:
     temp_dir.mkdir(exist_ok=True)
 
     clip_files = []
+
+    # Create silence files for pauses between speakers
+    short_pause = temp_dir / "pause_short.mp3"  # 400ms - thinking pause
+    long_pause = temp_dir / "pause_long.mp3"    # 800ms - between speakers
+    create_silence_mp3(400, short_pause)
+    create_silence_mp3(800, long_pause)
 
     print("Generating audio clips with ElevenLabs...")
     for i, line in enumerate(DEMO_SCRIPT):
@@ -118,14 +143,28 @@ def generate_demo_audio(api_key: str, output_path: Path) -> None:
         # Small delay to avoid rate limiting
         time.sleep(0.3)
 
-    print("\nCombining clips...")
+    print("\nCombining clips with natural pauses...")
 
-    # Concatenate MP3 files directly (works without ffmpeg)
-    # MP3 frames are self-contained, so simple concatenation works
+    # Concatenate MP3 files with pauses between speakers
     with open(output_path, "wb") as outfile:
-        for clip_path in clip_files:
+        prev_speaker = None
+        for i, clip_path in enumerate(clip_files):
+            # Add pause between different speakers (not before first clip)
+            if i > 0:
+                current_speaker = DEMO_SCRIPT[i]["speaker"]
+                if prev_speaker != current_speaker:
+                    # Longer pause when speaker changes
+                    with open(long_pause, "rb") as pf:
+                        outfile.write(pf.read())
+                else:
+                    # Shorter pause for same speaker continuing
+                    with open(short_pause, "rb") as pf:
+                        outfile.write(pf.read())
+
             with open(clip_path, "rb") as infile:
                 outfile.write(infile.read())
+
+            prev_speaker = DEMO_SCRIPT[i]["speaker"]
 
     print(f"Created combined audio: {output_path}")
 
@@ -133,6 +172,8 @@ def generate_demo_audio(api_key: str, output_path: Path) -> None:
     print("Cleaning up temporary files...")
     for clip in clip_files:
         clip.unlink(missing_ok=True)
+    short_pause.unlink(missing_ok=True)
+    long_pause.unlink(missing_ok=True)
     temp_dir.rmdir()
 
     # Show file size

@@ -159,7 +159,7 @@ export function HeroSection() {
               {/* Hidden audio element */}
               <audio
                 ref={audioRef}
-                src="/audio/demo-call-sample.mp3?v=3"
+                src="/audio/demo-call-sample.mp3?v=4"
                 onTimeUpdate={handleTimeUpdate}
                 onLoadedMetadata={handleLoadedMetadata}
                 onEnded={handleEnded}
