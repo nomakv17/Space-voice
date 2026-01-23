@@ -84,6 +84,10 @@ class OpenAIAdapter:
         )
 
         try:
+            import time
+
+            start_time = time.time()
+
             # Prepare API call parameters
             params: dict[str, Any] = {
                 "model": self.model,
@@ -98,16 +102,25 @@ class OpenAIAdapter:
                 params["tools"] = tools
                 params["tool_choice"] = "auto"
 
+            print(f"[OPENAI] Starting API call (model={self.model}, messages={len(messages)}, tools={len(tools) if tools else 0})", flush=True)
+
             # Stream response from OpenAI
             stream = await self.client.chat.completions.create(**params)
 
             # Track tool calls being built (OpenAI sends them incrementally)
             current_tool_calls: dict[int, dict[str, Any]] = {}
+            first_token_logged = False
 
             async for chunk in stream:
                 choice = chunk.choices[0] if chunk.choices else None
                 if not choice:
                     continue
+
+                # Log first token timing
+                if not first_token_logged:
+                    first_token_time = time.time() - start_time
+                    print(f"[OPENAI TIMING] First token in {first_token_time:.2f}s", flush=True)
+                    first_token_logged = True
 
                 delta = choice.delta
 
