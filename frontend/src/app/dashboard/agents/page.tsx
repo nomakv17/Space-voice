@@ -12,6 +12,7 @@ import {
   Wrench,
   Clock,
   FolderOpen,
+  Zap,
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -264,12 +265,20 @@ export default function AgentsPage() {
             </Select>
           )}
           {workspaces.length > 0 ? (
-            <Button size="sm" className="shadow-lg shadow-primary/20" asChild>
-              <Link href="/dashboard/agents/create-agent">
-                <Plus className="mr-2 h-4 w-4" />
-                Create Agent
-              </Link>
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button size="sm" variant="outline" asChild>
+                <Link href="/dashboard/agents/create-agent?quick=true">
+                  <Zap className="mr-2 h-4 w-4" />
+                  Quick Create
+                </Link>
+              </Button>
+              <Button size="sm" className="shadow-lg shadow-primary/20" asChild>
+                <Link href="/dashboard/agents/create-agent">
+                  <Plus className="mr-2 h-4 w-4" />
+                  Create Agent
+                </Link>
+              </Button>
+            </div>
           ) : (
             <Button size="sm" className="shadow-lg shadow-primary/20" asChild>
               <Link href="/dashboard/workspaces">
