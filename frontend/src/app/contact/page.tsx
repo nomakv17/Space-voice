@@ -15,18 +15,16 @@ export default function ContactPage() {
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
 
     // Simulate form submission - replace with actual API call
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-
-    // In production, send to your backend or email service
-    console.log("Form submitted:", formState);
-
-    setIsSubmitted(true);
-    setIsLoading(false);
+    // In production, send to your backend or email service (e.g., /api/contact)
+    setTimeout(() => {
+      setIsSubmitted(true);
+      setIsLoading(false);
+    }, 1000);
   };
 
   return (
