@@ -77,7 +77,7 @@ export default function PricingCalculatorPage() {
 
     const monthlyCost = minutesPerMonth * selectedTier.pricePerMinute;
     const humanAgentCost = minutesPerMonth * INDUSTRY_COSTS.humanAgent.costPerMinute;
-    const callCenterCost = minutesPerMonth * INDUSTRY_COSTS.callCenter;
+    const callCenterCost = minutesPerMonth * INDUSTRY_COSTS.callCenter.costPerMinute;
 
     const savingsVsHuman = humanAgentCost - monthlyCost;
     const savingsVsCallCenter = callCenterCost - monthlyCost;
