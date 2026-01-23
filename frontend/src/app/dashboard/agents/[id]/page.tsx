@@ -14,6 +14,7 @@ import {
   deleteAgent,
   getEmbedSettings,
   updateEmbedSettings,
+  publishAgentToRetell,
   type UpdateAgentRequest,
 } from "@/lib/api/agents";
 import { Button } from "@/components/ui/button";
@@ -51,6 +52,8 @@ import {
   AlertTriangle,
   ShieldAlert,
   Wand2,
+  RefreshCw,
+  CheckCircle2,
 } from "lucide-react";
 import { api } from "@/lib/api";
 import { getLanguagesForTier } from "@/lib/languages";
@@ -543,6 +546,24 @@ export default function EditAgentPage({ params }: EditAgentPageProps) {
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["agent-workspaces", agentId] });
+    },
+  });
+
+  // Sync agent settings to Retell
+  const syncToRetellMutation = useMutation({
+    mutationFn: async () => {
+      return publishAgentToRetell(agentId);
+    },
+    onSuccess: (data) => {
+      toast.success(
+        data.status === "created"
+          ? "Agent published to Retell successfully!"
+          : "Agent settings synced to Retell!"
+      );
+      void queryClient.invalidateQueries({ queryKey: ["agent", agentId] });
+    },
+    onError: (error: Error) => {
+      toast.error(`Failed to sync to Retell: ${error.message}`);
     },
   });
 
@@ -1862,6 +1883,47 @@ export default function EditAgentPage({ params }: EditAgentPageProps) {
                       </FormItem>
                     )}
                   />
+
+                  <Separator className="my-4" />
+
+                  {/* Sync to Retell Button */}
+                  <div className="flex items-center justify-between rounded-lg border p-4 bg-muted/50">
+                    <div className="space-y-0.5">
+                      <div className="text-sm font-medium flex items-center gap-2">
+                        Sync to Retell
+                        {agent?.retell_agent_id && (
+                          <Badge variant="outline" className="text-xs">
+                            <CheckCircle2 className="w-3 h-3 mr-1 text-green-500" />
+                            Connected
+                          </Badge>
+                        )}
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        {agent?.retell_agent_id
+                          ? "Update Retell agent with current response timing settings"
+                          : "Create a Retell agent and connect it to this agent"}
+                      </p>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => syncToRetellMutation.mutate()}
+                      disabled={syncToRetellMutation.isPending}
+                    >
+                      {syncToRetellMutation.isPending ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          Syncing...
+                        </>
+                      ) : (
+                        <>
+                          <RefreshCw className="w-4 h-4 mr-2" />
+                          {agent?.retell_agent_id ? "Sync Settings" : "Connect to Retell"}
+                        </>
+                      )}
+                    </Button>
+                  </div>
                 </CardContent>
               </Card>
 
