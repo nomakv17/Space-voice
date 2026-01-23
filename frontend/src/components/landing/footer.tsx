@@ -8,26 +8,14 @@ const footerLinks = {
     { label: "Features", href: "#features" },
     { label: "Pricing", href: "#pricing" },
     { label: "Use Cases", href: "#use-cases" },
-    { label: "ROI Calculator", href: "#roi" },
-    { label: "Demo", href: "#demo" },
+    { label: "FAQ", href: "#faq" },
   ],
   company: [
-    { label: "About Us", href: "/about" },
-    { label: "Blog", href: "/blog" },
-    { label: "Careers", href: "/careers" },
     { label: "Contact", href: "/contact" },
-  ],
-  resources: [
-    { label: "Documentation", href: "/docs" },
-    { label: "API Reference", href: "/api" },
-    { label: "Help Center", href: "/help" },
-    { label: "Status", href: "/status" },
   ],
   legal: [
     { label: "Privacy Policy", href: "/privacy" },
     { label: "Terms of Service", href: "/terms" },
-    { label: "Security", href: "/security" },
-    { label: "GDPR", href: "/gdpr" },
   ],
 };
 
@@ -55,11 +43,11 @@ export function FooterSection() {
 
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <a
-              href="https://dashboard.spacevoice.ai/login"
+              href="https://dashboard.spacevoice.ai/signup"
               className="group inline-flex items-center justify-center gap-2 px-8 py-4 rounded-xl bg-gradient-to-r from-cyan-600 to-cyan-500 text-white font-semibold text-lg shadow-lg shadow-cyan-500/25 hover:shadow-cyan-500/40 hover:scale-105 transition-all duration-300"
             >
               <Phone className="w-5 h-5" />
-              Start Free Trial
+              Get Started
               <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
             </a>
 
@@ -72,7 +60,7 @@ export function FooterSection() {
           </div>
 
           <p className="mt-6 text-sm text-gray-500">
-            14-day free trial • No credit card required • Cancel anytime
+            30-day money-back guarantee • Cancel anytime
           </p>
         </div>
       </section>
@@ -80,7 +68,7 @@ export function FooterSection() {
       {/* Footer */}
       <footer className="bg-white border-t border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-          <div className="grid grid-cols-2 md:grid-cols-6 gap-8">
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-8">
             {/* Brand column */}
             <div className="col-span-2">
               <div className="flex items-center gap-2 mb-4">
@@ -123,19 +111,6 @@ export function FooterSection() {
               <h4 className="text-gray-900 font-semibold mb-4">Company</h4>
               <ul className="space-y-2">
                 {footerLinks.company.map((link) => (
-                  <li key={link.label}>
-                    <Link href={link.href} className="text-sm text-gray-600 hover:text-cyan-600 transition-colors">
-                      {link.label}
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            </div>
-
-            <div>
-              <h4 className="text-gray-900 font-semibold mb-4">Resources</h4>
-              <ul className="space-y-2">
-                {footerLinks.resources.map((link) => (
                   <li key={link.label}>
                     <Link href={link.href} className="text-sm text-gray-600 hover:text-cyan-600 transition-colors">
                       {link.label}

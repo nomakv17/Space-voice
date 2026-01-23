@@ -252,11 +252,11 @@ export function HeroSection() {
               {/* CTA Buttons */}
               <div className="space-y-3">
                 <a
-                  href="https://dashboard.spacevoice.ai/login"
+                  href="https://dashboard.spacevoice.ai/signup"
                   className="flex items-center justify-center gap-2 w-full py-4 rounded-xl bg-gradient-to-r from-cyan-600 to-cyan-500 text-white font-semibold text-lg hover:shadow-lg hover:shadow-cyan-500/25 transition-all"
                 >
                   <Phone className="w-5 h-5" />
-                  Start Free Trial
+                  Get Started
                   <ArrowRight className="w-5 h-5" />
                 </a>
                 <a
@@ -268,7 +268,7 @@ export function HeroSection() {
               </div>
 
               <p className="text-xs text-gray-500 text-center mt-4">
-                14-day free trial • No credit card required
+                30-day money-back guarantee • Cancel anytime
               </p>
             </div>
 

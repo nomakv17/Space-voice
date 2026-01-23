@@ -65,7 +65,7 @@ export function Navbar() {
               Log In
             </a>
             <a
-              href="https://dashboard.spacevoice.ai/login"
+              href="https://dashboard.spacevoice.ai/signup"
               className="px-5 py-2.5 rounded-lg bg-gradient-to-r from-cyan-600 to-cyan-500 text-white font-semibold text-sm hover:shadow-lg hover:shadow-cyan-500/25 transition-all duration-300"
             >
               Get Started
@@ -103,7 +103,7 @@ export function Navbar() {
                   Log In
                 </a>
                 <a
-                  href="https://dashboard.spacevoice.ai/login"
+                  href="https://dashboard.spacevoice.ai/signup"
                   className="text-center py-2.5 rounded-lg bg-gradient-to-r from-cyan-600 to-cyan-500 text-white font-semibold text-sm"
                 >
                   Get Started

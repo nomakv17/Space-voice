@@ -23,8 +23,8 @@ export function middleware(request: NextRequest) {
         new URL(`https://dashboard.spacevoice.ai${pathname}`, request.url)
       );
     }
-    // Also redirect /login and /onboarding to dashboard subdomain
-    if (pathname === "/login" || pathname.startsWith("/onboarding")) {
+    // Also redirect /login, /signup, and /onboarding to dashboard subdomain
+    if (pathname === "/login" || pathname === "/signup" || pathname.startsWith("/onboarding")) {
       return NextResponse.redirect(
         new URL(`https://dashboard.spacevoice.ai${pathname}`, request.url)
       );

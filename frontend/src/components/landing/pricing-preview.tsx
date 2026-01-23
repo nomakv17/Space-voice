@@ -16,7 +16,7 @@ const pricingPlans = [
       "Email support",
       "Google Calendar integration",
     ],
-    cta: "Start Free Trial",
+    cta: "Get Started",
     popular: false,
   },
   {
@@ -33,7 +33,7 @@ const pricingPlans = [
       "Emergency triage protocols",
       "Human handoff",
     ],
-    cta: "Start Free Trial",
+    cta: "Get Started",
     popular: true,
   },
   {
@@ -132,7 +132,7 @@ export function PricingPreview() {
 
               {/* CTA */}
               <a
-                href={plan.price !== null ? "https://dashboard.spacevoice.ai/login" : "mailto:hello@spacevoice.ai"}
+                href={plan.price !== null ? "https://dashboard.spacevoice.ai/signup" : "mailto:hello@spacevoice.ai"}
                 className={cn(
                   "flex items-center justify-center gap-2 w-full py-3 rounded-xl font-semibold transition-all duration-300",
                   plan.popular
@@ -150,7 +150,7 @@ export function PricingPreview() {
         {/* Bottom notes */}
         <div className="mt-12 text-center">
           <p className="text-gray-500 text-sm mb-4">
-            All plans include 14-day free trial. No credit card required.
+            All plans include 30-day money-back guarantee. Cancel anytime.
           </p>
           <a
             href="https://dashboard.spacevoice.ai/dashboard/pricing"

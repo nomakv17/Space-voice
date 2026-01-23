@@ -128,10 +128,10 @@ export function HowItWorksSection() {
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <a
-              href="#demo"
+              href="https://dashboard.spacevoice.ai/signup"
               className="inline-flex items-center justify-center gap-2 px-8 py-4 rounded-xl bg-gradient-to-r from-cyan-600 to-cyan-500 text-white font-semibold text-lg hover:shadow-lg hover:shadow-cyan-500/25 transition-all duration-300"
             >
-              Start Free Trial
+              Get Started
               <ArrowRight className="w-5 h-5" />
             </a>
             <a
