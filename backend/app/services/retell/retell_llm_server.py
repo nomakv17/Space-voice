@@ -126,6 +126,12 @@ class RetellLLMServer:
         self._current_turn_text: str = ""  # Accumulate text for goodbye detection
         self._keepalive_enabled: bool = False  # Only enable after first response_required
 
+        # Conversation state tracking - survives barge-in and transcript trimming
+        # This ensures the agent doesn't restart from the beginning after interruption
+        self._conversation_stage: str = "greeting"  # Current stage in the flow
+        self._collected_info: dict[str, str] = {}  # Info collected during call
+        self._stages_completed: set[str] = set()  # Stages we've already completed
+
     def _is_goodbye_message(self, text: str) -> bool:
         """Check if text contains a goodbye/call-ending phrase.
 
@@ -162,6 +168,103 @@ class RetellLLMServer:
             "take care",
         ]
         return any(pattern in text_lower for pattern in explicit_goodbye_patterns)
+
+    def _detect_conversation_stage(self, transcript: list[dict[str, Any]]) -> None:
+        """Detect and update conversation stage based on transcript content.
+
+        This method analyzes the conversation to determine which stage we're in,
+        allowing the agent to resume correctly after barge-in/interruption.
+
+        Stages flow: greeting → triage → contact_info → scheduling → confirmation → completed
+        """
+        if not transcript:
+            return
+
+        # Combine recent transcript for analysis
+        recent_text = " ".join(
+            t.get("content", "").lower() for t in transcript[-6:]
+        )
+
+        # Detect stage progression based on conversation content
+        # Once a stage is completed, it stays completed (survives barge-in)
+
+        # Check if greeting is done (agent has introduced themselves)
+        if "greeting" not in self._stages_completed:
+            agent_texts = [t.get("content", "").lower() for t in transcript if t.get("role") == "agent"]
+            if any("how can i help" in t or "what can i do" in t for t in agent_texts):
+                self._stages_completed.add("greeting")
+                self._conversation_stage = "triage"
+
+        # Check if triage/safety questions are done (user described their issue)
+        if "triage" not in self._stages_completed and "greeting" in self._stages_completed:
+            issue_keywords = ["not working", "broken", "issue", "problem", "need", "help with",
+                           "ac ", "heating", "cooling", "hvac", "air condition", "furnace"]
+            if any(kw in recent_text for kw in issue_keywords):
+                self._stages_completed.add("triage")
+                self._conversation_stage = "contact_info"
+
+        # Check if contact info has been collected
+        if "contact_info" not in self._stages_completed and "triage" in self._stages_completed:
+            # Look for phone numbers or addresses mentioned
+            import re
+            has_phone = bool(re.search(r'\d{3}[-.\s]?\d{3}[-.\s]?\d{4}', recent_text))
+            has_address = any(kw in recent_text for kw in ["street", "avenue", "drive", "road", "lane", "address"])
+            if has_phone or has_address:
+                self._stages_completed.add("contact_info")
+                self._conversation_stage = "scheduling"
+
+        # Check if scheduling is in progress or done
+        if "scheduling" not in self._stages_completed and "contact_info" in self._stages_completed:
+            scheduling_keywords = ["tomorrow", "monday", "tuesday", "wednesday", "thursday",
+                                 "friday", "saturday", "sunday", "morning", "afternoon",
+                                 "o'clock", "am", "pm", "available", "appointment", "schedule"]
+            if any(kw in recent_text for kw in scheduling_keywords):
+                self._stages_completed.add("scheduling")
+                self._conversation_stage = "confirmation"
+
+        # Check if booking is confirmed
+        if self._booking_completed and "confirmation" not in self._stages_completed:
+            self._stages_completed.add("confirmation")
+            self._conversation_stage = "completed"
+
+    def _build_state_context(self) -> str:
+        """Build a context string describing current conversation state.
+
+        This is injected into the LLM call to ensure continuity after barge-in.
+        """
+        if not self._stages_completed:
+            return ""
+
+        # Build a concise state summary
+        stage_descriptions = {
+            "greeting": "introduced yourself",
+            "triage": "identified the customer's issue",
+            "contact_info": "collected contact information",
+            "scheduling": "discussed appointment times",
+            "confirmation": "confirmed the booking",
+        }
+
+        completed = [stage_descriptions.get(s, s) for s in self._stages_completed if s in stage_descriptions]
+
+        if not completed:
+            return ""
+
+        context = f"\n\n[CONVERSATION STATE - DO NOT REPEAT COMPLETED STEPS]\nYou have already: {', '.join(completed)}.\n"
+
+        if self._conversation_stage == "triage":
+            context += "Current step: Ask about their specific issue.\n"
+        elif self._conversation_stage == "contact_info":
+            context += "Current step: Get their contact info (phone/address) if not already provided.\n"
+        elif self._conversation_stage == "scheduling":
+            context += "Current step: Schedule the appointment.\n"
+        elif self._conversation_stage == "confirmation":
+            context += "Current step: Confirm details and wrap up.\n"
+        elif self._conversation_stage == "completed":
+            context += "Booking is complete. Ask if there's anything else.\n"
+
+        context += "IMPORTANT: Do NOT restart from the beginning. Continue from the current step.\n"
+
+        return context
 
     async def handle_connection(self) -> None:
         """Main WebSocket handler for Retell LLM communication.
@@ -552,6 +655,14 @@ CRITICAL: When customer says a day name (Monday, Tuesday, etc.), use the EXACT d
         response_id = data.get("response_id", 0)
         transcript = data.get("transcript", [])
 
+        # Detect conversation stage from transcript (survives barge-in)
+        self._detect_conversation_stage(transcript)
+
+        # Build state context to inject into prompt (prevents restarting flow)
+        state_context = self._build_state_context()
+        if state_context:
+            print(f"[STATE] Stage: {self._conversation_stage}, Completed: {self._stages_completed}", flush=True)
+
         # Enable connection-level keepalives now that we're in active conversation
         # This prevents keepalives from interrupting the initial greeting
         self._keepalive_enabled = True
@@ -612,6 +723,9 @@ CRITICAL: When customer says a day name (Monday, Tuesday, etc.), use the EXACT d
             tool_names = [t.get("function", {}).get("name") or t.get("name") for t in self.openai_tools]
             print(f"[LLM] Tool names: {tool_names}", flush=True)
 
+        # Inject conversation state into system prompt (survives barge-in/trimming)
+        effective_system_prompt = self.system_prompt + state_context
+
         # Timeout for LLM generation - if no first token in 8s, send fallback
         llm_timeout = 8.0
         first_token_received = False
@@ -619,7 +733,7 @@ CRITICAL: When customer says a day name (Monday, Tuesday, etc.), use the EXACT d
         try:
             async for event in self.llm.generate_response(
                 transcript=transcript,
-                system_prompt=self.system_prompt,
+                system_prompt=effective_system_prompt,
                 tools=self.openai_tools,
                 temperature=self.agent_config.get("temperature", 0.7),
                 max_tokens=self.agent_config.get("max_tokens", 1024),
