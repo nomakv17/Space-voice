@@ -58,9 +58,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    const isAuthPage = pathname === "/login";
+    const isAuthPage = pathname === "/login" || pathname === "/signup";
     const isLandingPage = pathname === "/";
-    const isPublicPage = pathname.startsWith("/embed");
+    const isPublicPage = pathname.startsWith("/embed") ||
+                         pathname === "/privacy" ||
+                         pathname === "/terms" ||
+                         pathname === "/contact";
 
     if (!token && !isAuthPage && !isLandingPage && !isPublicPage) {
       // No token and not on login/public page → go to login
