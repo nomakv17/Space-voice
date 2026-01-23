@@ -159,7 +159,7 @@ export function HeroSection() {
               {/* Hidden audio element */}
               <audio
                 ref={audioRef}
-                src="/audio/demo-call-sample.mp3?v=2"
+                src="/audio/demo-call-sample.mp3?v=3"
                 onTimeUpdate={handleTimeUpdate}
                 onLoadedMetadata={handleLoadedMetadata}
                 onEnded={handleEnded}
@@ -234,14 +234,14 @@ export function HeroSection() {
 
                   {/* Sample call transcript preview */}
                   <div className="text-sm text-gray-600 italic border-l-2 border-cyan-400 pl-3">
-                    &quot;Hi, thanks for calling CoolAir HVAC! I&apos;m Sarah, your AI assistant. How can I help you today?&quot;
+                    &quot;Hi there, CoolAir HVAC, this is Sarah. How can I help you?&quot;
                   </div>
                 </div>
               ) : (
                 <div className="bg-gray-50 rounded-2xl p-6 mb-6 text-center">
                   {/* Fallback when audio is unavailable */}
                   <div className="text-sm text-gray-600 italic border-l-2 border-cyan-400 pl-3 text-left mb-4">
-                    &quot;Hi, thanks for calling CoolAir HVAC! I&apos;m Sarah, your AI assistant. How can I help you today?&quot;
+                    &quot;Hi there, CoolAir HVAC, this is Sarah. How can I help you?&quot;
                   </div>
                   <p className="text-sm text-gray-500">
                     Audio demo coming soon • Contact us for a live demonstration

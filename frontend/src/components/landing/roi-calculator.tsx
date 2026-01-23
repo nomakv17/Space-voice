@@ -214,7 +214,7 @@ export function ROICalculator() {
 
             {/* CTA */}
             <a
-              href="#demo"
+              href="#demo-form"
               className="flex items-center justify-center gap-2 w-full py-4 rounded-xl bg-gradient-to-r from-cyan-600 to-cyan-500 text-white font-semibold text-lg hover:shadow-lg hover:shadow-cyan-500/25 transition-all duration-300"
             >
               Start Recovering Revenue

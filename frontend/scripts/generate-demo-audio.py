@@ -24,43 +24,44 @@ VOICES = {
     "customer": "TxGEqnHWrfWFTfGW9XjX",
 }
 
-# Demo call script - AI agent handling an HVAC inquiry
+# Demo call script - Natural conversational flow with real speech patterns
+# Using filler words, casual language, and natural pacing
 DEMO_SCRIPT = [
     {
         "speaker": "ai",
-        "text": "Hi, thanks for calling CoolAir HVAC! I'm Sarah, your AI assistant. How can I help you today?"
+        "text": "Hi there, CoolAir HVAC, this is Sarah. How can I help you?"
     },
     {
         "speaker": "customer",
-        "text": "Yeah, hi. My AC stopped working this morning and it's getting really hot in here. I need someone to come take a look."
+        "text": "Hey, uh, yeah so my AC just stopped working and it's like... it's really hot in here. I need somebody to come out."
     },
     {
         "speaker": "ai",
-        "text": "I'm sorry to hear that! I can definitely help you get that fixed. Just to make sure we send the right technician, is your unit not turning on at all, or is it running but not cooling?"
+        "text": "Oh no, I'm so sorry! Okay, let me help you with that. So is it not turning on at all, or is it running but just not cooling?"
     },
     {
         "speaker": "customer",
-        "text": "It's running, but it's just blowing warm air. The house is at 85 degrees right now."
+        "text": "No it's running, but it's just blowing like... warm air? And the house is at like 85 degrees already."
     },
     {
         "speaker": "ai",
-        "text": "Got it, sounds like it could be a refrigerant issue or a compressor problem. I have a technician available this afternoon between 2 and 4 PM, or tomorrow morning between 9 and 11. Which works better for you?"
+        "text": "Ugh, that's rough. Okay, so that sounds like maybe a refrigerant issue. Um, let me check availability... So I've got a tech free this afternoon between 2 and 4, or tomorrow morning around 9. What works for you?"
     },
     {
         "speaker": "customer",
-        "text": "This afternoon would be great. The sooner the better."
+        "text": "Oh, this afternoon for sure. The sooner the better honestly."
     },
     {
         "speaker": "ai",
-        "text": "Perfect! I've scheduled Mike, one of our senior technicians, to arrive between 2 and 4 PM today. He'll give you a call when he's 30 minutes out. Can I confirm this is for the address on file?"
+        "text": "Got it, totally understand. Okay so I'm putting you down for today, 2 to 4. Mike's gonna come out, he's one of our best guys. He'll call you when he's about 30 minutes away, cool?"
     },
     {
         "speaker": "customer",
-        "text": "Yes, that's correct."
+        "text": "Yeah, perfect. Thanks."
     },
     {
         "speaker": "ai",
-        "text": "Excellent! You're all set. Mike will be there this afternoon. In the meantime, try to stay cool, and don't hesitate to call back if you need anything else. Have a great day!"
+        "text": "You got it! Hang in there, and he'll get you taken care of this afternoon. Bye bye!"
     },
 ]
 
@@ -76,11 +77,11 @@ def generate_speech(api_key: str, voice_id: str, text: str) -> bytes:
 
     data = {
         "text": text,
-        "model_id": "eleven_multilingual_v2",  # Most natural sounding model
+        "model_id": "eleven_turbo_v2_5",  # Fast, natural conversational model
         "voice_settings": {
-            "stability": 0.5,
-            "similarity_boost": 0.75,
-            "style": 0.5,  # Add some expressiveness
+            "stability": 0.3,  # Lower = more expressive/variable
+            "similarity_boost": 0.8,
+            "style": 0.7,  # Higher = more dramatic/emotional delivery
             "use_speaker_boost": True
         }
     }

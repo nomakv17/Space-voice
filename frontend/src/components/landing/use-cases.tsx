@@ -197,7 +197,7 @@ export function UseCasesSection() {
             </ul>
 
             <a
-              href="#demo"
+              href="#demo-form"
               className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-r from-cyan-600 to-cyan-500 text-white font-semibold hover:shadow-lg hover:shadow-cyan-500/25 transition-all duration-300"
             >
               See It In Action
