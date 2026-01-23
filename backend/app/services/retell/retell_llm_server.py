@@ -905,14 +905,17 @@ CRITICAL: When customer says a day name (Monday, Tuesday, etc.), use the EXACT d
         tool_results = item["tool_results"]
         assistant_text = item["assistant_text"]
 
-        # ALWAYS use current response_id to send the confirmation
-        # Don't discard - we must send the confirmation even if response_id changed
-        response_id = self._current_response_id
-        if response_id != original_response_id:
+        # CRITICAL: Always use the ORIGINAL response_id from when tools started
+        # Using _current_response_id causes race condition - if user speaks while
+        # tools execute, _current_response_id changes but Retell still expects
+        # response for the original turn. Using wrong response_id = connection drop.
+        response_id = original_response_id
+        if self._current_response_id != original_response_id:
             self.logger.info(
-                "using_current_response_id",
+                "response_id_changed_during_tool_execution",
                 original_id=original_response_id,
-                current_id=response_id,
+                current_id=self._current_response_id,
+                using_id=response_id,
             )
 
         self.logger.info(
