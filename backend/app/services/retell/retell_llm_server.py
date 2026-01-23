@@ -372,18 +372,13 @@ class RetellLLMServer:
         Configures the LLM connection with options like:
         - auto_reconnect: Whether Retell should reconnect on disconnect
         - call_details: Request call metadata
-        - response_id: Required by Retell protocol (starts at 1)
         """
-        # Set initial response_id to 1 (Retell protocol requirement)
-        self._current_response_id = 1
-
         config = {
             "response_type": "config",
             "config": {
                 "auto_reconnect": True,
                 "call_details": True,
             },
-            "response_id": 1,  # Required by Retell protocol
         }
         await self._send(config)
         self.logger.debug("config_sent")
@@ -521,9 +516,9 @@ CRITICAL: When customer says a day name (Monday, Tuesday, etc.), use the EXACT d
 
         print(f"[GREETING] Greeting text: {greeting[:50]}...", flush=True)
 
-        # Use current response_id (set to 1 in _send_config)
+        # Send greeting with response_id=0 (initial turn before any response_required)
         await self._send_response(
-            response_id=self._current_response_id,
+            response_id=0,
             content=greeting,
             content_complete=True,
         )
