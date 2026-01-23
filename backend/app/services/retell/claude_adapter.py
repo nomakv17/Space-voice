@@ -95,7 +95,7 @@ class ClaudeAdapter:
         try:
             # Stream response from Claude
             # Note: type ignores are needed because we dynamically construct messages/tools
-            print("[CLAUDE] Opening stream to Claude API...", flush=True)
+            print(f"[CLAUDE] Opening stream to Claude API (model={CLAUDE_MODEL})...", flush=True)
             sys.stdout.flush()
 
             async with self.client.messages.stream(
