@@ -111,19 +111,21 @@ export function HeroSection() {
 
             {/* CTAs */}
             <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start mb-12 animate-fade-in-up delay-200">
-              <button
-                onClick={() => document.getElementById("demo-form")?.scrollIntoView()}
+              <a
+                href="https://dashboard.spacevoice.ai/signup"
                 className="group inline-flex items-center justify-center gap-2 px-8 py-4 rounded-xl bg-gradient-to-r from-cyan-600 to-cyan-500 text-white font-semibold text-lg shadow-lg shadow-cyan-500/25 hover:shadow-cyan-500/40 hover:scale-105 transition-all duration-300"
               >
                 <Phone className="w-5 h-5" />
-                Try Live Demo
+                Get Started
                 <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
-              </button>
+              </a>
 
-              <button className="inline-flex items-center justify-center gap-2 px-8 py-4 rounded-xl border-2 border-gray-200 text-gray-700 font-semibold text-lg hover:bg-gray-50 hover:border-gray-300 transition-all duration-300">
-                <Play className="w-5 h-5" />
-                Watch Demo
-              </button>
+              <a
+                href="mailto:hello@spacevoice.ai"
+                className="inline-flex items-center justify-center gap-2 px-8 py-4 rounded-xl border-2 border-gray-200 text-gray-700 font-semibold text-lg hover:bg-gray-50 hover:border-gray-300 transition-all duration-300"
+              >
+                Talk to Sales
+              </a>
             </div>
 
             {/* Metrics */}
