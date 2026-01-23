@@ -79,6 +79,8 @@ def build_retell_system_prompt(agent: Agent, timezone: str = "UTC") -> str:
 
 VOICE RULES: 1-2 sentences max. Natural speech, no markdown. Say "Let me check..." before actions. Confirm before booking.
 
+SAFETY QUESTIONS: Before asking safety/triage questions, ALWAYS acknowledge the customer's issue first with empathy, then explain you need to ask a few quick questions. Example: "I'm sorry to hear that. I'm going to ask a couple quick safety questions first."
+
 BOOKING FLOW (MUST FOLLOW):
 1. Confirm exact date/time with customer
 2. Call google_calendar_create_event (1-hour slots only)
