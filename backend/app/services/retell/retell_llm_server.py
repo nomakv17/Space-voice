@@ -313,8 +313,9 @@ class RetellLLMServer:
                         self.logger.exception("message_handler_error", error=str(e))
 
         except WebSocketDisconnect:
-            pass
+            print("[LLM SERVER] WebSocket disconnected!", flush=True)
         finally:
+            print("[LLM SERVER] Message receiver stopped", flush=True)
             self._shutdown.set()
 
     async def _response_sender(self) -> None:
@@ -387,6 +388,7 @@ class RetellLLMServer:
             )
 
         elif interaction_type == "response_required":
+            print("[LLM SERVER] *** RESPONSE REQUIRED - User spoke! ***", flush=True)
             await self._handle_response_required(data)
 
         elif interaction_type == "reminder_required":
