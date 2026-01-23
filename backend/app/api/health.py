@@ -211,6 +211,107 @@ You are Sarah, a friendly receptionist for Jobber HVAC. Help customers with HVAC
         return error_info
 
 
+@router.get("/admin/agent-tools/{agent_id}")
+async def get_agent_tools(
+    agent_id: str,
+    response: Response,
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, Any]:
+    """Debug endpoint to see what tools an agent has configured.
+
+    Shows:
+    - Agent's enabled_tools from DB
+    - Available integrations with credentials
+    - Actual tool definitions that would be sent to Claude
+    """
+    from sqlalchemy import text
+
+    from app.services.tools.registry import ToolRegistry
+
+    try:
+        # Get agent config
+        result = await db.execute(
+            text("""
+                SELECT id, name, user_id, enabled_tools, enabled_tool_ids
+                FROM agents WHERE id = :agent_id
+            """),
+            {"agent_id": agent_id},
+        )
+        row = result.fetchone()
+
+        if not row:
+            response.status_code = 404
+            return {"error": f"Agent {agent_id} not found"}
+
+        agent_info = {
+            "id": str(row[0]),
+            "name": row[1],
+            "user_id": row[2],
+            "enabled_tools": row[3] or [],
+            "enabled_tool_ids": row[4] or {},
+        }
+
+        # Get integrations
+        result = await db.execute(
+            text("""
+                SELECT integration_id, is_active, credentials IS NOT NULL as has_creds
+                FROM user_integrations
+                WHERE user_id = :user_id AND is_active = true
+            """),
+            {"user_id": row[2]},
+        )
+        integrations_list = [
+            {"id": r[0], "active": r[1], "has_creds": r[2]}
+            for r in result.fetchall()
+        ]
+
+        # Build integrations dict for tool registry
+        result = await db.execute(
+            text("""
+                SELECT integration_id, credentials
+                FROM user_integrations
+                WHERE user_id = :user_id AND is_active = true AND credentials IS NOT NULL
+            """),
+            {"user_id": row[2]},
+        )
+        integrations: dict[str, dict[str, Any]] = {}
+        for r in result.fetchall():
+            if r[1]:
+                integrations[r[0]] = r[1]
+
+        # Create tool registry and get definitions
+        tool_registry = ToolRegistry(
+            db=db,
+            user_id=row[2],
+            integrations=integrations,
+        )
+        tool_definitions = tool_registry.get_all_tool_definitions(
+            enabled_tools=agent_info["enabled_tools"],
+            enabled_tool_ids=agent_info["enabled_tool_ids"],
+        )
+
+        # Extract tool names for easy viewing
+        tool_names = []
+        for tool in tool_definitions:
+            if tool.get("function"):
+                tool_names.append(tool["function"].get("name"))
+            else:
+                tool_names.append(tool.get("name"))
+
+        return {
+            "agent": agent_info,
+            "integrations": integrations_list,
+            "tool_count": len(tool_definitions),
+            "tool_names": tool_names,
+            "tool_definitions": tool_definitions,  # Full definitions for debugging
+        }
+
+    except Exception as e:
+        logger.exception("Failed to get agent tools")
+        response.status_code = 500
+        return {"error": f"{type(e).__name__}: {e}"}
+
+
 @router.post("/admin/enable-agent-tools/{agent_id}")
 async def enable_agent_tools(
     agent_id: str,

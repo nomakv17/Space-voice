@@ -597,6 +597,10 @@ CRITICAL: When customer says a day name (Monday, Tuesday, etc.), use the EXACT d
         keepalive_task = asyncio.create_task(send_keepalives())
 
         print("[LLM] Starting response generation...", flush=True)
+        print(f"[LLM] Tools being sent: {len(self.openai_tools)} tools", flush=True)
+        if self.openai_tools:
+            tool_names = [t.get("function", {}).get("name") or t.get("name") for t in self.openai_tools]
+            print(f"[LLM] Tool names: {tool_names}", flush=True)
 
         try:
             async for event in self.llm.generate_response(
@@ -643,6 +647,25 @@ CRITICAL: When customer says a day name (Monday, Tuesday, etc.), use the EXACT d
                         content_complete=True,
                     )
                     return
+        except Exception as e:
+            # CRITICAL: Catch any error during LLM generation and send a fallback response
+            import sys
+            import traceback
+
+            error_msg = f"{type(e).__name__}: {e}"
+            print(f"[LLM CRITICAL ERROR] Exception during generation: {error_msg}", flush=True)
+            sys.stderr.write(f"[LLM CRITICAL ERROR] {error_msg}\n")
+            sys.stderr.write(f"[LLM CRITICAL ERROR] Traceback:\n{traceback.format_exc()}\n")
+            sys.stderr.flush()
+            self.logger.exception("llm_generation_exception", error=str(e))
+
+            # Always send a response so caller isn't left hanging
+            await self._send_response(
+                response_id=response_id,
+                content="I'm sorry, I had a technical issue. Could you please repeat that?",
+                content_complete=True,
+            )
+            return
         finally:
             keepalive_task.cancel()
             with contextlib.suppress(asyncio.CancelledError):
