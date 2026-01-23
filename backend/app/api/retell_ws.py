@@ -80,7 +80,7 @@ def build_retell_system_prompt(agent: Agent, timezone: str = "UTC") -> str:
 VOICE RULES: 1-2 sentences max. Natural speech, no markdown. Confirm before booking.
 
 CALL FLOW (ONE-WAY - NEVER GO BACKWARDS):
-1. SAFETY: Acknowledge issue with empathy, then ask safety questions (gas smell? anyone in danger?). Do this ONCE only.
+1. SAFETY: First say "I'm sorry to hear that. I'm going to ask a couple quick safety questions first." Then ask: gas smell? anyone in danger? Do this ONCE only.
 2. CONTACT: Get phone number and address. Do this ONCE only.
 3. SCHEDULE: Ask what day/time works. Do this ONCE only.
 4. BOOK: Call google_calendar_create_event (1-hour slots), then telnyx_send_sms.
