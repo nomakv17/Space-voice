@@ -137,14 +137,18 @@ class ClaudeAdapter:
             print(f"[CLAUDE] Opening stream to Claude API (model={CLAUDE_MODEL})...", flush=True)
             sys.stdout.flush()
 
-            async with self.client.messages.stream(
-                model=CLAUDE_MODEL,
-                max_tokens=max_tokens,
-                system=system_prompt,
-                messages=messages,  # type: ignore[arg-type]
-                tools=claude_tools,  # type: ignore[arg-type]
-                temperature=temperature,
-            ) as stream:
+            # Build kwargs - only include tools if we have them (Claude rejects tools=None)
+            stream_kwargs: dict[str, Any] = {
+                "model": CLAUDE_MODEL,
+                "max_tokens": max_tokens,
+                "system": system_prompt,
+                "messages": messages,
+                "temperature": temperature,
+            }
+            if claude_tools:
+                stream_kwargs["tools"] = claude_tools
+
+            async with self.client.messages.stream(**stream_kwargs) as stream:
                 stream_open_time = time.time() - start_time
                 print(
                     f"[CLAUDE] Stream opened in {stream_open_time:.2f}s, waiting for events...",
@@ -379,15 +383,18 @@ class ClaudeAdapter:
         try:
             self.logger.debug("starting_claude_stream_for_tool_results")
 
-            # Note: type ignores are needed because we dynamically construct messages/tools
-            async with self.client.messages.stream(
-                model=CLAUDE_MODEL,
-                max_tokens=max_tokens,
-                system=system_prompt,
-                messages=messages,  # type: ignore[arg-type]
-                tools=claude_tools,  # type: ignore[arg-type]
-                temperature=temperature,
-            ) as stream:
+            # Build kwargs - only include tools if we have them (Claude rejects tools=None)
+            stream_kwargs: dict[str, Any] = {
+                "model": CLAUDE_MODEL,
+                "max_tokens": max_tokens,
+                "system": system_prompt,
+                "messages": messages,
+                "temperature": temperature,
+            }
+            if claude_tools:
+                stream_kwargs["tools"] = claude_tools
+
+            async with self.client.messages.stream(**stream_kwargs) as stream:
                 self.logger.debug("claude_stream_opened")
                 event_count = 0
 

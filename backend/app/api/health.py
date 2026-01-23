@@ -153,7 +153,7 @@ You are Sarah, a friendly receptionist for Jobber HVAC. Help customers with HVAC
         {"role": "user", "content": "My cooling system isn't working."},
     ]
 
-    # Include tools to match real scenario (empty list like in logs)
+    # No tools in this test (matches real scenario where agent has no tools enabled)
     tools: list[dict[str, Any]] = []
 
     try:
@@ -163,16 +163,20 @@ You are Sarah, a friendly receptionist for Jobber HVAC. Help customers with HVAC
         result["message_count"] = len(messages)
         result["tool_count"] = len(tools)
 
+        # Build kwargs - only include tools if we have them (Claude rejects tools=None or tools=[])
+        stream_kwargs: dict[str, Any] = {
+            "model": "claude-sonnet-4-20250514",
+            "max_tokens": 1024,
+            "system": system_prompt,
+            "messages": messages,
+            "temperature": 0.7,
+        }
+        if tools:
+            stream_kwargs["tools"] = tools
+
         # Call Claude with streaming (like voice does)
         collected_text = ""
-        async with client.messages.stream(
-            model="claude-sonnet-4-20250514",
-            max_tokens=1024,
-            system=system_prompt,
-            messages=messages,  # type: ignore[arg-type]
-            tools=tools if tools else None,  # type: ignore[arg-type]
-            temperature=0.7,
-        ) as stream:
+        async with client.messages.stream(**stream_kwargs) as stream:
             async for event in stream:
                 if event.type == "content_block_delta":
                     if hasattr(event.delta, "text"):
