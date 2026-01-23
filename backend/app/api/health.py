@@ -211,6 +211,101 @@ You are Sarah, a friendly receptionist for Jobber HVAC. Help customers with HVAC
         return error_info
 
 
+@router.get("/test-voice-claude-with-tools")
+async def test_voice_claude_with_tools(response: Response) -> dict[str, Any]:
+    """Test Claude with voice parameters AND tools enabled.
+
+    This test verifies Claude works when tools are passed.
+    """
+    from anthropic import AsyncAnthropic
+
+    result: dict[str, Any] = {"test": "voice_claude_with_tools"}
+
+    if not settings.ANTHROPIC_API_KEY:
+        response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
+        return {"status": "error", "error": "ANTHROPIC_API_KEY not set"}
+
+    system_prompt = """Voice AI on phone call. Keep responses to 1-2 sentences.
+You are Sarah, a friendly receptionist for Jobber HVAC."""
+
+    messages = [
+        {"role": "user", "content": "[Call connected]"},
+        {
+            "role": "assistant",
+            "content": "Hello, thank you for calling Jobber HVAC. How can I help you today?",
+        },
+        {"role": "user", "content": "My cooling system isn't working."},
+    ]
+
+    # Test with actual tools (Claude format)
+    tools = [
+        {
+            "name": "google_calendar_create_event",
+            "description": "Create a calendar event (book an appointment)",
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "summary": {"type": "string", "description": "Event title"},
+                    "start_time": {"type": "string", "description": "Start time ISO 8601"},
+                    "end_time": {"type": "string", "description": "End time ISO 8601"},
+                },
+                "required": ["summary", "start_time", "end_time"],
+            },
+        },
+        {
+            "name": "telnyx_send_sms",
+            "description": "Send an SMS message",
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "to": {"type": "string", "description": "Phone number E.164"},
+                    "body": {"type": "string", "description": "Message content"},
+                },
+                "required": ["to", "body"],
+            },
+        },
+    ]
+
+    try:
+        client = AsyncAnthropic(api_key=settings.ANTHROPIC_API_KEY)
+
+        result["system_prompt_len"] = len(system_prompt)
+        result["message_count"] = len(messages)
+        result["tool_count"] = len(tools)
+
+        collected_text = ""
+        async with client.messages.stream(
+            model="claude-sonnet-4-20250514",
+            max_tokens=1024,
+            system=system_prompt,
+            messages=messages,
+            tools=tools,
+            temperature=0.7,
+        ) as stream:
+            async for event in stream:
+                if event.type == "content_block_delta":
+                    if hasattr(event.delta, "text"):
+                        collected_text += event.delta.text
+
+        result["status"] = "ok"
+        result["response"] = collected_text
+        return result
+
+    except Exception as e:
+        error_info: dict[str, Any] = {
+            "status": "error",
+            "error_type": type(e).__name__,
+            "error_message": str(e),
+        }
+        if hasattr(e, "status_code"):
+            error_info["status_code"] = e.status_code
+        if hasattr(e, "body"):
+            error_info["api_body"] = e.body
+
+        response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
+        return error_info
+
+
 @router.get("/admin/agent-tools/{agent_id}")
 async def get_agent_tools(
     agent_id: str,
