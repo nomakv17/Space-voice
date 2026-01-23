@@ -32,6 +32,7 @@ import {
   LogOut,
   Key,
   DollarSign,
+  Calculator,
 } from "lucide-react";
 import { useSidebarStore } from "@/lib/sidebar-store";
 import { useAuth } from "@/hooks/use-auth";
@@ -90,6 +91,12 @@ const navigation = [
     href: "/dashboard/calls",
     icon: History,
     color: "text-orange-400",
+  },
+  {
+    name: "Pricing Calculator",
+    href: "/dashboard/calculator",
+    icon: Calculator,
+    color: "text-emerald-400",
   },
   {
     name: "Test Agent",
