@@ -161,7 +161,7 @@ export default function PricingCalculatorPage() {
               </div>
               <Slider
                 value={[callsPerDay]}
-                onValueChange={([v]) => setCallsPerDay(v)}
+                onValueChange={(values) => setCallsPerDay(values[0] ?? 50)}
                 min={10}
                 max={500}
                 step={10}
@@ -180,7 +180,7 @@ export default function PricingCalculatorPage() {
               </div>
               <Slider
                 value={[avgCallDuration]}
-                onValueChange={([v]) => setAvgCallDuration(v)}
+                onValueChange={(values) => setAvgCallDuration(values[0] ?? 4)}
                 min={1}
                 max={15}
                 step={1}
