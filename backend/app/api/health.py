@@ -209,3 +209,97 @@ You are Sarah, a friendly receptionist for Jobber HVAC. Help customers with HVAC
 
         response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
         return error_info
+
+
+@router.post("/admin/enable-agent-tools/{agent_id}")
+async def enable_agent_tools(
+    agent_id: str,
+    response: Response,
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, Any]:
+    """Admin endpoint to enable tools on an agent.
+
+    WARNING: This is a temporary admin endpoint. Remove after use.
+    """
+    from sqlalchemy import text
+
+    try:
+        # Check current state
+        result = await db.execute(
+            text("SELECT id, name, enabled_tools, enabled_tool_ids, user_id FROM agents WHERE id = :agent_id"),
+            {"agent_id": agent_id},
+        )
+        row = result.fetchone()
+
+        if not row:
+            response.status_code = 404
+            return {"error": f"Agent {agent_id} not found"}
+
+        before_state = {
+            "id": str(row[0]),
+            "name": row[1],
+            "enabled_tools": row[2],
+            "enabled_tool_ids": row[3],
+        }
+
+        # Check integrations
+        result = await db.execute(
+            text("""
+                SELECT integration_id, is_active, credentials IS NOT NULL as has_credentials
+                FROM user_integrations
+                WHERE user_id = :user_id AND is_active = true
+            """),
+            {"user_id": row[4]},
+        )
+        integrations = [
+            {"id": r[0], "active": r[1], "has_creds": r[2]}
+            for r in result.fetchall()
+        ]
+
+        # Update the agent with tools enabled
+        import json
+
+        enabled_tools = ["google-calendar", "telnyx-sms"]
+        enabled_tool_ids = {
+            "google-calendar": ["google_calendar_create_event", "google_calendar_check_availability"],
+            "telnyx-sms": ["telnyx_send_sms"],
+        }
+
+        await db.execute(
+            text("""
+                UPDATE agents
+                SET enabled_tools = :enabled_tools::jsonb,
+                    enabled_tool_ids = :enabled_tool_ids::jsonb
+                WHERE id = :agent_id
+            """),
+            {
+                "agent_id": agent_id,
+                "enabled_tools": json.dumps(enabled_tools),
+                "enabled_tool_ids": json.dumps(enabled_tool_ids),
+            },
+        )
+        await db.commit()
+
+        # Verify update
+        result = await db.execute(
+            text("SELECT enabled_tools, enabled_tool_ids FROM agents WHERE id = :agent_id"),
+            {"agent_id": agent_id},
+        )
+        updated_row = result.fetchone()
+
+        return {
+            "status": "success",
+            "agent_id": agent_id,
+            "before": before_state,
+            "after": {
+                "enabled_tools": updated_row[0] if updated_row else None,
+                "enabled_tool_ids": updated_row[1] if updated_row else None,
+            },
+            "integrations_available": integrations,
+            "message": "Agent tools enabled. Make a test call to verify.",
+        }
+
+    except Exception as e:
+        logger.exception("Failed to enable agent tools")
+        response.status_code = 500
+        return {"error": f"{type(e).__name__}: {e}"}
