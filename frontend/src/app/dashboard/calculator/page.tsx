@@ -135,7 +135,7 @@ export default function PricingCalculatorPage() {
                     <SelectItem key={key} value={key}>
                       <div className="flex items-center gap-2">
                         {t.name}
-                        {t.recommended && (
+                        {"recommended" in t && t.recommended && (
                           <Badge variant="secondary" className="text-xs">
                             Recommended
                           </Badge>
