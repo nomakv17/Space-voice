@@ -92,33 +92,14 @@ def generate_demo_audio(api_key: str, output_path: Path) -> None:
 
     print("\nCombining clips...")
 
-    # Try to use ffmpeg to combine clips with small pauses
-    try:
-        import subprocess
+    # Concatenate MP3 files directly (works without ffmpeg)
+    # MP3 frames are self-contained, so simple concatenation works
+    with open(output_path, "wb") as outfile:
+        for i, clip_path in enumerate(clip_files):
+            with open(clip_path, "rb") as infile:
+                outfile.write(infile.read())
 
-        # Create a file list for ffmpeg
-        list_file = temp_dir / "clips.txt"
-        with open(list_file, "w") as f:
-            for clip in clip_files:
-                f.write(f"file '{clip.absolute()}'\n")
-                # Add a small silence between clips (using a silent audio file or filter)
-
-        # Combine using ffmpeg concat demuxer
-        subprocess.run([
-            "ffmpeg", "-y", "-f", "concat", "-safe", "0",
-            "-i", str(list_file),
-            "-c", "copy",
-            str(output_path)
-        ], check=True, capture_output=True)
-
-        print(f"Created combined audio: {output_path}")
-
-    except (subprocess.CalledProcessError, FileNotFoundError):
-        print("ffmpeg not available - using first clip as demo")
-        # Fallback: just use the combined clips manually or first clip
-        import shutil
-        shutil.copy(clip_files[0], output_path)
-        print(f"Copied first clip to: {output_path}")
+    print(f"Created combined audio: {output_path}")
 
     # Cleanup temp files
     print("Cleaning up temporary files...")
