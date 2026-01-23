@@ -83,11 +83,21 @@ class ClaudeAdapter:
             tool_count=len(claude_tools) if claude_tools else 0,
         )
 
-        print(f"[CLAUDE] Starting API call with {len(messages)} messages, {len(claude_tools) if claude_tools else 0} tools", flush=True)
+        import sys
+
+        print(
+            f"[CLAUDE] Starting API call with {len(messages)} messages, {len(claude_tools) if claude_tools else 0} tools",
+            flush=True,
+        )
+        sys.stdout.flush()
+        sys.stderr.flush()
 
         try:
             # Stream response from Claude
             # Note: type ignores are needed because we dynamically construct messages/tools
+            print("[CLAUDE] Opening stream to Claude API...", flush=True)
+            sys.stdout.flush()
+
             async with self.client.messages.stream(
                 model=CLAUDE_MODEL,
                 max_tokens=max_tokens,
@@ -96,10 +106,18 @@ class ClaudeAdapter:
                 tools=claude_tools,  # type: ignore[arg-type]
                 temperature=temperature,
             ) as stream:
+                print("[CLAUDE] Stream opened successfully, waiting for events...", flush=True)
+                sys.stdout.flush()
+
                 current_tool_use: dict[str, Any] | None = None
                 current_tool_input = ""
+                event_count = 0
 
                 async for event in stream:
+                    event_count += 1
+                    if event_count <= 3:  # Log first 3 events
+                        print(f"[CLAUDE] Event #{event_count}: {event.type}", flush=True)
+                        sys.stdout.flush()
                     # Handle different event types
                     if event.type == "content_block_start":
                         block = event.content_block
@@ -156,9 +174,12 @@ class ClaudeAdapter:
 
         except Exception as e:
             print(f"[CLAUDE ERROR] Generation failed: {type(e).__name__}: {e}", flush=True)
+            sys.stdout.flush()
+            sys.stderr.flush()
             import traceback
 
             traceback.print_exc()
+            sys.stderr.flush()
             self.logger.exception("claude_generation_error", error=str(e))
             yield {
                 "type": "error",
