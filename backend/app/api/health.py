@@ -268,8 +268,8 @@ async def enable_agent_tools(
         await db.execute(
             text("""
                 UPDATE agents
-                SET enabled_tools = :enabled_tools::jsonb,
-                    enabled_tool_ids = :enabled_tool_ids::jsonb
+                SET enabled_tools = CAST(:enabled_tools AS jsonb),
+                    enabled_tool_ids = CAST(:enabled_tool_ids AS jsonb)
                 WHERE id = :agent_id
             """),
             {
