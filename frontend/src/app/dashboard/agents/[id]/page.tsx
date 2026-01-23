@@ -1796,7 +1796,7 @@ export default function EditAgentPage({ params }: EditAgentPageProps) {
                 <CardHeader className="pb-3">
                   <CardTitle className="text-sm font-medium flex items-center gap-2">
                     Response Timing
-                    <InfoTooltip content="Configure how quickly the AI responds and handles interruptions. Higher responsiveness = faster responses (2-3 seconds vs 5+ seconds). These settings are synced to Retell when you save." />
+                    <InfoTooltip content="Configure how quickly the AI responds and handles interruptions. Higher responsiveness = faster responses (2-3 seconds vs 5+ seconds). Click 'Apply Changes' after saving to activate." />
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
@@ -1886,22 +1886,22 @@ export default function EditAgentPage({ params }: EditAgentPageProps) {
 
                   <Separator className="my-4" />
 
-                  {/* Sync to Retell Button */}
+                  {/* Apply Voice Settings Button */}
                   <div className="flex items-center justify-between rounded-lg border p-4 bg-muted/50">
                     <div className="space-y-0.5">
                       <div className="text-sm font-medium flex items-center gap-2">
-                        Sync to Retell
+                        Apply Voice Settings
                         {agent?.retell_agent_id && (
                           <Badge variant="outline" className="text-xs">
                             <CheckCircle2 className="w-3 h-3 mr-1 text-green-500" />
-                            Connected
+                            Active
                           </Badge>
                         )}
                       </div>
                       <p className="text-xs text-muted-foreground">
                         {agent?.retell_agent_id
-                          ? "Update Retell agent with current response timing settings"
-                          : "Create a Retell agent and connect it to this agent"}
+                          ? "Push response timing changes to your voice agent"
+                          : "Activate voice settings for this agent"}
                       </p>
                     </div>
                     <Button
@@ -1914,12 +1914,12 @@ export default function EditAgentPage({ params }: EditAgentPageProps) {
                       {syncToRetellMutation.isPending ? (
                         <>
                           <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                          Syncing...
+                          Applying...
                         </>
                       ) : (
                         <>
                           <RefreshCw className="w-4 h-4 mr-2" />
-                          {agent?.retell_agent_id ? "Sync Settings" : "Connect to Retell"}
+                          {agent?.retell_agent_id ? "Apply Changes" : "Activate"}
                         </>
                       )}
                     </Button>
