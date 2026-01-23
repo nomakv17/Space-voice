@@ -12,6 +12,7 @@ We use these to maintain call history and enable outcome-based reporting.
 Reference: https://docs.retellai.com/features/post-call-webhook
 """
 
+import base64
 import hashlib
 import hmac
 import uuid
@@ -119,14 +120,33 @@ async def verify_retell_signature(request: Request) -> None:
 
     body = await request.body()
 
-    expected = hmac.new(
+    # Compute expected signature
+    hmac_obj = hmac.new(
         settings.RETELL_API_KEY.encode("utf-8"),
         body,
         hashlib.sha256,
-    ).hexdigest()
+    )
 
-    if not hmac.compare_digest(signature, expected):
-        logger.warning("retell_webhook_signature_mismatch")
+    # Try hex format first (most common)
+    expected_hex = hmac_obj.hexdigest()
+
+    # Also try base64 format (some APIs use this)
+    expected_b64 = base64.b64encode(hmac_obj.digest()).decode("utf-8")
+
+    # Check both formats
+    is_valid = (
+        hmac.compare_digest(signature, expected_hex) or
+        hmac.compare_digest(signature, expected_b64)
+    )
+
+    if not is_valid:
+        # Log for debugging
+        logger.warning(
+            "retell_webhook_signature_mismatch",
+            received_sig_prefix=signature[:20] if signature else "none",
+            expected_hex_prefix=expected_hex[:20],
+            expected_b64_prefix=expected_b64[:20],
+        )
         raise HTTPException(
             status_code=401,
             detail="Invalid webhook signature",
