@@ -526,6 +526,20 @@ class ClaudeAdapter:
         Returns:
             Claude-format messages list
         """
+        # LATENCY OPTIMIZATION: Trim transcript to last N turns
+        # Voice conversations don't need full history - 8 turns (~4 exchanges)
+        # provides enough context while reducing input tokens significantly
+        from app.core.config import settings
+
+        max_turns = settings.VOICE_MAX_TRANSCRIPT_TURNS
+        if len(transcript) > max_turns:
+            self.logger.debug(
+                "trimming_transcript_for_latency",
+                original_turns=len(transcript),
+                keeping_turns=max_turns,
+            )
+            transcript = transcript[-max_turns:]
+
         messages: list[dict[str, Any]] = []
 
         for utterance in transcript:

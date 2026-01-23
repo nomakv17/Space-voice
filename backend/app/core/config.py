@@ -150,6 +150,10 @@ class Settings(BaseSettings):
     ANTHROPIC_TIMEOUT: float = 60.0  # Claude inference (streaming)
     DEFAULT_EXTERNAL_TIMEOUT: float = 30.0  # Fallback for other APIs
 
+    # Voice Latency Optimization
+    VOICE_MAX_TOKENS: int = 500  # Lower than default for faster voice responses
+    VOICE_MAX_TRANSCRIPT_TURNS: int = 8  # Trim old turns to reduce input tokens
+
     # Retry Configuration
     MAX_RETRIES: int = 3  # Number of retry attempts for failed requests
     RETRY_BACKOFF_FACTOR: float = 2.0  # Exponential backoff multiplier

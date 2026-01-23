@@ -274,7 +274,7 @@ async def retell_llm_websocket(
             enabled_tool_ids=enabled_tool_ids,
             agent_config={
                 "temperature": agent.temperature or 0.7,
-                "max_tokens": agent.max_tokens or 1024,
+                "max_tokens": min(agent.max_tokens or settings.VOICE_MAX_TOKENS, settings.VOICE_MAX_TOKENS),
                 "language": agent.language or "en-US",
                 "agent_name": agent.name,
                 # Use initial_greeting from agent config if set
