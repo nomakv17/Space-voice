@@ -132,6 +132,11 @@ class RetellLLMServer:
         self._collected_info: dict[str, str] = {}  # Info collected during call
         self._stages_completed: set[str] = set()  # Stages we've already completed
 
+        # Silence timeout handling - prevent Retell from ending call on inactivity
+        self._silence_timer_task: asyncio.Task[None] | None = None
+        self._silence_timeout: float = 6.5  # seconds before sending reminder
+        self._last_transcript: list[dict[str, Any]] = []  # Store for reminder context
+
     def _is_goodbye_message(self, text: str) -> bool:
         """Check if text contains a goodbye/call-ending phrase.
 
@@ -294,6 +299,62 @@ class RetellLLMServer:
 
         return context
 
+    def _start_silence_timer(self) -> None:
+        """Start or restart the silence timer.
+
+        Called after agent finishes speaking. If user doesn't respond within
+        _silence_timeout seconds, we send a gentle reminder prompt.
+
+        The timer is a fallback in case Retell doesn't send reminder_required.
+        """
+        # Cancel any existing timer
+        self._cancel_silence_timer()
+
+        # Don't start timer if we've said goodbye (call is ending)
+        if self._said_goodbye:
+            return
+
+        async def silence_timeout_handler() -> None:
+            """Fires when user has been silent too long."""
+            try:
+                await asyncio.sleep(self._silence_timeout)
+
+                # Double-check we haven't said goodbye while waiting
+                if self._said_goodbye:
+                    return
+
+                # Double-check we're not in shutdown
+                if self._shutdown.is_set():
+                    return
+
+                print(f"[SILENCE TIMER] User silent for {self._silence_timeout}s, sending reminder", flush=True)
+                self.logger.info("silence_timer_triggered", timeout=self._silence_timeout)
+
+                # Send a gentle reminder
+                await self._send_response(
+                    response_id=self._current_response_id,
+                    content="Are you still there? How can I help you today?",
+                    content_complete=True,
+                )
+
+                # Restart timer for next potential silence
+                self._start_silence_timer()
+
+            except asyncio.CancelledError:
+                # Timer was cancelled (user spoke or call ended)
+                pass
+            except Exception as e:
+                print(f"[SILENCE TIMER ERROR] {type(e).__name__}: {e}", flush=True)
+                self.logger.exception("silence_timer_error", error=str(e))
+
+        self._silence_timer_task = asyncio.create_task(silence_timeout_handler())
+
+    def _cancel_silence_timer(self) -> None:
+        """Cancel the silence timer (user spoke or call is ending)."""
+        if self._silence_timer_task and not self._silence_timer_task.done():
+            self._silence_timer_task.cancel()
+            self._silence_timer_task = None
+
     async def handle_connection(self) -> None:
         """Main WebSocket handler for Retell LLM communication.
 
@@ -349,6 +410,7 @@ class RetellLLMServer:
         finally:
             # Clean shutdown
             self._shutdown.set()
+            self._cancel_silence_timer()
             await self._cancel_pending_tool_execution()
             self.logger.info("retell_llm_connection_closed")
 
@@ -680,8 +742,14 @@ CRITICAL: When customer says a day name (Monday, Tuesday, etc.), use the EXACT d
         sys.stdout.flush()
         sys.stderr.flush()
 
+        # User spoke - cancel silence timer
+        self._cancel_silence_timer()
+
         response_id = data.get("response_id", 0)
         transcript = data.get("transcript", [])
+
+        # Store transcript for reminder context
+        self._last_transcript = transcript
 
         # Detect conversation stage from transcript (survives barge-in)
         self._detect_conversation_stage(transcript)
@@ -916,11 +984,22 @@ CRITICAL: When customer says a day name (Monday, Tuesday, etc.), use the EXACT d
         Retell sends this when the user hasn't spoken for a while.
         We generate a gentle prompt to re-engage them.
 
+        IMPORTANT: Do NOT send reminders after goodbye - let the call end naturally.
+
         Args:
             data: Reminder request with transcript
         """
         response_id = data.get("response_id", 0)
         transcript = data.get("transcript", [])
+
+        # Cancel our own silence timer since Retell is handling it
+        self._cancel_silence_timer()
+
+        # Don't send reminders after goodbye - let call end
+        if self._said_goodbye:
+            print("[REMINDER] Skipping - already said goodbye", flush=True)
+            self.logger.info("reminder_skipped_after_goodbye", response_id=response_id)
+            return
 
         self.logger.info("reminder_required", response_id=response_id)
 
@@ -1692,6 +1771,10 @@ CRITICAL: When customer says a day name (Monday, Tuesday, etc.), use the EXACT d
         # Reset accumulated text for next turn when complete
         if content_complete:
             self._current_turn_text = ""
+            # Start silence timer if we're not ending the call
+            # This will prompt the user if they don't respond
+            if not end_call:
+                self._start_silence_timer()
 
         response: dict[str, Any] = {
             "response_type": "response",
