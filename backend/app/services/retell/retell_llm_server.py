@@ -175,57 +175,78 @@ class RetellLLMServer:
         This method analyzes the conversation to determine which stage we're in,
         allowing the agent to resume correctly after barge-in/interruption.
 
-        Stages flow: greeting → triage → contact_info → scheduling → confirmation → completed
+        Stages flow: greeting → safety → contact_info → scheduling → booking → sms_sent → completed
         """
         if not transcript:
             return
 
-        # Combine recent transcript for analysis
-        recent_text = " ".join(
-            t.get("content", "").lower() for t in transcript[-6:]
-        )
+        # Combine all transcript for analysis (full history for stage detection)
+        all_text = " ".join(t.get("content", "").lower() for t in transcript)
+        agent_texts = [t.get("content", "").lower() for t in transcript if t.get("role") == "agent"]
+        user_texts = [t.get("content", "").lower() for t in transcript if t.get("role") == "user"]
 
         # Detect stage progression based on conversation content
         # Once a stage is completed, it stays completed (survives barge-in)
 
-        # Check if greeting is done (agent has introduced themselves)
+        # Stage 1: Greeting done (agent introduced themselves)
         if "greeting" not in self._stages_completed:
-            agent_texts = [t.get("content", "").lower() for t in transcript if t.get("role") == "agent"]
-            if any("how can i help" in t or "what can i do" in t for t in agent_texts):
+            if any("how can i help" in t or "what can i do" in t or "thank you for calling" in t for t in agent_texts):
                 self._stages_completed.add("greeting")
-                self._conversation_stage = "triage"
+                self._conversation_stage = "safety"
+                print(f"[STATE] Completed: greeting -> safety", flush=True)
 
-        # Check if triage/safety questions are done (user described their issue)
-        if "triage" not in self._stages_completed and "greeting" in self._stages_completed:
-            issue_keywords = ["not working", "broken", "issue", "problem", "need", "help with",
-                           "ac ", "heating", "cooling", "hvac", "air condition", "furnace"]
-            if any(kw in recent_text for kw in issue_keywords):
-                self._stages_completed.add("triage")
-                self._conversation_stage = "contact_info"
-
-        # Check if contact info has been collected
-        if "contact_info" not in self._stages_completed and "triage" in self._stages_completed:
-            # Look for phone numbers or addresses mentioned
+        # Stage 2: Safety questions done (agent asked AND user answered safety questions)
+        if "safety" not in self._stages_completed and "greeting" in self._stages_completed:
+            # Detect if agent asked safety questions
+            safety_asked = any(
+                kw in " ".join(agent_texts) for kw in
+                ["danger", "emergency", "gas smell", "leak", "safe", "safety question"]
+            )
+            # Detect if user answered (any response after safety question, typically "no")
+            safety_answered = safety_asked and any(
+                kw in " ".join(user_texts[-3:]) if user_texts else "" for kw in
+                ["no", "nope", "not", "fine", "safe", "okay", "ok", "we're good", "all good"]
+            )
+            # Also mark done if we've moved past it (user gave phone/address)
             import re
-            has_phone = bool(re.search(r'\d{3}[-.\s]?\d{3}[-.\s]?\d{4}', recent_text))
-            has_address = any(kw in recent_text for kw in ["street", "avenue", "drive", "road", "lane", "address"])
+            has_phone = bool(re.search(r'\d{3}[-.\s]?\d{3}[-.\s]?\d{4}', all_text))
+
+            if safety_answered or has_phone:
+                self._stages_completed.add("safety")
+                self._conversation_stage = "contact_info"
+                print(f"[STATE] Completed: safety -> contact_info", flush=True)
+
+        # Stage 3: Contact info collected (phone number or address given)
+        if "contact_info" not in self._stages_completed and "safety" in self._stages_completed:
+            import re
+            has_phone = bool(re.search(r'\d{3}[-.\s]?\d{3}[-.\s]?\d{4}', all_text))
+            has_address = any(kw in all_text for kw in ["street", "avenue", "drive", "road", "lane", "blvd", "way", "circle"])
             if has_phone or has_address:
                 self._stages_completed.add("contact_info")
                 self._conversation_stage = "scheduling"
+                print(f"[STATE] Completed: contact_info -> scheduling", flush=True)
 
-        # Check if scheduling is in progress or done
+        # Stage 4: Scheduling discussed (date/time mentioned)
         if "scheduling" not in self._stages_completed and "contact_info" in self._stages_completed:
-            scheduling_keywords = ["tomorrow", "monday", "tuesday", "wednesday", "thursday",
-                                 "friday", "saturday", "sunday", "morning", "afternoon",
-                                 "o'clock", "am", "pm", "available", "appointment", "schedule"]
-            if any(kw in recent_text for kw in scheduling_keywords):
+            scheduling_keywords = ["tomorrow", "today", "monday", "tuesday", "wednesday", "thursday",
+                                 "friday", "saturday", "sunday", "morning", "afternoon", "evening",
+                                 "o'clock", "am", "pm", "available", "appointment", "schedule", "book"]
+            if any(kw in all_text for kw in scheduling_keywords):
                 self._stages_completed.add("scheduling")
-                self._conversation_stage = "confirmation"
+                self._conversation_stage = "booking"
+                print(f"[STATE] Completed: scheduling -> booking", flush=True)
 
-        # Check if booking is confirmed
-        if self._booking_completed and "confirmation" not in self._stages_completed:
-            self._stages_completed.add("confirmation")
+        # Stage 5: Booking done (calendar tool was called)
+        if self._booking_completed and "booking" not in self._stages_completed:
+            self._stages_completed.add("booking")
+            self._conversation_stage = "sms_confirmation"
+            print(f"[STATE] Completed: booking -> sms_confirmation", flush=True)
+
+        # Stage 6: SMS sent (sms tool was called)
+        if self._sent_sms_numbers and "sms_sent" not in self._stages_completed:
+            self._stages_completed.add("sms_sent")
             self._conversation_stage = "completed"
+            print(f"[STATE] Completed: sms_sent -> completed", flush=True)
 
     def _build_state_context(self) -> str:
         """Build a context string describing current conversation state.
@@ -235,34 +256,41 @@ class RetellLLMServer:
         if not self._stages_completed:
             return ""
 
-        # Build a concise state summary
-        stage_descriptions = {
-            "greeting": "introduced yourself",
-            "triage": "identified the customer's issue",
-            "contact_info": "collected contact information",
-            "scheduling": "discussed appointment times",
-            "confirmation": "confirmed the booking",
-        }
+        # Build explicit DO NOT and DO lists
+        do_not_repeat = []
+        if "greeting" in self._stages_completed:
+            do_not_repeat.append("greet or introduce yourself")
+        if "safety" in self._stages_completed:
+            do_not_repeat.append("ask safety/emergency questions")
+        if "contact_info" in self._stages_completed:
+            do_not_repeat.append("ask for phone number or address")
+        if "scheduling" in self._stages_completed:
+            do_not_repeat.append("ask what time works for them")
+        if "booking" in self._stages_completed:
+            do_not_repeat.append("create another calendar event")
+        if "sms_sent" in self._stages_completed:
+            do_not_repeat.append("send another SMS")
 
-        completed = [stage_descriptions.get(s, s) for s in self._stages_completed if s in stage_descriptions]
+        context = "\n\n[CONVERSATION STATE - CRITICAL]\n"
 
-        if not completed:
-            return ""
+        if do_not_repeat:
+            context += f"DO NOT REPEAT (already done): {'; '.join(do_not_repeat)}.\n"
 
-        context = f"\n\n[CONVERSATION STATE - DO NOT REPEAT COMPLETED STEPS]\nYou have already: {', '.join(completed)}.\n"
-
-        if self._conversation_stage == "triage":
-            context += "Current step: Ask about their specific issue.\n"
+        # Current action
+        if self._conversation_stage == "safety":
+            context += "CURRENT STEP: Ask safety questions (gas smell, anyone in danger).\n"
         elif self._conversation_stage == "contact_info":
-            context += "Current step: Get their contact info (phone/address) if not already provided.\n"
+            context += "CURRENT STEP: Get their phone number and address for the appointment.\n"
         elif self._conversation_stage == "scheduling":
-            context += "Current step: Schedule the appointment.\n"
-        elif self._conversation_stage == "confirmation":
-            context += "Current step: Confirm details and wrap up.\n"
+            context += "CURRENT STEP: Ask what day and time works for the appointment.\n"
+        elif self._conversation_stage == "booking":
+            context += "CURRENT STEP: Call google_calendar_create_event to book, then telnyx_send_sms to confirm.\n"
+        elif self._conversation_stage == "sms_confirmation":
+            context += "CURRENT STEP: Send SMS confirmation with telnyx_send_sms.\n"
         elif self._conversation_stage == "completed":
-            context += "Booking is complete. Ask if there's anything else.\n"
+            context += "BOOKING COMPLETE. Just ask: 'Is there anything else I can help with?'\n"
 
-        context += "IMPORTANT: Do NOT restart from the beginning. Continue from the current step.\n"
+        context += "NEVER go backwards in the flow. Only move forward.\n"
 
         return context
 
