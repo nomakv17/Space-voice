@@ -1129,8 +1129,20 @@ CRITICAL: When customer says a day name (Monday, Tuesday, etc.), use the EXACT d
         # If Claude didn't generate meaningful text, send a fallback confirmation
         # This ensures we ALWAYS speak the confirmation before ending the turn
         if not has_meaningful_content:
-            self.logger.info("sending_fallback_confirmation_after_tools")
-            fallback = "Your appointment has been booked and you'll receive a text confirmation shortly. Is there anything else I can help you with?"
+            # Check if any tool actually failed before confirming success
+            tool_failed = any(
+                '"success": false' in str(r.get("content", "")).lower()
+                or '"error"' in str(r.get("content", "")).lower()
+                for r in tool_results
+            )
+
+            if tool_failed:
+                self.logger.warning("tool_execution_had_failures", tool_results=tool_results)
+                fallback = "I apologize, I had trouble completing that. Would you like me to try again?"
+            else:
+                self.logger.info("sending_fallback_confirmation_after_tools")
+                fallback = "Your appointment has been booked and you'll receive a text confirmation shortly. Is there anything else I can help you with?"
+
             await self._send_response(
                 response_id=response_id,
                 content=fallback,

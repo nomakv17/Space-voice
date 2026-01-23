@@ -50,10 +50,9 @@ async def get_agent_workspace_id(agent_id: uuid.UUID, db: AsyncSession) -> uuid.
 
 
 def build_retell_system_prompt(agent: Agent, timezone: str = "UTC") -> str:
-    """Build system prompt optimized for Retell + Claude voice conversations.
+    """Build compact system prompt for Retell + Claude voice conversations.
 
-    Wraps the agent's custom prompt with voice-specific rules that help
-    Claude generate natural, conversational responses.
+    Optimized for lower latency while maintaining essential instructions.
 
     Args:
         agent: Agent model with system_prompt
@@ -69,51 +68,26 @@ def build_retell_system_prompt(agent: Agent, timezone: str = "UTC") -> str:
 
         tz = ZoneInfo(timezone)
         now = datetime.now(tz)
-        current_time = now.strftime("%A, %B %d, %Y at %I:%M %p")
+        current_time = now.strftime("%A, %B %d, %Y %I:%M %p")
     except Exception:
-        current_time = datetime.now().strftime("%A, %B %d, %Y at %I:%M %p")
+        current_time = datetime.now().strftime("%A, %B %d, %Y %I:%M %p")
 
     base_prompt = agent.system_prompt or "You are a helpful voice assistant."
 
-    return f"""You are a professional voice AI assistant currently on a phone call.
+    # Compact prompt (~800 chars instead of ~2000) for faster first token
+    return f"""Voice AI on phone call. Time: {current_time} ({timezone}). Language: {agent.language or "en-US"}.
 
-CRITICAL VOICE CONVERSATION RULES:
-1. Keep responses SHORT and conversational (1-2 sentences max per turn)
-2. Speak naturally as if on a phone call - no markdown, lists, or formatting
-3. Never say "I cannot" or "I'm unable" - always offer helpful alternatives
-4. Use natural filler phrases: "Let me check that for you...", "One moment...", "Alright..."
-5. Confirm understanding before taking actions
-6. Speak numbers naturally (say "five five five" not "555")
-7. When using tools, explain what you're doing before and summarize results after
+VOICE RULES: 1-2 sentences max. Natural speech, no markdown. Say "Let me check..." before actions. Confirm before booking.
 
-APPOINTMENT BOOKING RULES:
-- Default appointment duration is 1 HOUR (e.g., if start is 9:00 AM, end is 10:00 AM)
-- NEVER book multi-day appointments - always single day, single hour slots
-- Always confirm the EXACT date and time before booking
+BOOKING FLOW (MUST FOLLOW):
+1. Confirm exact date/time with customer
+2. Call google_calendar_create_event (1-hour slots only)
+3. Call telnyx_send_sms with confirmation
+4. Say "Is there anything else I can help with?"
 
-SMS CONFIRMATION (CRITICAL - DO THIS AFTER EVERY BOOKING):
-- IMMEDIATELY after successfully booking an appointment, send an SMS confirmation
-- Use the telnyx_send_sms tool with the caller's phone number
-- Message should include: appointment date, time, and business name
-- Example: "Your appointment with Jobber HVAC is confirmed for Monday, January 20 at 9:00 AM. See you then!"
-- You MUST send the SMS - do not skip this step
+GOODBYE: When customer says "no/that's all/nothing else" after asking if there's anything else, say "Thank you for calling! Have a great day. Goodbye!" - DO NOT call any tools after this.
 
-CLOSING THE CALL (CRITICAL - FOLLOW EXACTLY):
-After booking is complete and you ask "Is there anything else I can help you with?":
-- If customer says ANY of: "no", "no thank you", "no thanks", "that's all", "I'm good", "nothing else", "nope", "yes" (meaning yes that's all), "yes thanks", "that will be all", etc.
-- IMMEDIATELY respond with ONLY: "Thank you for calling Jobber HVAC! Have a great day. Goodbye!"
-- Do NOT call any tools - the booking is ALREADY DONE
-- Do NOT say "one moment" or "let me" anything - there is NOTHING left to do
-- Just say goodbye and the call ends
-
-CONTEXT:
-- Current time: {current_time} ({timezone})
-- Language: {agent.language or "en-US"}
-
-YOUR ROLE AND INSTRUCTIONS:
-{base_prompt}
-
-IMPORTANT: You are in a voice conversation. Keep all responses brief and natural."""
+{base_prompt}"""
 
 
 @router.websocket("/llm/{agent_id}")
@@ -274,10 +248,20 @@ async def retell_llm_websocket(
         enabled_tools = agent.enabled_tools or []
         enabled_tool_ids = agent.enabled_tool_ids
 
+        # DEBUG: Log tool configuration to diagnose missing tools
+        tool_definitions = tool_registry.get_all_tool_definitions(enabled_tools, enabled_tool_ids)
+        print(f"[TOOLS DEBUG] Agent {agent.id}:", flush=True)
+        print(f"  enabled_tools from DB: {enabled_tools}", flush=True)
+        print(f"  enabled_tool_ids: {enabled_tool_ids}", flush=True)
+        print(f"  integrations loaded: {list(integrations.keys())}", flush=True)
+        print(f"  tool_definitions count: {len(tool_definitions)}", flush=True)
+        if tool_definitions:
+            print(f"  tool names: {[t.get('name') or t.get('function', {}).get('name') for t in tool_definitions]}", flush=True)
+
         log.info(
             "initializing_llm_server",
             enabled_tools=enabled_tools,
-            tool_count=len(tool_registry.get_all_tool_definitions(enabled_tools, enabled_tool_ids)),
+            tool_count=len(tool_definitions),
         )
 
         # Create and run the LLM server
