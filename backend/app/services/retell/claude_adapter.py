@@ -106,6 +106,9 @@ class ClaudeAdapter:
         try:
             # Stream response from Claude
             # Note: type ignores are needed because we dynamically construct messages/tools
+            import time
+
+            start_time = time.time()
             print(f"[CLAUDE] Opening stream to Claude API (model={CLAUDE_MODEL})...", flush=True)
             sys.stdout.flush()
 
@@ -117,16 +120,30 @@ class ClaudeAdapter:
                 tools=claude_tools,  # type: ignore[arg-type]
                 temperature=temperature,
             ) as stream:
-                print("[CLAUDE] Stream opened successfully, waiting for events...", flush=True)
+                stream_open_time = time.time() - start_time
+                print(
+                    f"[CLAUDE] Stream opened in {stream_open_time:.2f}s, waiting for events...",
+                    flush=True,
+                )
                 sys.stdout.flush()
 
                 current_tool_use: dict[str, Any] | None = None
                 current_tool_input = ""
                 event_count = 0
+                first_event_logged = False
 
                 async for event in stream:
                     event_count += 1
-                    if event_count <= 3:  # Log first 3 events
+                    # Log timing for first event (critical for Retell timeout)
+                    if not first_event_logged:
+                        first_token_time = time.time() - start_time
+                        print(
+                            f"[CLAUDE TIMING] First event in {first_token_time:.2f}s (type={event.type})",
+                            flush=True,
+                        )
+                        first_event_logged = True
+                        sys.stdout.flush()
+                    elif event_count <= 3:  # Log first 3 events
                         print(f"[CLAUDE] Event #{event_count}: {event.type}", flush=True)
                         sys.stdout.flush()
                     # Handle different event types
