@@ -174,12 +174,14 @@ class RetellLLMServer:
         """
         from starlette.websockets import WebSocketDisconnect
 
+        print("[LLM SERVER] Connection started, sending config...", flush=True)
         self.logger.info("retell_llm_connection_started")
         self._last_activity_time = asyncio.get_event_loop().time()
 
         try:
             # Send initial configuration
             await self._send_config()
+            print("[LLM SERVER] Config sent, starting message loop...", flush=True)
 
             # Run message receiver, response sender, and keepalive concurrently
             # The keepalive runs for the ENTIRE connection lifetime to prevent timeouts
@@ -296,6 +298,8 @@ class RetellLLMServer:
 
                 try:
                     data = json.loads(message)
+                    interaction_type = data.get("interaction_type", "unknown")
+                    print(f"[LLM SERVER] Received: {interaction_type}", flush=True)
                     await self._handle_message(data)
                 except json.JSONDecodeError as e:
                     self.logger.warning("invalid_json", error=str(e))
