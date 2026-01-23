@@ -128,17 +128,17 @@ export function HowItWorksSection() {
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <a
-              href="https://dashboard.spacevoice.ai/signup"
+              href="mailto:hello@spacevoice.ai"
               className="inline-flex items-center justify-center gap-2 px-8 py-4 rounded-xl bg-gradient-to-r from-cyan-600 to-cyan-500 text-white font-semibold text-lg hover:shadow-lg hover:shadow-cyan-500/25 transition-all duration-300"
             >
-              Get Started
+              Book Demo
               <ArrowRight className="w-5 h-5" />
             </a>
             <a
-              href="/dashboard/pricing"
+              href="https://dashboard.spacevoice.ai/signup"
               className="inline-flex items-center justify-center gap-2 px-8 py-4 rounded-xl border-2 border-gray-200 text-gray-700 font-semibold text-lg hover:bg-gray-50 hover:border-gray-300 transition-all duration-300"
             >
-              View Pricing
+              Start Free Trial
             </a>
           </div>
         </div>
