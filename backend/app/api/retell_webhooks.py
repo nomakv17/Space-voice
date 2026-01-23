@@ -12,9 +12,10 @@ We use these to maintain call history and enable outcome-based reporting.
 Reference: https://docs.retellai.com/features/post-call-webhook
 """
 
-import base64
 import hashlib
 import hmac
+import re
+import time
 import uuid
 from datetime import UTC, datetime
 from typing import Any
@@ -93,8 +94,12 @@ class InboundCallResponse(BaseModel):
 async def verify_retell_signature(request: Request) -> None:
     """Verify Retell webhook signature.
 
-    Retell signs webhooks using HMAC-SHA256 with your API key.
-    The signature is in the x-retell-signature header.
+    Retell signs webhooks using HMAC-SHA256 with a specific format:
+    - Signature format: "v={timestamp},d={hmac_digest}"
+    - HMAC is computed over: body + timestamp (concatenated)
+    - Timestamp must be within 5 minutes of current time
+
+    Reference: https://github.com/RetellAI/retell-python-sdk/blob/main/src/retell/lib/webhook_auth.py
 
     Args:
         request: FastAPI request object
@@ -120,32 +125,61 @@ async def verify_retell_signature(request: Request) -> None:
 
     body = await request.body()
 
-    # Compute expected signature
+    # Parse Retell signature format: "v={timestamp},d={hmac_digest}"
+    match = re.match(r"v=(\d+),d=(.*)", signature)
+    if not match:
+        logger.warning(
+            "retell_webhook_invalid_signature_format",
+            signature_preview=signature[:30] if signature else "none",
+        )
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid webhook signature format",
+        )
+
+    timestamp_str = match.group(1)
+    received_digest = match.group(2)
+
+    # Validate timestamp is within 5 minutes (300 seconds)
+    try:
+        timestamp = int(timestamp_str)
+        current_time = int(time.time())
+        time_diff = abs(current_time - timestamp)
+        max_time_diff = 300  # 5 minutes
+
+        if time_diff > max_time_diff:
+            logger.warning(
+                "retell_webhook_timestamp_expired",
+                timestamp=timestamp,
+                current_time=current_time,
+                diff_seconds=time_diff,
+            )
+            raise HTTPException(
+                status_code=401,
+                detail="Webhook signature expired",
+            )
+    except ValueError:
+        logger.warning("retell_webhook_invalid_timestamp", timestamp_str=timestamp_str)
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid webhook timestamp",
+        ) from None
+
+    # Compute expected HMAC: HMAC-SHA256(api_key, body + timestamp)
+    message = body + timestamp_str.encode("utf-8")
     hmac_obj = hmac.new(
         settings.RETELL_API_KEY.encode("utf-8"),
-        body,
+        message,
         hashlib.sha256,
     )
+    expected_digest = hmac_obj.hexdigest()
 
-    # Try hex format first (most common)
-    expected_hex = hmac_obj.hexdigest()
-
-    # Also try base64 format (some APIs use this)
-    expected_b64 = base64.b64encode(hmac_obj.digest()).decode("utf-8")
-
-    # Check both formats
-    is_valid = (
-        hmac.compare_digest(signature, expected_hex) or
-        hmac.compare_digest(signature, expected_b64)
-    )
-
-    if not is_valid:
-        # Log for debugging
+    # Constant-time comparison to prevent timing attacks
+    if not hmac.compare_digest(received_digest, expected_digest):
         logger.warning(
             "retell_webhook_signature_mismatch",
-            received_sig_prefix=signature[:20] if signature else "none",
-            expected_hex_prefix=expected_hex[:20],
-            expected_b64_prefix=expected_b64[:20],
+            received_digest_prefix=received_digest[:16] if received_digest else "none",
+            expected_digest_prefix=expected_digest[:16],
         )
         raise HTTPException(
             status_code=401,
