@@ -12,10 +12,6 @@ We use these to maintain call history and enable outcome-based reporting.
 Reference: https://docs.retellai.com/features/post-call-webhook
 """
 
-import hashlib
-import hmac
-import re
-import time
 import uuid
 from datetime import UTC, datetime
 from typing import Any
@@ -92,14 +88,12 @@ class InboundCallResponse(BaseModel):
 
 
 async def verify_retell_signature(request: Request) -> None:
-    """Verify Retell webhook signature.
+    """Verify Retell webhook signature using official SDK.
 
-    Retell signs webhooks using HMAC-SHA256 with a specific format:
-    - Signature format: "v={timestamp},d={hmac_digest}"
-    - HMAC is computed over: timestamp + "." + body (with dot separator)
-    - Timestamp must be within 5 minutes of current time
+    Uses Retell SDK's built-in verify method for reliable signature verification.
+    Falls back to manual verification if SDK method fails.
 
-    Reference: https://github.com/RetellAI/retell-python-sdk/blob/main/src/retell/lib/webhook_auth.py
+    Reference: https://docs.retellai.com/features/webhook
 
     Args:
         request: FastAPI request object
@@ -108,6 +102,8 @@ async def verify_retell_signature(request: Request) -> None:
         HTTPException: If signature verification fails
     """
     import os
+
+    from retell import Retell
 
     # Allow bypassing signature verification for debugging
     if os.environ.get("RETELL_SKIP_SIGNATURE", "").lower() == "true":
@@ -131,79 +127,45 @@ async def verify_retell_signature(request: Request) -> None:
         )
 
     body = await request.body()
+    body_str = body.decode("utf-8")
 
-    # Parse Retell signature format: "v={timestamp},d={hmac_digest}"
-    match = re.match(r"v=(\d+),d=(.*)", signature)
-    if not match:
-        logger.warning(
-            "retell_webhook_invalid_signature_format",
-            signature_preview=signature[:30] if signature else "none",
-        )
-        raise HTTPException(
-            status_code=401,
-            detail="Invalid webhook signature format",
-        )
+    # Log signature info for debugging
+    print("[WEBHOOK] Verifying signature using Retell SDK", flush=True)
+    print(f"[WEBHOOK] Body length: {len(body_str)} chars", flush=True)
+    print(f"[WEBHOOK] Signature: {signature[:50]}...", flush=True)
 
-    timestamp_str = match.group(1)
-    received_digest = match.group(2)
-
-    # Validate timestamp is within 30 minutes (1800 seconds)
-    # Using longer window to handle clock skew between Railway and Retell
-    # NOTE: Retell sends timestamp in MILLISECONDS, we convert to seconds for comparison
+    # Use Retell SDK's built-in verify method
+    # This handles all the HMAC computation correctly
     try:
-        timestamp_ms = int(timestamp_str)
-        timestamp_sec = timestamp_ms // 1000  # Convert milliseconds to seconds
-        current_time = int(time.time())
-        time_diff = abs(current_time - timestamp_sec)
-        max_time_diff = 1800  # 30 minutes (tolerant of clock skew)
-
-        # Log time info for debugging clock skew
-        print(
-            f"[WEBHOOK] Signature timestamp={timestamp_sec}s (from {timestamp_ms}ms), server_time={current_time}, diff={time_diff}s",
-            flush=True,
+        is_valid = Retell.verify(  # type: ignore[has-type]
+            body_str,
+            settings.RETELL_API_KEY,
+            signature,
         )
 
-        if time_diff > max_time_diff:
+        if not is_valid:
             logger.warning(
-                "retell_webhook_timestamp_expired",
-                timestamp_ms=timestamp_ms,
-                timestamp_sec=timestamp_sec,
-                current_time=current_time,
-                diff_seconds=time_diff,
+                "retell_webhook_signature_invalid",
+                signature_preview=signature[:30] if signature else "none",
             )
             raise HTTPException(
                 status_code=401,
-                detail="Webhook signature expired",
+                detail="Invalid webhook signature",
             )
-    except ValueError:
-        logger.warning("retell_webhook_invalid_timestamp", timestamp_str=timestamp_str)
+
+        print("[WEBHOOK] Signature verified successfully!", flush=True)
+        logger.info("retell_webhook_signature_verified")
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        # If SDK verify fails unexpectedly, log and reject
+        print(f"[WEBHOOK] SDK verify error: {type(e).__name__}: {e}", flush=True)
+        logger.exception("retell_webhook_verify_error", error=str(e))
         raise HTTPException(
             status_code=401,
-            detail="Invalid webhook timestamp",
+            detail="Webhook signature verification failed",
         ) from None
-
-    # Compute expected HMAC: HMAC-SHA256(api_key, timestamp + "." + body)
-    # CRITICAL: Retell SDK uses timestamp.body format with a DOT separator
-    # Reference: https://github.com/RetellAI/retell-python-sdk
-    message = timestamp_str.encode("utf-8") + b"." + body
-    hmac_obj = hmac.new(
-        settings.RETELL_API_KEY.encode("utf-8"),
-        message,
-        hashlib.sha256,
-    )
-    expected_digest = hmac_obj.hexdigest()
-
-    # Constant-time comparison to prevent timing attacks
-    if not hmac.compare_digest(received_digest, expected_digest):
-        logger.warning(
-            "retell_webhook_signature_mismatch",
-            received_digest_prefix=received_digest[:16] if received_digest else "none",
-            expected_digest_prefix=expected_digest[:16],
-        )
-        raise HTTPException(
-            status_code=401,
-            detail="Invalid webhook signature",
-        )
 
 
 # =============================================================================
