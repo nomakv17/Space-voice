@@ -520,6 +520,12 @@ CRITICAL: When customer says a day name (Monday, Tuesday, etc.), use the EXACT d
         Args:
             data: Request data including transcript and response_id
         """
+        import sys
+
+        print("[LLM] *** _handle_response_required ENTERED ***", flush=True)
+        sys.stdout.flush()
+        sys.stderr.flush()
+
         response_id = data.get("response_id", 0)
         transcript = data.get("transcript", [])
 

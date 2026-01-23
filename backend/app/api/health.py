@@ -49,3 +49,64 @@ async def health_check_redis(response: Response) -> dict[str, str]:
         logger.exception("Redis health check failed")
         response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
         return {"status": "unhealthy", "redis": str(e)}
+
+
+@router.get("/test-llm")
+async def test_llm(response: Response) -> dict[str, str]:
+    """Test LLM API connectivity (Claude or OpenAI).
+
+    This endpoint verifies the configured LLM provider is working.
+    Useful for debugging voice agent issues.
+    """
+    result: dict[str, str] = {"llm_provider": settings.LLM_PROVIDER}
+
+    try:
+        if settings.LLM_PROVIDER.lower() == "claude":
+            from anthropic import Anthropic
+
+            if not settings.ANTHROPIC_API_KEY:
+                response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
+                return {"status": "error", "error": "ANTHROPIC_API_KEY not set"}
+
+            anthropic_client = Anthropic(api_key=settings.ANTHROPIC_API_KEY)
+            claude_response = anthropic_client.messages.create(
+                model="claude-sonnet-4-20250514",
+                max_tokens=20,
+                messages=[
+                    {
+                        "role": "user",
+                        "content": "Say 'Hello, I am working!' in exactly those words.",
+                    }
+                ],
+            )
+            result["status"] = "ok"
+            # Get text from the first text block
+            content_block = claude_response.content[0]
+            result["response"] = getattr(content_block, "text", str(content_block))
+        else:
+            from openai import OpenAI
+
+            if not settings.OPENAI_API_KEY:
+                response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
+                return {"status": "error", "error": "OPENAI_API_KEY not set"}
+
+            openai_client = OpenAI(api_key=settings.OPENAI_API_KEY)
+            openai_response = openai_client.chat.completions.create(
+                model="gpt-4o-mini",
+                max_tokens=20,
+                messages=[
+                    {
+                        "role": "user",
+                        "content": "Say 'Hello, I am working!' in exactly those words.",
+                    }
+                ],
+            )
+            result["status"] = "ok"
+            result["response"] = openai_response.choices[0].message.content or ""
+
+        return result
+
+    except Exception as e:
+        logger.exception("LLM test failed")
+        response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
+        return {"status": "error", "error": f"{type(e).__name__}: {e!s}"}
