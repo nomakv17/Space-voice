@@ -23,7 +23,7 @@ const steps = [
     number: "03",
     icon: Rocket,
     title: "Start Converting",
-    description: "Your AI agent immediately starts handling calls, booking appointments, and escalating emergencies—24/7/365.",
+    description: "Your AI agent immediately starts handling calls, booking appointments, and escalating emergencies - 24/7/365.",
     features: ["Real-time call handling", "Automatic appointment booking", "Emergency escalation", "Full call transcripts"],
     color: "green",
   },

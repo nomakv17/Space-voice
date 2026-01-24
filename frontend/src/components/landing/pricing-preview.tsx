@@ -7,7 +7,7 @@ const pricingPlans = [
   {
     name: "Starter",
     description: "Perfect for small businesses just getting started",
-    bestFor: "Best for 1–2 techs and low call volume",
+    bestFor: "Best for 1-2 techs and low call volume",
     price: 99,
     minutes: 500,
     features: [
@@ -23,7 +23,7 @@ const pricingPlans = [
   {
     name: "Growth",
     description: "For growing businesses ready to scale",
-    bestFor: "Best for 3–10 techs and steady inbound calls",
+    bestFor: "Best for 3-10 techs and steady inbound calls",
     price: 249,
     minutes: 2500,
     features: [

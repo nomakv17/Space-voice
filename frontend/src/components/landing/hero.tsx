@@ -97,16 +97,16 @@ export function HeroSection() {
 
             {/* Headline */}
             <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight text-gray-900 mb-5 animate-fade-in-up">
-              Stop Losing{" "}
-              <span className="bg-gradient-to-r from-cyan-600 via-cyan-500 to-purple-600 bg-clip-text text-transparent">
+              Stop Losing
+              <span className="block mt-2 bg-gradient-to-r from-cyan-600 via-cyan-500 to-purple-600 bg-clip-text text-transparent">
                 $8,500/Month
-              </span>{" "}
+              </span>
               to Missed Calls
             </h1>
 
             {/* Subheadline */}
             <p className="text-lg sm:text-xl text-gray-600 mb-7 max-w-xl mx-auto lg:mx-0 animate-fade-in-up delay-100">
-              AI voice agents answer every HVAC &amp; plumbing call 24/7, triage emergencies, and book appointments—so you don&apos;t have to.
+              AI voice agents answer every HVAC &amp; plumbing call 24/7, triage emergencies, and book appointments - so you don&apos;t have to.
             </p>
 
             {/* CTAs */}
@@ -118,13 +118,6 @@ export function HeroSection() {
                 <Phone className="w-5 h-5" />
                 Book Demo
                 <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
-              </a>
-
-              <a
-                href="https://dashboard.spacevoice.ai/signup"
-                className="inline-flex items-center justify-center gap-2 px-8 py-4 rounded-xl border-2 border-gray-200 text-gray-700 font-semibold text-lg hover:bg-gray-50 hover:border-gray-300 transition-all duration-300"
-              >
-                Start Free Trial
               </a>
             </div>
 
@@ -287,7 +280,7 @@ export function HeroSection() {
               <p className="text-xs text-gray-700">
                 &quot;Recovered $8,500/month in missed calls&quot;
               </p>
-              <p className="text-xs text-gray-500 mt-1">— HVAC Pro Services</p>
+              <p className="text-xs text-gray-500 mt-1">- HVAC Pro Services</p>
             </div>
           </div>
         </div>

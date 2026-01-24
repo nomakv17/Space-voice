@@ -13,7 +13,7 @@ const features = [
   {
     icon: Clock,
     title: "24/7 Availability",
-    description: "Never miss another call—even at 3 AM on Christmas. Your AI agent handles every inquiry with the same professionalism as your best receptionist.",
+    description: "Never miss another call - even at 3 AM on Christmas. Your AI agent handles every inquiry with the same professionalism as your best receptionist.",
     highlight: "Always On",
     color: "cyan",
   },
