@@ -1,8 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
+import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -70,6 +72,8 @@ interface PricingUpdateForm {
 }
 
 export default function PricingPage() {
+  const router = useRouter();
+  const { user, isLoading: authLoading } = useAuth();
   const queryClient = useQueryClient();
   const [editingConfig, setEditingConfig] = useState<PricingConfig | null>(null);
   const [editForm, setEditForm] = useState<PricingUpdateForm>({
@@ -81,12 +85,20 @@ export default function PricingPage() {
     base_telephony_cost_per_minute: "",
   });
 
+  // Admin-only route guard
+  useEffect(() => {
+    if (!authLoading && user && !user.is_superuser) {
+      router.push("/dashboard");
+    }
+  }, [authLoading, user, router]);
+
   const { data: pricingConfigs, isLoading } = useQuery<PricingConfig[]>({
     queryKey: ["pricing-configs"],
     queryFn: async () => {
       const response = await api.get("/api/v1/admin/pricing");
       return response.data;
     },
+    enabled: !!user?.is_superuser, // Only fetch if user is admin
   });
 
   const seedDefaults = useMutation({
@@ -99,7 +111,7 @@ export default function PricingPage() {
       toast.success(data.message);
     },
     onError: (error: Error) => {
-      toast.error(error.message || "Failed to seed pricing configs");
+      toast.error(error.message ?? "Failed to seed pricing configs");
     },
   });
 
@@ -135,9 +147,18 @@ export default function PricingPage() {
       toast.success("Pricing updated successfully!");
     },
     onError: (error: Error) => {
-      toast.error(error.message || "Failed to update pricing");
+      toast.error(error.message ?? "Failed to update pricing");
     },
   });
+
+  // Show loading while checking auth or if not admin
+  if (authLoading || !user?.is_superuser) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
 
   const openEditDialog = (config: PricingConfig) => {
     setEditingConfig(config);

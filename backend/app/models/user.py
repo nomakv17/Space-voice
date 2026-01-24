@@ -8,6 +8,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db.base import Base, TimestampMixin
 
 if TYPE_CHECKING:
+    from app.models.access_token import AccessToken
     from app.models.workspace import Workspace
 
 
@@ -38,4 +39,7 @@ class User(Base, TimestampMixin):
     # Relationships
     workspaces: Mapped[list["Workspace"]] = relationship(
         "Workspace", back_populates="user", cascade="all, delete-orphan"
+    )
+    access_tokens: Mapped[list["AccessToken"]] = relationship(
+        "AccessToken", back_populates="created_by", cascade="all, delete-orphan"
     )

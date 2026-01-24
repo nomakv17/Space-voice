@@ -1,7 +1,8 @@
-"""Admin API routes for managing clients and pricing."""
+"""Admin API routes for managing clients, pricing, and access tokens."""
 
 import secrets
 import string
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
 import structlog
@@ -12,7 +13,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.auth import get_password_hash
 from app.core.auth import CurrentUser
+from app.core.config import settings
 from app.db.session import get_db
+from app.models.access_token import AccessToken
 from app.models.pricing_config import PricingConfig
 from app.models.user import User
 
@@ -581,3 +584,197 @@ async def seed_default_pricing_configs(
     return {
         "message": f"Seeded {created_count} pricing configs, skipped {skipped_count} existing"
     }
+
+
+# =============================================================================
+# Access Token Pydantic Models
+# =============================================================================
+
+
+def generate_access_token() -> str:
+    """Generate a secure access token with sv_at_ prefix."""
+    random_part = secrets.token_urlsafe(32)
+    return f"sv_at_{random_part}"
+
+
+class CreateAccessTokenRequest(BaseModel):
+    """Request to create a one-time access token."""
+
+    label: str | None = Field(None, max_length=255)
+    expires_in_hours: int = Field(default=24, ge=1, le=72)
+    is_read_only: bool = True
+    notes: str | None = None
+
+
+class AccessTokenResponse(BaseModel):
+    """Response for a created access token."""
+
+    id: int
+    token: str
+    url: str
+    label: str | None
+    expires_at: str
+    is_read_only: bool
+    status: str
+    created_at: str
+    used_at: str | None = None
+
+    model_config = {"from_attributes": True}
+
+    @classmethod
+    def from_model(cls, token: AccessToken, include_token: bool = True) -> "AccessTokenResponse":
+        """Create response from AccessToken model."""
+        # Build the access URL
+        frontend_url = getattr(settings, "FRONTEND_URL", "https://dashboard.spacevoice.ai")
+        url = f"{frontend_url}/access/{token.token}" if include_token else ""
+
+        return cls(
+            id=token.id,
+            token=token.token if include_token else "***",
+            url=url,
+            label=token.label,
+            expires_at=token.expires_at.isoformat() if token.expires_at else "",
+            is_read_only=token.is_read_only,
+            status=token.status,
+            created_at=token.created_at.isoformat() if token.created_at else "",
+            used_at=token.used_at.isoformat() if token.used_at else None,
+        )
+
+
+class AccessTokenListResponse(BaseModel):
+    """Response for listing access tokens (without full token)."""
+
+    id: int
+    token_preview: str  # Shows only first/last few chars
+    label: str | None
+    expires_at: str
+    is_read_only: bool
+    status: str
+    created_at: str
+    used_at: str | None = None
+    used_by_ip: str | None = None
+
+    model_config = {"from_attributes": True}
+
+    @classmethod
+    def from_model(cls, token: AccessToken) -> "AccessTokenListResponse":
+        """Create response from AccessToken model."""
+        # Show only preview: sv_at_abc...xyz
+        preview = f"{token.token[:10]}...{token.token[-4:]}" if len(token.token) > 14 else token.token
+
+        return cls(
+            id=token.id,
+            token_preview=preview,
+            label=token.label,
+            expires_at=token.expires_at.isoformat() if token.expires_at else "",
+            is_read_only=token.is_read_only,
+            status=token.status,
+            created_at=token.created_at.isoformat() if token.created_at else "",
+            used_at=token.used_at.isoformat() if token.used_at else None,
+            used_by_ip=token.used_by_ip,
+        )
+
+
+# =============================================================================
+# Access Token Admin Endpoints
+# =============================================================================
+
+
+@router.post("/access-tokens", response_model=AccessTokenResponse)
+async def create_access_token(
+    body: CreateAccessTokenRequest,
+    current_user: CurrentUser,
+    db: AsyncSession = Depends(get_db),
+) -> AccessTokenResponse:
+    """Generate a new one-time access token for dashboard access.
+
+    This creates a secure, single-use URL that grants temporary access
+    to the dashboard for superior review.
+    """
+    require_admin(current_user)
+
+    log = logger.bind(admin_id=current_user.id, label=body.label)
+    log.info("creating_access_token")
+
+    # Generate unique token
+    token_value = generate_access_token()
+    while True:
+        result = await db.execute(select(AccessToken).where(AccessToken.token == token_value))
+        if not result.scalar_one_or_none():
+            break
+        token_value = generate_access_token()
+
+    # Calculate expiration
+    expires_at = datetime.now(UTC) + timedelta(hours=body.expires_in_hours)
+
+    # Create token
+    access_token = AccessToken(
+        token=token_value,
+        created_by_id=current_user.id,
+        expires_at=expires_at,
+        label=body.label,
+        is_read_only=body.is_read_only,
+        notes=body.notes,
+    )
+    db.add(access_token)
+    await db.commit()
+    await db.refresh(access_token)
+
+    log.info("access_token_created", token_id=access_token.id, expires_at=expires_at.isoformat())
+    return AccessTokenResponse.from_model(access_token, include_token=True)
+
+
+@router.get("/access-tokens", response_model=list[AccessTokenListResponse])
+async def list_access_tokens(
+    current_user: CurrentUser,
+    db: AsyncSession = Depends(get_db),
+) -> list[AccessTokenListResponse]:
+    """List all access tokens created by the current admin."""
+    require_admin(current_user)
+
+    result = await db.execute(
+        select(AccessToken)
+        .where(AccessToken.created_by_id == current_user.id)
+        .order_by(AccessToken.created_at.desc())
+    )
+    tokens = result.scalars().all()
+
+    return [AccessTokenListResponse.from_model(token) for token in tokens]
+
+
+@router.delete("/access-tokens/{token_id}")
+async def revoke_access_token(
+    token_id: int,
+    current_user: CurrentUser,
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, str]:
+    """Revoke an access token."""
+    require_admin(current_user)
+
+    log = logger.bind(admin_id=current_user.id, token_id=token_id)
+
+    result = await db.execute(
+        select(AccessToken).where(
+            AccessToken.id == token_id,
+            AccessToken.created_by_id == current_user.id,
+        )
+    )
+    token = result.scalar_one_or_none()
+
+    if not token:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Access token not found",
+        )
+
+    if token.revoked_at:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Token already revoked",
+        )
+
+    token.revoked_at = datetime.now(UTC)
+    await db.commit()
+
+    log.info("access_token_revoked")
+    return {"message": "Access token revoked successfully"}

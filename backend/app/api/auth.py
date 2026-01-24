@@ -15,6 +15,7 @@ from app.core.auth import CurrentUser
 from app.core.config import settings
 from app.core.limiter import limiter
 from app.db.session import get_db
+from app.models.access_token import AccessToken
 from app.models.user import User
 
 router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
@@ -206,3 +207,114 @@ async def get_current_user_info(current_user: CurrentUser) -> UserResponse:
         User information
     """
     return UserResponse.from_user(current_user)
+
+
+# =============================================================================
+# Access Token Endpoints
+# =============================================================================
+
+
+class AccessTokenLoginResponse(BaseModel):
+    """Response for access token login."""
+
+    access_token: str
+    token_type: str = "bearer"
+    is_read_only: bool
+    user: UserResponse
+
+
+@router.get("/access/{token}", response_model=AccessTokenLoginResponse)
+async def consume_access_token(
+    token: str,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+) -> AccessTokenLoginResponse:
+    """Consume a one-time access token and receive a JWT.
+
+    This endpoint validates the token, marks it as used, and returns
+    a JWT that grants access to the dashboard.
+
+    Args:
+        token: The one-time access token (sv_at_xxx format)
+        request: Request object (for IP logging)
+        db: Database session
+
+    Returns:
+        JWT access token and user info
+    """
+    log = logger.bind(token_prefix=token[:14] if len(token) > 14 else token)
+    log.info("access_token_consumption_attempt")
+
+    # Find the token
+    result = await db.execute(select(AccessToken).where(AccessToken.token == token))
+    access_token = result.scalar_one_or_none()
+
+    if not access_token:
+        log.warning("access_token_not_found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Invalid or expired access link",
+        )
+
+    # Check if already used
+    if access_token.used_at:
+        log.warning("access_token_already_used")
+        raise HTTPException(
+            status_code=status.HTTP_410_GONE,
+            detail="This access link has already been used",
+        )
+
+    # Check if revoked
+    if access_token.revoked_at:
+        log.warning("access_token_revoked")
+        raise HTTPException(
+            status_code=status.HTTP_410_GONE,
+            detail="This access link has been revoked",
+        )
+
+    # Check if expired
+    now = datetime.now(UTC)
+    if access_token.expires_at <= now:
+        log.warning("access_token_expired")
+        raise HTTPException(
+            status_code=status.HTTP_410_GONE,
+            detail="This access link has expired",
+        )
+
+    # Get the admin user who created the token
+    user_result = await db.execute(select(User).where(User.id == access_token.created_by_id))
+    token_user: User | None = user_result.scalar_one_or_none()
+
+    if not token_user:
+        log.error("access_token_user_not_found")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Associated user not found",
+        )
+
+    # Mark token as used
+    client_ip = request.client.host if request.client else "unknown"
+    access_token.used_at = now
+    access_token.used_by_ip = client_ip
+    await db.commit()
+
+    # Create JWT with read_only claim if applicable
+    jwt_payload = {"sub": str(token_user.id), "exp": now + timedelta(hours=24)}
+    if access_token.is_read_only:
+        jwt_payload["read_only"] = True
+
+    jwt_token = jwt.encode(jwt_payload, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
+
+    log.info(
+        "access_token_consumed",
+        token_id=access_token.id,
+        user_id=token_user.id,
+        is_read_only=access_token.is_read_only,
+        client_ip=client_ip,
+    )
+
+    return AccessTokenLoginResponse(
+        access_token=jwt_token,
+        is_read_only=access_token.is_read_only,
+        user=UserResponse.from_user(token_user),
+    )

@@ -1,5 +1,6 @@
 """SQLAlchemy models."""
 
+from app.models.access_token import AccessToken
 from app.models.agent import Agent
 from app.models.appointment import Appointment
 from app.models.call_interaction import CallInteraction
@@ -14,6 +15,7 @@ from app.models.user_integration import UserIntegration
 from app.models.workspace import AgentWorkspace, Workspace
 
 __all__ = [
+    "AccessToken",
     "Agent",
     "AgentWorkspace",
     "Appointment",

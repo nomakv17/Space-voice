@@ -3,6 +3,9 @@
 This script creates a demo workspace with sample contacts, appointments,
 and links existing agents for demonstration purposes.
 
+It also creates a demo user account (demo@spacevoice.ai) for customer demos.
+This user is NOT a superuser, so admin-only pages (Pricing, Clients) are hidden.
+
 Usage:
     cd backend
     uv run python -m app.scripts.seed_demo
@@ -13,6 +16,7 @@ import uuid
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
+from passlib.context import CryptContext
 from sqlalchemy import select
 
 from app.db.session import AsyncSessionLocal
@@ -21,6 +25,14 @@ from app.models.appointment import Appointment
 from app.models.contact import Contact
 from app.models.user import User
 from app.models.workspace import AgentWorkspace, Workspace
+
+# Password hashing
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+# Demo user credentials
+DEMO_USER_EMAIL = "demo@spacevoice.ai"
+DEMO_USER_PASSWORD = "demo2024!"  # Change this in production
+DEMO_USER_NAME = "Demo User"
 
 # Sample HVAC contacts data
 SAMPLE_CONTACTS: list[dict[str, Any]] = [
@@ -156,23 +168,72 @@ SAMPLE_APPOINTMENTS: list[dict[str, Any]] = [
 ]
 
 
+async def create_demo_user() -> User | None:
+    """Create or get the demo user account.
+
+    Returns:
+        The demo user, or None if creation failed.
+    """
+    async with AsyncSessionLocal() as db:
+        # Check if demo user already exists
+        result = await db.execute(select(User).where(User.email == DEMO_USER_EMAIL))
+        existing_user = result.scalar_one_or_none()
+
+        if existing_user:
+            print(f"Demo user already exists: {existing_user.email} (ID: {existing_user.id})")
+            return existing_user
+
+        # Create demo user (NOT a superuser - can't see admin pages)
+        demo_user = User(
+            email=DEMO_USER_EMAIL,
+            hashed_password=pwd_context.hash(DEMO_USER_PASSWORD),
+            full_name=DEMO_USER_NAME,
+            is_superuser=False,  # Important: NOT admin - hides Pricing & Clients pages
+            is_active=True,
+            onboarding_completed=True,
+            onboarding_step=5,
+            company_name="Demo HVAC Company",
+            industry="HVAC",
+        )
+        db.add(demo_user)
+        await db.commit()
+        await db.refresh(demo_user)
+
+        print(f"Created demo user: {demo_user.email} (ID: {demo_user.id})")
+        print(f"  Password: {DEMO_USER_PASSWORD}")
+        print(f"  is_superuser: {demo_user.is_superuser} (admin pages hidden)")
+
+        return demo_user
+
+
 async def seed_demo_workspace(user_id: int | None = None) -> dict[str, Any]:
     """Seed demo workspace with sample data.
 
     Args:
-        user_id: Optional user ID to create demo for. If None, uses first user.
+        user_id: Optional user ID to create demo for. If None, creates/uses demo user.
 
     Returns:
         Dict with created workspace and counts
     """
     async with AsyncSessionLocal() as db:
-        # Get user
+        # Get user - prefer demo user if no specific ID given
         if user_id:
             result = await db.execute(select(User).where(User.id == user_id))
             user = result.scalar_one_or_none()
         else:
-            result = await db.execute(select(User).limit(1))
+            # Try to get or create demo user
+            result = await db.execute(select(User).where(User.email == DEMO_USER_EMAIL))
             user = result.scalar_one_or_none()
+
+            if not user:
+                # Create demo user first
+                demo_user = await create_demo_user()
+                if demo_user:
+                    # Re-fetch in current session
+                    result = await db.execute(
+                        select(User).where(User.email == DEMO_USER_EMAIL)
+                    )
+                    user = result.scalar_one_or_none()
 
         if not user:
             return {"error": "No users found. Please create a user first."}
@@ -304,6 +365,10 @@ async def main() -> None:
     print("=" * 50)
     print()
 
+    # Create or get demo user first
+    _ = await create_demo_user()
+
+    # Seed demo workspace
     result = await seed_demo_workspace()
 
     print()
@@ -311,6 +376,14 @@ async def main() -> None:
     print("Result:")
     for key, value in result.items():
         print(f"  {key}: {value}")
+    print()
+    print("-" * 50)
+    print("DEMO CREDENTIALS (for customer demos):")
+    print("  URL:      https://dashboard.spacevoice.ai/login")
+    print(f"  Email:    {DEMO_USER_EMAIL}")
+    print(f"  Password: {DEMO_USER_PASSWORD}")
+    print()
+    print("NOTE: This account CANNOT see admin pages (Pricing, Clients)")
     print("=" * 50)
 
 
