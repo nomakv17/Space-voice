@@ -112,7 +112,7 @@ export function HeroSection() {
             {/* CTAs */}
             <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start mb-10 animate-fade-in-up delay-200">
               <a
-                href="mailto:hello@spacevoice.ai"
+                href="https://calendly.com/tai-alabi/spacevoice-demo"
                 className="group inline-flex items-center justify-center gap-2 px-8 py-4 rounded-xl bg-gradient-to-r from-cyan-600 to-cyan-500 text-white font-semibold text-lg shadow-lg shadow-cyan-500/25 hover:shadow-cyan-500/40 hover:scale-105 transition-all duration-300"
               >
                 <Phone className="w-5 h-5" />
@@ -199,7 +199,8 @@ export function HeroSection() {
                 </h3>
               </div>
               <p className="text-gray-600 text-center mb-6">
-                Listen to a real call sample. This is exactly how SpaceVoice handles HVAC inquiries.
+                Listen to a real demo call: SpaceVoice answers, triages emergencies, captures details,
+                and books an appointment in under a minute.
               </p>
 
               {/* Audio player controls */}
@@ -254,7 +255,7 @@ export function HeroSection() {
               {/* CTA Buttons */}
               <div className="space-y-3">
                 <a
-                  href="mailto:hello@spacevoice.ai"
+                  href="https://calendly.com/tai-alabi/spacevoice-demo"
                   className="flex items-center justify-center gap-2 w-full py-4 rounded-xl bg-gradient-to-r from-cyan-600 to-cyan-500 text-white font-semibold text-lg hover:shadow-lg hover:shadow-cyan-500/25 transition-all"
                 >
                   <Phone className="w-5 h-5" />
