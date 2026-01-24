@@ -97,15 +97,16 @@ export function HeroSection() {
 
             {/* Headline */}
             <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight text-gray-900 mb-5 animate-fade-in-up">
-              AI Voice Agents for Home Services{" "}
+              Stop Losing{" "}
               <span className="bg-gradient-to-r from-cyan-600 via-cyan-500 to-purple-600 bg-clip-text text-transparent">
-                That Actually Convert
-              </span>
+                $8,500/Month
+              </span>{" "}
+              to Missed Calls
             </h1>
 
             {/* Subheadline */}
             <p className="text-lg sm:text-xl text-gray-600 mb-7 max-w-xl mx-auto lg:mx-0 animate-fade-in-up delay-100">
-              Answer every HVAC & plumbing call, triage emergencies, and book appointments automatically.
+              AI voice agents answer every HVAC &amp; plumbing call 24/7, triage emergencies, and book appointments—so you don&apos;t have to.
             </p>
 
             {/* CTAs */}
