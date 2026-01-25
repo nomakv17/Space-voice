@@ -5,7 +5,7 @@ import { Building2, Users, Clock, CheckCircle2 } from "lucide-react";
 const stats = [
   {
     icon: Building2,
-    value: "50+",
+    value: "Trusted in Canada",
     label: "Home Service Businesses",
   },
   {

@@ -38,7 +38,7 @@ export function FooterSection() {
             </span>
           </h2>
           <p className="text-xl text-gray-600 mb-10 max-w-2xl mx-auto">
-            Join 50+ home service businesses already using SpaceVoice to capture more leads, book more appointments, and grow their revenue.
+            Trusted by home service teams across Canada.
           </p>
 
           <div className="flex justify-center">
@@ -81,7 +81,7 @@ export function FooterSection() {
                 </a>
                 <div className="flex items-center gap-2">
                   <MapPin className="w-4 h-4" />
-                  San Francisco, CA
+                  Saskatchewan, CA
                 </div>
               </div>
             </div>

@@ -8,7 +8,7 @@ const testimonials = [
     author: "Mike Rodriguez",
     title: "Owner",
     company: "CoolAir HVAC Solutions",
-    location: "Phoenix, AZ",
+    location: "Ontario, CA",
     metric: "$8,500/mo",
     metricLabel: "Revenue Recovered",
     rating: 5,
@@ -19,7 +19,7 @@ const testimonials = [
     author: "Sarah Chen",
     title: "Operations Manager",
     company: "SafeHome Plumbing",
-    location: "Dallas, TX",
+    location: "Ontario, CA",
     metric: "100%",
     metricLabel: "Emergency Detection",
     rating: 5,
@@ -30,7 +30,7 @@ const testimonials = [
     author: "James Thompson",
     title: "CEO",
     company: "Thompson Electric",
-    location: "Atlanta, GA",
+    location: "British Columbia, CA",
     metric: "73%",
     metricLabel: "Booking Rate Increase",
     rating: 5,
@@ -41,7 +41,7 @@ const testimonials = [
     author: "Lisa Martinez",
     title: "Owner",
     company: "Comfort Zone HVAC",
-    location: "Miami, FL",
+    location: "Alberta, CA",
     metric: "< 24hrs",
     metricLabel: "Setup Time",
     rating: 5,
@@ -133,7 +133,7 @@ export function TestimonialsSection() {
               <div className="text-sm text-gray-600">Average Rating</div>
             </div>
             <div>
-              <div className="text-3xl font-bold text-gray-900 mb-1">50+</div>
+              <div className="text-3xl font-bold text-gray-900 mb-1">Home service teams</div>
               <div className="text-sm text-gray-600 mt-3">Active Businesses</div>
             </div>
             <div>
