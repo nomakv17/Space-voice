@@ -30,7 +30,7 @@ const testimonials = [
     author: "James Thompson",
     title: "CEO",
     company: "Thompson Electric",
-    location: "British Columbia, CA",
+    location: "FL, US",
     metric: "73%",
     metricLabel: "Booking Rate Increase",
     rating: 5,
@@ -133,7 +133,7 @@ export function TestimonialsSection() {
               <div className="text-sm text-gray-600">Average Rating</div>
             </div>
             <div>
-              <div className="text-3xl font-bold text-gray-900 mb-1">Home service teams</div>
+              <div className="text-3xl font-bold text-gray-900 mb-1">50+</div>
               <div className="text-sm text-gray-600 mt-3">Active Businesses</div>
             </div>
             <div>
