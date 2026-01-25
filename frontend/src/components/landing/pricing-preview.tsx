@@ -51,7 +51,7 @@ const pricingPlans = [
       "SLA guarantee",
       "White-labeling available",
     ],
-    cta: "Contact Sales",
+    cta: "Book Demo",
     popular: false,
   },
 ];
@@ -132,7 +132,7 @@ export function PricingPreview() {
 
               {/* CTA */}
               <a
-                href={plan.price !== null ? "https://dashboard.spacevoice.ai/signup" : "mailto:hello@spacevoice.ai"}
+                href={plan.price !== null ? "https://dashboard.spacevoice.ai/signup" : "https://calendly.com/tai-alabi/spacevoice-demo"}
                 className={cn(
                   "flex items-center justify-center gap-2 w-full py-3 rounded-xl font-semibold transition-all duration-300",
                   plan.popular

@@ -97,34 +97,27 @@ export function HeroSection() {
 
             {/* Headline */}
             <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight text-gray-900 mb-6 animate-fade-in-up">
-              AI Voice Agents for Home Services{" "}
-              <span className="bg-gradient-to-r from-cyan-600 via-cyan-500 to-purple-600 bg-clip-text text-transparent">
-                That Actually Convert
+              Stop Losing
+              <span className="block mt-2 bg-gradient-to-r from-cyan-600 via-cyan-500 to-purple-600 bg-clip-text text-transparent">
+                $8,500/Month
               </span>
+              to Missed Calls
             </h1>
 
             {/* Subheadline */}
             <p className="text-lg sm:text-xl text-gray-600 mb-8 max-w-xl mx-auto lg:mx-0 animate-fade-in-up delay-100">
-              Stop losing HVAC & plumbing calls to voicemail. SpaceVoice answers 24/7, triages
-              emergencies, and books appointments—automatically.
+              AI voice agents answer every HVAC & plumbing call 24/7, triage emergencies, and book appointments - so you don&apos;t have to.
             </p>
 
-            {/* CTAs */}
-            <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start mb-12 animate-fade-in-up delay-200">
+            {/* CTA - Single primary action above the fold */}
+            <div className="flex justify-center lg:justify-start mb-12 animate-fade-in-up delay-200">
               <a
-                href="https://dashboard.spacevoice.ai/signup"
-                className="group inline-flex items-center justify-center gap-2 px-8 py-4 rounded-xl bg-gradient-to-r from-cyan-600 to-cyan-500 text-white font-semibold text-lg shadow-lg shadow-cyan-500/25 hover:shadow-cyan-500/40 hover:scale-105 transition-all duration-300"
+                href="https://calendly.com/tai-alabi/spacevoice-demo"
+                className="group w-full sm:w-auto inline-flex items-center justify-center gap-2 px-8 py-4 rounded-xl bg-gradient-to-r from-cyan-600 to-cyan-500 text-white font-semibold text-lg shadow-lg shadow-cyan-500/25 hover:shadow-cyan-500/40 hover:scale-105 transition-all duration-300"
               >
                 <Phone className="w-5 h-5" />
-                Get Started
+                Book Demo
                 <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
-              </a>
-
-              <a
-                href="mailto:hello@spacevoice.ai"
-                className="inline-flex items-center justify-center gap-2 px-8 py-4 rounded-xl border-2 border-gray-200 text-gray-700 font-semibold text-lg hover:bg-gray-50 hover:border-gray-300 transition-all duration-300"
-              >
-                Talk to Sales
               </a>
             </div>
 
@@ -156,7 +149,7 @@ export function HeroSection() {
             {/* Audio sample player card */}
             <div
               id="demo-form"
-              className="bg-white rounded-3xl p-8 max-w-md mx-auto animate-scale-in shadow-2xl border border-gray-100"
+              className="bg-white rounded-3xl p-5 sm:p-8 max-w-md mx-auto animate-scale-in shadow-2xl border border-gray-100"
             >
               {/* Hidden audio element */}
               <audio
@@ -251,23 +244,15 @@ export function HeroSection() {
                 </div>
               )}
 
-              {/* CTA Buttons */}
-              <div className="space-y-3">
-                <a
-                  href="https://dashboard.spacevoice.ai/signup"
-                  className="flex items-center justify-center gap-2 w-full py-4 rounded-xl bg-gradient-to-r from-cyan-600 to-cyan-500 text-white font-semibold text-lg hover:shadow-lg hover:shadow-cyan-500/25 transition-all"
-                >
-                  <Phone className="w-5 h-5" />
-                  Get Started
-                  <ArrowRight className="w-5 h-5" />
-                </a>
-                <a
-                  href="mailto:hello@spacevoice.ai"
-                  className="flex items-center justify-center gap-2 w-full py-3 rounded-xl border-2 border-gray-200 text-gray-700 font-medium hover:bg-gray-50 hover:border-gray-300 transition-all"
-                >
-                  Talk to Sales
-                </a>
-              </div>
+              {/* CTA Button */}
+              <a
+                href="https://calendly.com/tai-alabi/spacevoice-demo"
+                className="flex items-center justify-center gap-2 w-full py-4 rounded-xl bg-gradient-to-r from-cyan-600 to-cyan-500 text-white font-semibold text-lg hover:shadow-lg hover:shadow-cyan-500/25 transition-all"
+              >
+                <Phone className="w-5 h-5" />
+                Book Demo
+                <ArrowRight className="w-5 h-5" />
+              </a>
 
               <p className="text-xs text-gray-500 text-center mt-4">
                 30-day money-back guarantee • Cancel anytime
@@ -286,7 +271,7 @@ export function HeroSection() {
               <p className="text-xs text-gray-700">
                 &quot;Recovered $8,500/month in missed calls&quot;
               </p>
-              <p className="text-xs text-gray-500 mt-1">— HVAC Pro Services</p>
+              <p className="text-xs text-gray-500 mt-1">- HVAC Pro Services</p>
             </div>
           </div>
         </div>
