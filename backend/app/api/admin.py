@@ -12,7 +12,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.auth import get_password_hash
-from app.core.auth import CurrentUser
+from app.core.auth import CurrentUser, require_write_access
 from app.core.config import settings
 from app.db.session import get_db
 from app.models.access_token import AccessToken
@@ -80,12 +80,22 @@ class ClientResponse(BaseModel):
 
 
 def require_admin(current_user: CurrentUser) -> User:
-    """Require the current user to be an admin."""
+    """Require the current user to be an admin (read-only allowed)."""
     if not current_user.is_superuser:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Admin access required",
         )
+    return current_user
+
+
+def require_admin_write(current_user: CurrentUser) -> User:
+    """Require admin access AND write permissions.
+
+    Use this for POST, PUT, DELETE operations that modify data.
+    """
+    require_admin(current_user)
+    require_write_access(current_user)
     return current_user
 
 
@@ -119,7 +129,7 @@ async def create_client(
     db: AsyncSession = Depends(get_db),
 ) -> ClientResponse:
     """Create a new client account with a unique Client ID."""
-    require_admin(current_user)
+    require_admin_write(current_user)
 
     # Generate unique client_id
     client_id = generate_client_id()
@@ -194,7 +204,7 @@ async def delete_client(
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, str]:
     """Delete a client account."""
-    require_admin(current_user)
+    require_admin_write(current_user)
 
     log = logger.bind(admin_id=current_user.id, client_id=client_id)
 
@@ -334,15 +344,13 @@ async def create_pricing_config(
     db: AsyncSession = Depends(get_db),
 ) -> PricingConfigResponse:
     """Create a new pricing configuration."""
-    require_admin(current_user)
+    require_admin_write(current_user)
 
     log = logger.bind(admin_id=current_user.id, tier_id=body.tier_id)
     log.info("creating_pricing_config")
 
     # Check if tier_id already exists
-    result = await db.execute(
-        select(PricingConfig).where(PricingConfig.tier_id == body.tier_id)
-    )
+    result = await db.execute(select(PricingConfig).where(PricingConfig.tier_id == body.tier_id))
     if result.scalar_one_or_none():
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -384,9 +392,7 @@ async def get_pricing_config(
     """Get a specific pricing configuration by tier ID."""
     require_admin(current_user)
 
-    result = await db.execute(
-        select(PricingConfig).where(PricingConfig.tier_id == tier_id)
-    )
+    result = await db.execute(select(PricingConfig).where(PricingConfig.tier_id == tier_id))
     config = result.scalar_one_or_none()
 
     if not config:
@@ -406,14 +412,12 @@ async def update_pricing_config(
     db: AsyncSession = Depends(get_db),
 ) -> PricingConfigResponse:
     """Update a pricing configuration (base costs and/or markups)."""
-    require_admin(current_user)
+    require_admin_write(current_user)
 
     log = logger.bind(admin_id=current_user.id, tier_id=tier_id)
     log.info("updating_pricing_config")
 
-    result = await db.execute(
-        select(PricingConfig).where(PricingConfig.tier_id == tier_id)
-    )
+    result = await db.execute(select(PricingConfig).where(PricingConfig.tier_id == tier_id))
     config = result.scalar_one_or_none()
 
     if not config:
@@ -457,13 +461,11 @@ async def delete_pricing_config(
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, str]:
     """Delete a pricing configuration."""
-    require_admin(current_user)
+    require_admin_write(current_user)
 
     log = logger.bind(admin_id=current_user.id, tier_id=tier_id)
 
-    result = await db.execute(
-        select(PricingConfig).where(PricingConfig.tier_id == tier_id)
-    )
+    result = await db.execute(select(PricingConfig).where(PricingConfig.tier_id == tier_id))
     config = result.scalar_one_or_none()
 
     if not config:
@@ -489,7 +491,7 @@ async def seed_default_pricing_configs(
     This creates pricing configs with estimated base costs and default markups.
     Costs are approximate based on provider pricing as of 2025.
     """
-    require_admin(current_user)
+    require_admin_write(current_user)
 
     log = logger.bind(admin_id=current_user.id)
     log.info("seeding_default_pricing_configs")
@@ -581,9 +583,7 @@ async def seed_default_pricing_configs(
     await db.commit()
 
     log.info("pricing_configs_seeded", created=created_count, skipped=skipped_count)
-    return {
-        "message": f"Seeded {created_count} pricing configs, skipped {skipped_count} existing"
-    }
+    return {"message": f"Seeded {created_count} pricing configs, skipped {skipped_count} existing"}
 
 
 # =============================================================================
@@ -660,7 +660,9 @@ class AccessTokenListResponse(BaseModel):
     def from_model(cls, token: AccessToken) -> "AccessTokenListResponse":
         """Create response from AccessToken model."""
         # Show only preview: sv_at_abc...xyz
-        preview = f"{token.token[:10]}...{token.token[-4:]}" if len(token.token) > 14 else token.token
+        preview = (
+            f"{token.token[:10]}...{token.token[-4:]}" if len(token.token) > 14 else token.token
+        )
 
         return cls(
             id=token.id,
@@ -691,7 +693,7 @@ async def create_access_token(
     This creates a secure, single-use URL that grants temporary access
     to the dashboard for superior review.
     """
-    require_admin(current_user)
+    require_admin_write(current_user)
 
     log = logger.bind(admin_id=current_user.id, label=body.label)
     log.info("creating_access_token")
@@ -749,7 +751,7 @@ async def revoke_access_token(
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, str]:
     """Revoke an access token."""
-    require_admin(current_user)
+    require_admin_write(current_user)
 
     log = logger.bind(admin_id=current_user.id, token_id=token_id)
 

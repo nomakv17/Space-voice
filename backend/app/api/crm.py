@@ -11,7 +11,7 @@ from sqlalchemy.exc import DBAPIError, IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import undefer
 
-from app.core.auth import CurrentUser
+from app.core.auth import CurrentUser, require_write_access
 from app.core.cache import cache_get, cache_invalidate, cache_set
 from app.core.limiter import limiter
 from app.db.session import get_db
@@ -460,6 +460,7 @@ async def create_contact(
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, object]:
     """Create a new contact for the current user."""
+    require_write_access(current_user)
     user_id = current_user.id
 
     # Validate workspace_id if provided
@@ -679,6 +680,7 @@ async def update_contact(
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, object]:
     """Update an existing contact (must belong to current user)."""
+    require_write_access(current_user)
     user_id = current_user.id
 
     # Validate workspace_id if provided
@@ -791,6 +793,7 @@ async def delete_contact(
     db: AsyncSession = Depends(get_db),
 ) -> None:
     """Delete a contact (must belong to current user)."""
+    require_write_access(current_user)
     user_id = current_user.id
 
     # Fetch existing contact - filter by user_id for security
@@ -1169,6 +1172,8 @@ async def create_appointment(
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, object]:
     """Create a new appointment."""
+    require_write_access(current_user)
+
     from datetime import datetime
 
     from sqlalchemy.orm import selectinload
@@ -1259,6 +1264,8 @@ async def update_appointment(
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, object]:
     """Update an existing appointment."""
+    require_write_access(current_user)
+
     from datetime import datetime
 
     from sqlalchemy.orm import selectinload
@@ -1344,6 +1351,7 @@ async def delete_appointment(
     db: AsyncSession = Depends(get_db),
 ) -> None:
     """Delete an appointment."""
+    require_write_access(current_user)
     user_id = current_user.id
 
     try:

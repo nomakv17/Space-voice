@@ -8,7 +8,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.auth import CurrentUser
+from app.core.auth import CurrentUser, require_write_access
 from app.core.config import settings
 from app.core.limiter import limiter
 from app.core.public_id import generate_public_id
@@ -180,6 +180,8 @@ async def create_agent(
     Returns:
         Created agent
     """
+    require_write_access(current_user)
+
     # Build provider config based on tier (from pricing-tiers.ts)
     provider_config = _get_provider_config(agent_request.pricing_tier)
 
@@ -322,6 +324,8 @@ async def delete_agent(
     Raises:
         HTTPException: If agent not found or unauthorized
     """
+    require_write_access(current_user)
+
     result = await db.execute(
         select(Agent).where(
             Agent.id == uuid.UUID(agent_id),
@@ -364,6 +368,8 @@ async def update_agent(
     Raises:
         HTTPException: If agent not found or unauthorized
     """
+    require_write_access(current_user)
+
     result = await db.execute(
         select(Agent).where(
             Agent.id == uuid.UUID(agent_id),
