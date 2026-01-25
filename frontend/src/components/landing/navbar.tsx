@@ -6,7 +6,6 @@ import { Phone, Menu, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const navLinks = [
-  { label: "Why SpaceVoice", href: "#why-spacevoice" },
   { label: "Features", href: "#features" },
   { label: "Use Cases", href: "#use-cases" },
   { label: "Pricing", href: "#pricing" },
@@ -66,10 +65,10 @@ export function Navbar() {
               Log In
             </a>
             <a
-              href="https://calendly.com/tai-alabi/spacevoice-demo"
+              href="https://dashboard.spacevoice.ai/signup"
               className="px-5 py-2.5 rounded-lg bg-gradient-to-r from-cyan-600 to-cyan-500 text-white font-semibold text-sm hover:shadow-lg hover:shadow-cyan-500/25 transition-all duration-300"
             >
-              Book Demo
+              Get Started
             </a>
           </div>
 
@@ -104,10 +103,10 @@ export function Navbar() {
                   Log In
                 </a>
                 <a
-                  href="https://calendly.com/tai-alabi/spacevoice-demo"
+                  href="https://dashboard.spacevoice.ai/signup"
                   className="text-center py-2.5 rounded-lg bg-gradient-to-r from-cyan-600 to-cyan-500 text-white font-semibold text-sm"
                 >
-                  Book Demo
+                  Get Started
                 </a>
               </div>
             </div>

@@ -15,7 +15,7 @@ const faqs = [
   },
   {
     question: "What happens if there's a real emergency?",
-    answer: "Safety is our top priority. The AI is trained to recognize emergencies like gas leaks, flooding, electrical hazards, and no-heat/no-AC situations. It immediately escalates these to your on-call team via call, text, or your preferred method - while keeping the customer calm and collecting critical information.",
+    answer: "Safety is our top priority. The AI is trained to recognize emergencies like gas leaks, flooding, electrical hazards, and no-heat/no-AC situations. It immediately escalates these to your on-call team via call, text, or your preferred method—while keeping the customer calm and collecting critical information.",
   },
   {
     question: "How long does setup take?",
@@ -31,7 +31,7 @@ const faqs = [
   },
   {
     question: "What if the AI can't handle a call?",
-    answer: "The AI knows its limits. When it encounters a situation it can't handle confidently, it seamlessly transfers the call to your team with full context - so customers never have to repeat themselves. You can also set custom rules for immediate transfers based on keywords or caller ID.",
+    answer: "The AI knows its limits. When it encounters a situation it can't handle confidently, it seamlessly transfers the call to your team with full context—so customers never have to repeat themselves. You can also set custom rules for immediate transfers based on keywords or caller ID.",
   },
   {
     question: "Is my data secure?",

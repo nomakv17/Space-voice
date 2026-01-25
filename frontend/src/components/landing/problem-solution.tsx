@@ -44,7 +44,7 @@ const solutions = [
   {
     icon: Bot,
     title: "Natural Conversations",
-    description: "Customers can't tell it's AI - sounds like your best receptionist",
+    description: "Customers can't tell it's AI—sounds like your best receptionist",
   },
 ];
 

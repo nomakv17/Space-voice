@@ -7,7 +7,6 @@ const pricingPlans = [
   {
     name: "Starter",
     description: "Perfect for small businesses just getting started",
-    bestFor: "Best for 1-2 techs and low call volume",
     price: 99,
     minutes: 500,
     features: [
@@ -17,13 +16,12 @@ const pricingPlans = [
       "Email support",
       "Google Calendar integration",
     ],
-    cta: "Start Free Trial",
+    cta: "Get Started",
     popular: false,
   },
   {
     name: "Growth",
     description: "For growing businesses ready to scale",
-    bestFor: "Best for 3-10 techs and steady inbound calls",
     price: 249,
     minutes: 2500,
     features: [
@@ -35,13 +33,12 @@ const pricingPlans = [
       "Emergency triage protocols",
       "Human handoff",
     ],
-    cta: "Start Free Trial",
+    cta: "Get Started",
     popular: true,
   },
   {
     name: "Enterprise",
     description: "Custom solutions for large operations",
-    bestFor: "Best for multi‑location teams and complex workflows",
     price: null,
     minutes: null,
     features: [
@@ -54,7 +51,7 @@ const pricingPlans = [
       "SLA guarantee",
       "White-labeling available",
     ],
-    cta: "Book Demo",
+    cta: "Contact Sales",
     popular: false,
   },
 ];
@@ -101,8 +98,7 @@ export function PricingPreview() {
 
               {/* Plan name */}
               <h3 className="text-xl font-bold text-gray-900 mb-2">{plan.name}</h3>
-              <p className="text-gray-600 text-sm mb-3">{plan.description}</p>
-              <p className="text-xs text-gray-500 mb-6">{plan.bestFor}</p>
+              <p className="text-gray-600 text-sm mb-6">{plan.description}</p>
 
               {/* Price */}
               <div className="mb-6">
@@ -136,11 +132,7 @@ export function PricingPreview() {
 
               {/* CTA */}
               <a
-                href={
-                  plan.price !== null
-                    ? "https://dashboard.spacevoice.ai/signup"
-                    : "https://calendly.com/tai-alabi/spacevoice-demo"
-                }
+                href={plan.price !== null ? "https://dashboard.spacevoice.ai/signup" : "mailto:hello@spacevoice.ai"}
                 className={cn(
                   "flex items-center justify-center gap-2 w-full py-3 rounded-xl font-semibold transition-all duration-300",
                   plan.popular

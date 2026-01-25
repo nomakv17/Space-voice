@@ -10,7 +10,7 @@ const useCases = [
     icon: Thermometer,
     title: "HVAC Contractors",
     tagline: "Keep customers cool when it matters most",
-    description: "Handle AC emergencies, schedule maintenance calls, and qualify leads - all automatically. Your AI knows the difference between 'AC not working' and 'my house is 95 degrees.'",
+    description: "Handle AC emergencies, schedule maintenance calls, and qualify leads—all automatically. Your AI knows the difference between 'AC not working' and 'my house is 95 degrees.'",
     features: [
       "Emergency triage for no-AC situations",
       "Seasonal maintenance reminders",

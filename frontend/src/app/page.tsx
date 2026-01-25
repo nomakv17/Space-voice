@@ -6,12 +6,10 @@ import {
   SocialProofBar,
   ProblemSolutionSection,
   HowItWorksSection,
-  DifferentiationSection,
   FeaturesGrid,
   UseCasesSection,
   ROICalculator,
   PricingPreview,
-  CaseStudiesSection,
   TestimonialsSection,
   FAQSection,
   FooterSection,
@@ -23,9 +21,7 @@ export default function LandingPage() {
       <Navbar />
       <HeroSection />
       <SocialProofBar />
-      <ROICalculator />
       <ProblemSolutionSection />
-      <DifferentiationSection />
       <HowItWorksSection />
       <section id="features">
         <FeaturesGrid />
@@ -33,7 +29,7 @@ export default function LandingPage() {
       <section id="use-cases">
         <UseCasesSection />
       </section>
-      <CaseStudiesSection />
+      <ROICalculator />
       <PricingPreview />
       <TestimonialsSection />
       <section id="faq">

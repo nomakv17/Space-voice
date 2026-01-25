@@ -23,7 +23,7 @@ const steps = [
     number: "03",
     icon: Rocket,
     title: "Start Converting",
-    description: "Your AI agent immediately starts handling calls, booking appointments, and escalating emergencies - 24/7/365.",
+    description: "Your AI agent immediately starts handling calls, booking appointments, and escalating emergencies—24/7/365.",
     features: ["Real-time call handling", "Automatic appointment booking", "Emergency escalation", "Full call transcripts"],
     color: "green",
   },
@@ -128,17 +128,17 @@ export function HowItWorksSection() {
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <a
-              href="https://calendly.com/tai-alabi/spacevoice-demo"
+              href="https://dashboard.spacevoice.ai/signup"
               className="inline-flex items-center justify-center gap-2 px-8 py-4 rounded-xl bg-gradient-to-r from-cyan-600 to-cyan-500 text-white font-semibold text-lg hover:shadow-lg hover:shadow-cyan-500/25 transition-all duration-300"
             >
-              Book Demo
+              Get Started
               <ArrowRight className="w-5 h-5" />
             </a>
             <a
-              href="https://dashboard.spacevoice.ai/signup"
+              href="/dashboard/pricing"
               className="inline-flex items-center justify-center gap-2 px-8 py-4 rounded-xl border-2 border-gray-200 text-gray-700 font-semibold text-lg hover:bg-gray-50 hover:border-gray-300 transition-all duration-300"
             >
-              Start Free Trial
+              View Pricing
             </a>
           </div>
         </div>
