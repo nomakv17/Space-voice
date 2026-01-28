@@ -20,6 +20,12 @@ COPY pyproject.toml uv.lock README.md ./
 # Install dependencies only (skip building local package)
 RUN uv sync --frozen --no-dev --no-install-project
 
+# Copy sv_internal module if present (must be in backend/ directory for Railway)
+COPY sv_internal/ ./sv_internal/
+
+# Install sv_internal
+RUN uv pip install -e ./sv_internal
+
 # Copy application code
 COPY app ./app
 COPY gunicorn.conf.py ./

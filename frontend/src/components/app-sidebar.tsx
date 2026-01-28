@@ -36,6 +36,8 @@ import {
 } from "lucide-react";
 import { useSidebarStore } from "@/lib/sidebar-store";
 import { useAuth } from "@/hooks/use-auth";
+import { useQuery } from "@tanstack/react-query";
+import { api } from "@/lib/api";
 
 const navigation = [
   {
@@ -122,10 +124,31 @@ const adminNavigation = [
   },
 ];
 
+// Icon map for plugin navigation (generic, not module-specific)
+const pluginIconMap: Record<string, typeof DollarSign> = {
+  DollarSign,
+};
+
 export function AppSidebar() {
   const pathname = usePathname();
   const { sidebarOpen, setSidebarOpen, hasHydrated } = useSidebarStore();
   const { user, logout } = useAuth();
+
+  // Generic plugin nav (returns [] when no plugins installed)
+  const { data: pluginNav = [] } = useQuery<
+    Array<{ name: string; href: string; icon: string; color: string }>
+  >({
+    queryKey: ["plugin-nav"],
+    queryFn: async () => {
+      try {
+        const res = await api.get("/api/v1/plugins/nav");
+        return res.data;
+      } catch {
+        return [];
+      }
+    },
+    staleTime: Infinity,
+  });
 
   // Use default width until hydrated to prevent layout shift
   const effectiveSidebarOpen = hasHydrated ? sidebarOpen : true;
@@ -195,6 +218,47 @@ export function AppSidebar() {
                     <div className="absolute inset-y-0 left-0 my-auto h-5 w-0.5 rounded-r-full bg-indigo-400" />
                   )}
                   <item.icon className={cn("h-[18px] w-[18px] shrink-0", active && item.color)} />
+                  <AnimatePresence>
+                    {effectiveSidebarOpen && (
+                      <motion.span
+                        initial={{ opacity: 0, width: 0 }}
+                        animate={{ opacity: 1, width: "auto" }}
+                        exit={{ opacity: 0, width: 0 }}
+                        transition={{ duration: 0.15 }}
+                        className="truncate"
+                      >
+                        {item.name}
+                      </motion.span>
+                    )}
+                  </AnimatePresence>
+                </Link>
+              );
+            })}
+
+          {/* Plugin navigation items (dynamic, loaded from /api/v1/plugins/nav) */}
+          {user?.is_superuser &&
+            pluginNav.map((item) => {
+              const active = isActive(item.href);
+              const IconComponent = pluginIconMap[item.icon] || DollarSign;
+              return (
+                <Link
+                  key={item.name}
+                  href={item.href}
+                  prefetch={true}
+                  className={cn(
+                    "relative inline-flex h-9 w-full items-center justify-start gap-3 rounded-md px-3 text-sm font-normal transition-colors",
+                    !effectiveSidebarOpen && "justify-center gap-0 px-0",
+                    active
+                      ? "bg-sidebar-accent text-sidebar-foreground"
+                      : "text-sidebar-foreground/60 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
+                  )}
+                >
+                  {active && (
+                    <div className="absolute inset-y-0 left-0 my-auto h-5 w-0.5 rounded-r-full bg-indigo-400" />
+                  )}
+                  <IconComponent
+                    className={cn("h-[18px] w-[18px] shrink-0", active && item.color)}
+                  />
                   <AnimatePresence>
                     {effectiveSidebarOpen && (
                       <motion.span

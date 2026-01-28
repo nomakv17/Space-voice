@@ -74,3 +74,5 @@ frontend/.env.local
 Thumbs.db
 .env.vercel
 frontend/.env.vercel
+
+# (Internal module files are now tracked for deployment)

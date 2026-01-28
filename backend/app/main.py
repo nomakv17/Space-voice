@@ -250,6 +250,14 @@ app.include_router(embed.router)  # Public embed API (unauthenticated)
 app.include_router(embed.ws_router)  # Public embed WebSocket
 app.include_router(demo.router)  # Public demo call API (landing page)
 
+# Optional plugin modules (internal/private extensions)
+try:
+    from sv_internal import plugin_setup
+
+    plugin_setup(app)
+except ImportError:
+    pass
+
 
 @app.get("/")
 async def root() -> dict[str, str]:
