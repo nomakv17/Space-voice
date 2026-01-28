@@ -76,11 +76,11 @@ async def seed_clients(db: AsyncSession) -> dict[str, int]:
         month_date = month_date.replace(day=1)
         months.append(month_date)
 
-    # Create 50 clients
-    enterprise_count = 35
-    medium_count = 15
-    churned_count = 3
-    paused_count = 1
+    # Create 50 clients - AGGRESSIVE enterprise-heavy mix
+    enterprise_count = 42  # 84% enterprise
+    medium_count = 8       # 16% medium
+    churned_count = 2      # Only 2 churned (4%)
+    paused_count = 1       # 1 paused
 
     all_clients: list[SimClient] = []
 
@@ -98,15 +98,15 @@ async def seed_clients(db: AsyncSession) -> dict[str, int]:
         else:
             status = "active"
 
-        # Generate MRR based on size
+        # Generate MRR based on size - AGGRESSIVE high values
         if is_enterprise:
-            # Enterprise: $2,000-$15,000, weighted toward $4,000-$8,000
-            mrr = Decimal(str(random.triangular(2000, 15000, 6000)))
-            setup_fee = Decimal(str(random.randint(500, 2000)))
+            # Enterprise: $5,000-$25,000, weighted toward $12,000-$18,000
+            mrr = Decimal(str(random.triangular(5000, 25000, 15000)))
+            setup_fee = Decimal(str(random.randint(1500, 5000)))
         else:
-            # Medium: $200-$2,000
-            mrr = Decimal(str(random.triangular(200, 2000, 800)))
-            setup_fee = Decimal(str(random.randint(0, 500)))
+            # Medium: $800-$4,000, weighted toward $2,000
+            mrr = Decimal(str(random.triangular(800, 4000, 2000)))
+            setup_fee = Decimal(str(random.randint(200, 1000)))
 
         mrr = mrr.quantize(Decimal("0.01"))
         setup_fee = setup_fee.quantize(Decimal("0.01"))
@@ -157,8 +157,8 @@ async def seed_clients(db: AsyncSession) -> dict[str, int]:
         monthly_histories = []
 
         for month_idx, month in enumerate(months):
-            # Base MRR with slight growth
-            growth_factor = Decimal(str(1 + random.uniform(0.01, 0.03) * month_idx))
+            # Base MRR with aggressive growth (3-6% monthly)
+            growth_factor = Decimal(str(1 + random.uniform(0.03, 0.06) * month_idx))
             month_mrr = (mrr * growth_factor).quantize(Decimal("0.01"))
 
             # For churned clients, MRR drops to 0 in month 5 or 6
@@ -187,13 +187,13 @@ async def seed_clients(db: AsyncSession) -> dict[str, int]:
 
             net_revenue = paid - refunds - chargebacks
 
-            # Usage data correlated to MRR
+            # Usage data - AGGRESSIVE high call volumes
             if is_enterprise:
-                calls_handled = random.randint(200, 2000)
+                calls_handled = random.randint(1500, 8000)  # High volume enterprise
             else:
-                calls_handled = random.randint(20, 200)
+                calls_handled = random.randint(300, 1500)   # Medium still substantial
 
-            avg_duration = random.uniform(60, 300)  # 1-5 minutes
+            avg_duration = random.uniform(90, 360)  # 1.5-6 minutes average
             total_minutes = calls_handled * avg_duration / 60
 
             history = SimClientHistory(
