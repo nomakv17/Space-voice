@@ -16,9 +16,10 @@ import type { IncomeSummary } from "@/lib/api/income";
 interface IncomeStatsCardsProps {
   summary: IncomeSummary | undefined;
   isLoading: boolean;
+  selectedMonth?: string; // "current" or "YYYY-MM-DD"
 }
 
-export function IncomeStatsCards({ summary, isLoading }: IncomeStatsCardsProps) {
+export function IncomeStatsCards({ summary, isLoading, selectedMonth }: IncomeStatsCardsProps) {
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat("en-US", {
       style: "currency",
@@ -28,6 +29,9 @@ export function IncomeStatsCards({ summary, isLoading }: IncomeStatsCardsProps) 
     }).format(value);
   };
 
+  // Descriptions change based on whether viewing a specific month or live data
+  const isHistorical = selectedMonth && selectedMonth !== "current";
+
   const stats = [
     {
       name: "Total MRR",
@@ -35,7 +39,7 @@ export function IncomeStatsCards({ summary, isLoading }: IncomeStatsCardsProps) 
       icon: DollarSign,
       color: "text-emerald-400",
       bgColor: "bg-emerald-400/10",
-      description: "Monthly recurring revenue",
+      description: isHistorical ? "MRR for this month" : "Current MRR",
     },
     {
       name: "Total ARR",
@@ -43,7 +47,7 @@ export function IncomeStatsCards({ summary, isLoading }: IncomeStatsCardsProps) 
       icon: TrendingUp,
       color: "text-blue-400",
       bgColor: "bg-blue-400/10",
-      description: "Annual recurring revenue",
+      description: isHistorical ? "ARR for this month" : "Current ARR",
     },
     {
       name: "Net Revenue",
@@ -51,7 +55,7 @@ export function IncomeStatsCards({ summary, isLoading }: IncomeStatsCardsProps) 
       icon: Banknote,
       color: "text-violet-400",
       bgColor: "bg-violet-400/10",
-      description: "Lifetime net revenue",
+      description: isHistorical ? "Revenue - refunds - chargebacks" : "Lifetime net revenue",
     },
     {
       name: "Active Clients",
@@ -59,7 +63,7 @@ export function IncomeStatsCards({ summary, isLoading }: IncomeStatsCardsProps) 
       icon: Building2,
       color: "text-amber-400",
       bgColor: "bg-amber-400/10",
-      description: "Currently active",
+      description: isHistorical ? "Paying this month" : "Currently active",
     },
     {
       name: "MRR Growth",
@@ -67,7 +71,7 @@ export function IncomeStatsCards({ summary, isLoading }: IncomeStatsCardsProps) 
       icon: summary?.mrr_growth_pct && summary.mrr_growth_pct >= 0 ? ArrowUpRight : ArrowDownRight,
       color: summary?.mrr_growth_pct && summary.mrr_growth_pct >= 0 ? "text-emerald-400" : "text-red-400",
       bgColor: summary?.mrr_growth_pct && summary.mrr_growth_pct >= 0 ? "bg-emerald-400/10" : "bg-red-400/10",
-      description: "Month over month",
+      description: "vs previous month",
     },
     {
       name: "Setup Fees",
@@ -75,7 +79,7 @@ export function IncomeStatsCards({ summary, isLoading }: IncomeStatsCardsProps) 
       icon: Receipt,
       color: "text-cyan-400",
       bgColor: "bg-cyan-400/10",
-      description: "One-time fees collected",
+      description: isHistorical ? "Fees this month" : "Total collected",
     },
   ];
 

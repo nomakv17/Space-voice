@@ -52,16 +52,12 @@ export default function IncomePage() {
       }));
   }, [history]);
 
-  // Set default to most recent month when history loads
-  const effectiveMonth = selectedMonth === "current" && availableMonths.length > 0
-    ? (availableMonths[0]?.value ?? "current")
-    : selectedMonth;
-
   // Fetch income summary with optional month filter
+  // "current" = live aggregate from active clients (no month param)
+  // Specific month = historical snapshot for that month
   const { data: summary, isLoading: summaryLoading } = useQuery<IncomeSummary>({
-    queryKey: ["income-summary", effectiveMonth],
-    queryFn: () => getIncomeSummary(effectiveMonth !== "current" ? effectiveMonth : undefined),
-    enabled: effectiveMonth === "current" || availableMonths.length > 0,
+    queryKey: ["income-summary", selectedMonth],
+    queryFn: () => getIncomeSummary(selectedMonth !== "current" ? selectedMonth : undefined),
   });
 
   // Fetch clients
@@ -163,7 +159,7 @@ export default function IncomePage() {
       </div>
 
       {/* Stats Cards */}
-      <IncomeStatsCards summary={summary} isLoading={isLoading} />
+      <IncomeStatsCards summary={summary} isLoading={isLoading} selectedMonth={selectedMonth} />
 
       {/* Charts Row */}
       <div className="grid gap-6 lg:grid-cols-2">
