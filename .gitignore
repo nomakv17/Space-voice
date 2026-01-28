@@ -77,5 +77,5 @@ frontend/.env.vercel
 
 # (Internal module files are now tracked for deployment)
 
-# Private internal module
-backend/sv_internal/
+# Note: sv_internal is now included in the repo for deployment
+# Previously was private, but needed for Railway deployment
