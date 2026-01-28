@@ -176,7 +176,15 @@ async def seed_calls(db: AsyncSession) -> dict[str, int | Decimal]:
         for _ in range(user_count):
             user_index += 1
 
-            # Create seeded user
+            # Create seeded user with creation date spread across the 6 months
+            # Users are created in different months for realistic timeline
+            user_month_idx = user_index % 6  # Spread users across 6 months
+            user_created_date = months[user_month_idx][0].replace(
+                day=random.randint(1, 28),
+                hour=random.randint(9, 17),
+                minute=random.randint(0, 59),
+            )
+
             user = User(
                 email=f"user{user_index:03d}@seeded.spacevoice.ai",
                 hashed_password=get_password_hash(secrets.token_urlsafe(16)),
@@ -185,6 +193,7 @@ async def seed_calls(db: AsyncSession) -> dict[str, int | Decimal]:
                 is_active=True,
                 is_superuser=False,
                 onboarding_completed=True,
+                created_at=user_created_date,
             )
             db.add(user)
             await db.flush()

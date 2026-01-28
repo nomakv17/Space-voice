@@ -15,10 +15,13 @@ import {
   Users,
   PhoneCall,
   Settings,
+  DollarSign,
 } from "lucide-react";
 import { fetchAgents } from "@/lib/api/agents";
 import { listCalls } from "@/lib/api/calls";
+import { getRevenueSummary } from "@/lib/api/revenue";
 import { api } from "@/lib/api";
+import { useAuth } from "@/hooks/use-auth";
 
 interface Workspace {
   id: string;
@@ -35,16 +38,26 @@ interface Appointment {
 }
 
 export default function DashboardPage() {
+  const { user } = useAuth();
+  const isAdmin = user?.is_superuser ?? false;
+
   // Fetch agents
   const { data: agents = [] } = useQuery({
     queryKey: ["agents"],
     queryFn: fetchAgents,
   });
 
-  // Fetch recent calls
+  // Fetch recent calls (for non-admin or recent calls list)
   const { data: callsData } = useQuery({
     queryKey: ["calls", 1],
     queryFn: () => listCalls({ page: 1, page_size: 5 }),
+  });
+
+  // Fetch platform-wide revenue stats (admin only)
+  const { data: revenueData } = useQuery({
+    queryKey: ["revenue-summary"],
+    queryFn: () => getRevenueSummary(),
+    enabled: isAdmin,
   });
 
   // Fetch workspaces
@@ -66,18 +79,28 @@ export default function DashboardPage() {
   });
 
   const activeAgents = agents.filter((a) => a.is_active).length;
-  const totalCalls = callsData?.total ?? 0;
-  const completedCalls = callsData?.calls?.filter((c) => c.status === "completed").length ?? 0;
-  const avgDuration =
-    callsData?.calls && callsData.calls.length > 0
-      ? Math.round(
-          callsData.calls.reduce((sum, c) => sum + c.duration_seconds, 0) / callsData.calls.length
-        )
-      : 0;
+
+  // For admins, use platform-wide stats from revenue API
+  // For regular users, use their own call data
+  const totalCalls = isAdmin && revenueData ? revenueData.total_calls : (callsData?.total ?? 0);
+  const completedCalls = isAdmin && revenueData
+    ? revenueData.completed_calls
+    : (callsData?.calls?.filter((c) => c.status === "completed").length ?? 0);
+  const avgDuration = isAdmin && revenueData
+    ? Math.round(revenueData.avg_call_duration_secs)
+    : (callsData?.calls && callsData.calls.length > 0
+        ? Math.round(
+            callsData.calls.reduce((sum, c) => sum + c.duration_seconds, 0) / callsData.calls.length
+          )
+        : 0);
   const totalContacts = workspaces.reduce((sum, w) => sum + w.contact_count, 0);
   const upcomingAppointments = appointments.filter(
     (a) => new Date(a.scheduled_at) > new Date()
   ).length;
+
+  // Additional admin stats
+  const totalRevenue = isAdmin && revenueData ? revenueData.total_revenue : null;
+  const activeUsers = isAdmin && revenueData ? revenueData.unique_users : null;
 
   const formatDuration = (seconds: number) => {
     if (seconds === 0) return "0s";
@@ -170,33 +193,67 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
 
-        <Card className="group hover:-translate-y-0.5 hover:border-violet-500/20 hover:shadow-card-hover">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div className="space-y-1">
-                <p className="text-xs font-medium text-muted-foreground">Contacts</p>
-                <p className="text-2xl font-bold tracking-tight">{totalContacts}</p>
+        {isAdmin && totalRevenue !== null ? (
+          <Card className="group hover:-translate-y-0.5 hover:border-green-500/20 hover:shadow-card-hover">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div className="space-y-1">
+                  <p className="text-xs font-medium text-muted-foreground">Total Revenue</p>
+                  <p className="text-2xl font-bold tracking-tight">
+                    ${totalRevenue.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                  </p>
+                </div>
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-green-500/20 to-emerald-500/10 shadow-inner-glow">
+                  <DollarSign className="h-5 w-5 text-green-400" />
+                </div>
               </div>
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-violet-500/20 to-purple-500/10 shadow-inner-glow">
-                <Users className="h-5 w-5 text-violet-400" />
+            </CardContent>
+          </Card>
+        ) : (
+          <Card className="group hover:-translate-y-0.5 hover:border-violet-500/20 hover:shadow-card-hover">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div className="space-y-1">
+                  <p className="text-xs font-medium text-muted-foreground">Contacts</p>
+                  <p className="text-2xl font-bold tracking-tight">{totalContacts}</p>
+                </div>
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-violet-500/20 to-purple-500/10 shadow-inner-glow">
+                  <Users className="h-5 w-5 text-violet-400" />
+                </div>
               </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        )}
 
-        <Card className="group hover:-translate-y-0.5 hover:border-rose-500/20 hover:shadow-card-hover">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div className="space-y-1">
-                <p className="text-xs font-medium text-muted-foreground">Upcoming</p>
-                <p className="text-2xl font-bold tracking-tight">{upcomingAppointments}</p>
+        {isAdmin && activeUsers !== null ? (
+          <Card className="group hover:-translate-y-0.5 hover:border-violet-500/20 hover:shadow-card-hover">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div className="space-y-1">
+                  <p className="text-xs font-medium text-muted-foreground">Active Users</p>
+                  <p className="text-2xl font-bold tracking-tight">{activeUsers}</p>
+                </div>
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-violet-500/20 to-purple-500/10 shadow-inner-glow">
+                  <Users className="h-5 w-5 text-violet-400" />
+                </div>
               </div>
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-rose-500/20 to-pink-500/10 shadow-inner-glow">
-                <Calendar className="h-5 w-5 text-rose-400" />
+            </CardContent>
+          </Card>
+        ) : (
+          <Card className="group hover:-translate-y-0.5 hover:border-rose-500/20 hover:shadow-card-hover">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div className="space-y-1">
+                  <p className="text-xs font-medium text-muted-foreground">Upcoming</p>
+                  <p className="text-2xl font-bold tracking-tight">{upcomingAppointments}</p>
+                </div>
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-rose-500/20 to-pink-500/10 shadow-inner-glow">
+                  <Calendar className="h-5 w-5 text-rose-400" />
+                </div>
               </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        )}
       </div>
 
       {/* Main Content Grid */}
