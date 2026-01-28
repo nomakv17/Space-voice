@@ -1,17 +1,25 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { RefreshCw } from "lucide-react";
-import { cn } from "@/lib/utils";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { RefreshCw, RotateCcw } from "lucide-react";
+import { cn, formatMonthYear } from "@/lib/utils";
 import { toast } from "sonner";
 import {
   getIncomeSummary,
   getIncomeHistory,
   listClients,
   seedData,
+  reseedData,
   type IncomeSummary,
   type IncomeHistoryItem,
   type SimClientListItem,
@@ -25,17 +33,35 @@ import { ClientDetailDialog } from "./components/client-detail";
 export default function IncomePage() {
   const queryClient = useQueryClient();
   const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
+  const [selectedMonth, setSelectedMonth] = useState<string>("current");
 
-  // Fetch income summary
-  const { data: summary, isLoading: summaryLoading } = useQuery<IncomeSummary>({
-    queryKey: ["income-summary"],
-    queryFn: getIncomeSummary,
-  });
-
-  // Fetch income history
+  // Fetch income history first (to get available months)
   const { data: history = [], isLoading: historyLoading } = useQuery<IncomeHistoryItem[]>({
     queryKey: ["income-history"],
     queryFn: getIncomeHistory,
+  });
+
+  // Compute available months from history, sorted newest first
+  const availableMonths = useMemo(() => {
+    if (history.length === 0) return [];
+    return [...history]
+      .sort((a, b) => b.month.localeCompare(a.month))
+      .map((item) => ({
+        value: item.month,
+        label: formatMonthYear(item.month),
+      }));
+  }, [history]);
+
+  // Set default to most recent month when history loads
+  const effectiveMonth = selectedMonth === "current" && availableMonths.length > 0
+    ? (availableMonths[0]?.value ?? "current")
+    : selectedMonth;
+
+  // Fetch income summary with optional month filter
+  const { data: summary, isLoading: summaryLoading } = useQuery<IncomeSummary>({
+    queryKey: ["income-summary", effectiveMonth],
+    queryFn: () => getIncomeSummary(effectiveMonth !== "current" ? effectiveMonth : undefined),
+    enabled: effectiveMonth === "current" || availableMonths.length > 0,
   });
 
   // Fetch clients
@@ -59,8 +85,25 @@ export default function IncomePage() {
     },
   });
 
+  // Reseed mutation
+  const reseedMutation = useMutation({
+    mutationFn: reseedData,
+    onSuccess: (data) => {
+      toast.success(data.message);
+      setSelectedMonth("current"); // Reset to current month
+      // Invalidate all queries to refresh data
+      void queryClient.invalidateQueries({ queryKey: ["income-summary"] });
+      void queryClient.invalidateQueries({ queryKey: ["income-history"] });
+      void queryClient.invalidateQueries({ queryKey: ["internal-clients"] });
+    },
+    onError: (error: Error) => {
+      toast.error(`Failed to reseed data: ${error.message}`);
+    },
+  });
+
   const isLoading = summaryLoading || historyLoading || clientsLoading;
   const hasData = clients.length > 0;
+  const isPending = seedMutation.isPending || reseedMutation.isPending;
 
   return (
     <div className="space-y-6">
@@ -72,16 +115,51 @@ export default function IncomePage() {
             Revenue analytics and client performance metrics
           </p>
         </div>
-        <Button
-          onClick={() => seedMutation.mutate()}
-          disabled={seedMutation.isPending || hasData}
-          variant={hasData ? "outline" : "default"}
-        >
-          <RefreshCw
-            className={cn("mr-2 h-4 w-4", seedMutation.isPending && "animate-spin")}
-          />
-          {hasData ? "Data Seeded" : "Seed Data"}
-        </Button>
+        <div className="flex items-center gap-3">
+          {/* Month Selector */}
+          {availableMonths.length > 0 && (
+            <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Select month" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="current">Current (Live)</SelectItem>
+                {availableMonths.map((month) => (
+                  <SelectItem key={month.value} value={month.value}>
+                    {month.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+
+          {/* Reseed Button */}
+          {hasData && (
+            <Button
+              onClick={() => reseedMutation.mutate()}
+              disabled={isPending}
+              variant="outline"
+              size="icon"
+              title="Reseed with fresh data"
+            >
+              <RotateCcw
+                className={cn("h-4 w-4", reseedMutation.isPending && "animate-spin")}
+              />
+            </Button>
+          )}
+
+          {/* Seed Button */}
+          <Button
+            onClick={() => seedMutation.mutate()}
+            disabled={isPending || hasData}
+            variant={hasData ? "outline" : "default"}
+          >
+            <RefreshCw
+              className={cn("mr-2 h-4 w-4", seedMutation.isPending && "animate-spin")}
+            />
+            {hasData ? "Data Seeded" : "Seed Data"}
+          </Button>
+        </div>
       </div>
 
       {/* Stats Cards */}

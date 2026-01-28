@@ -10,6 +10,7 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import type { IncomeHistoryItem } from "@/lib/api/income";
+import { formatShortMonthYear } from "@/lib/utils";
 
 interface MrrChartProps {
   data: IncomeHistoryItem[];
@@ -37,10 +38,7 @@ export function MrrChart({ data, isLoading }: MrrChartProps) {
   const chartData = [...data]
     .sort((a, b) => a.month.localeCompare(b.month))
     .map((item) => ({
-      month: new Date(item.month).toLocaleDateString("en-US", {
-        month: "short",
-        year: "2-digit",
-      }),
+      month: formatShortMonthYear(item.month),
       mrr: item.total_mrr,
       arr: item.total_arr,
     }));

@@ -11,6 +11,7 @@ import {
   Legend,
 } from "recharts";
 import type { IncomeHistoryItem } from "@/lib/api/income";
+import { formatShortMonthYear } from "@/lib/utils";
 
 interface RevenueChartProps {
   data: IncomeHistoryItem[];
@@ -38,10 +39,7 @@ export function RevenueChart({ data, isLoading }: RevenueChartProps) {
   const chartData = [...data]
     .sort((a, b) => a.month.localeCompare(b.month))
     .map((item) => ({
-      month: new Date(item.month).toLocaleDateString("en-US", {
-        month: "short",
-        year: "2-digit",
-      }),
+      month: formatShortMonthYear(item.month),
       revenue: item.total_revenue,
       refunds: -item.total_refunds, // Negative to show as reduction
       chargebacks: -item.total_chargebacks, // Negative to show as reduction

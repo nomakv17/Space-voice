@@ -147,8 +147,12 @@ export async function getClientHistory(clientId: string): Promise<ClientHistoryI
   return response.json();
 }
 
-export async function getIncomeSummary(): Promise<IncomeSummary> {
-  const response = await fetch(`${API_BASE}/api/v1/internal/income/summary`, {
+export async function getIncomeSummary(month?: string): Promise<IncomeSummary> {
+  const params = new URLSearchParams();
+  if (month) params.set("month", month);
+
+  const url = `${API_BASE}/api/v1/internal/income/summary${params.toString() ? `?${params}` : ""}`;
+  const response = await fetch(url, {
     headers: getAuthHeaders(),
   });
 
@@ -182,6 +186,20 @@ export async function seedData(): Promise<{ message: string }> {
   if (!response.ok) {
     const error = await response.json().catch(() => ({ detail: response.statusText }));
     throw new Error(error.detail ?? "Failed to seed data");
+  }
+
+  return response.json();
+}
+
+export async function reseedData(): Promise<{ message: string }> {
+  const response = await fetch(`${API_BASE}/api/v1/internal/reseed`, {
+    method: "POST",
+    headers: getAuthHeaders(),
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ detail: response.statusText }));
+    throw new Error(error.detail ?? "Failed to reseed data");
   }
 
   return response.json();

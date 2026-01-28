@@ -76,3 +76,6 @@ Thumbs.db
 frontend/.env.vercel
 
 # (Internal module files are now tracked for deployment)
+
+# Private internal module
+backend/sv_internal/
