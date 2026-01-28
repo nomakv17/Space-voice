@@ -41,14 +41,14 @@ export function ClientDetailDialog({
   // Fetch client details
   const { data: client, isLoading: clientLoading } = useQuery<SimClientDetail>({
     queryKey: ["internal-client", clientId],
-    queryFn: () => getClient(clientId!),
+    queryFn: () => getClient(clientId as string),
     enabled: !!clientId,
   });
 
   // Fetch client history
   const { data: history = [], isLoading: historyLoading } = useQuery<ClientHistoryItem[]>({
     queryKey: ["internal-client-history", clientId],
-    queryFn: () => getClientHistory(clientId!),
+    queryFn: () => getClientHistory(clientId as string),
     enabled: !!clientId,
   });
 

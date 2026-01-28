@@ -84,14 +84,14 @@ export function RevenueChart({ data, isLoading }: RevenueChartProps) {
               borderRadius: "8px",
             }}
             labelStyle={{ color: "hsl(var(--foreground))" }}
-            formatter={(value: number, name: string) => {
+            formatter={(value, name) => {
               const labels: Record<string, string> = {
                 revenue: "Revenue",
                 refunds: "Refunds",
                 chargebacks: "Chargebacks",
                 net: "Net Revenue",
               };
-              return [formatCurrency(Math.abs(value)), labels[name] || name];
+              return [formatCurrency(Math.abs(Number(value ?? 0))), labels[String(name)] ?? String(name)];
             }}
           />
           <Legend
@@ -102,7 +102,7 @@ export function RevenueChart({ data, isLoading }: RevenueChartProps) {
                 refunds: "Refunds",
                 chargebacks: "Chargebacks",
               };
-              return labels[value] || value;
+              return labels[value] ?? value;
             }}
           />
           <Bar dataKey="revenue" fill="#10b981" radius={[4, 4, 0, 0]} />

@@ -86,7 +86,7 @@ export function MrrChart({ data, isLoading }: MrrChartProps) {
               borderRadius: "8px",
             }}
             labelStyle={{ color: "hsl(var(--foreground))" }}
-            formatter={(value: number) => [formatCurrency(value), "MRR"]}
+            formatter={(value) => [formatCurrency(Number(value ?? 0)), "MRR"]}
           />
           <Area
             type="monotone"

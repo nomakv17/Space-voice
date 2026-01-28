@@ -239,7 +239,7 @@ export function AppSidebar() {
           {user?.is_superuser &&
             pluginNav.map((item) => {
               const active = isActive(item.href);
-              const IconComponent = pluginIconMap[item.icon] || DollarSign;
+              const IconComponent = pluginIconMap[item.icon] ?? DollarSign;
               return (
                 <Link
                   key={item.name}
