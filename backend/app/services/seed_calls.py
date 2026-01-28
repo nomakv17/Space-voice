@@ -30,12 +30,12 @@ TIER_DISTRIBUTION = [
 ]
 
 # Call parameters for each tier (calls_per_user, avg_duration_min, demo_price_per_min)
-# Demo prices are higher to hit $35-40K target with realistic call volumes
+# Demo prices set to generate ~$400K total across 6 months
 TIER_CALL_PARAMS = {
-    "premium": (200, 8, Decimal("1.50")),      # Enterprise: high volume, longer calls
-    "premium-mini": (150, 6, Decimal("1.00")), # Business: medium-high volume
-    "balanced": (120, 5, Decimal("0.75")),     # Standard: medium volume
-    "budget": (80, 4, Decimal("0.50")),        # Starter: lower volume
+    "premium": (200, 8, Decimal("3.00")),      # Enterprise: high volume, longer calls
+    "premium-mini": (150, 6, Decimal("2.00")), # Business: medium-high volume
+    "balanced": (120, 5, Decimal("1.50")),     # Standard: medium volume
+    "budget": (80, 4, Decimal("1.00")),        # Starter: lower volume
 }
 
 # Phone number prefixes for realistic data
