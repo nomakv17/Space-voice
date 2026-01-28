@@ -126,10 +126,10 @@ async def ensure_pricing_tiers(db: AsyncSession) -> dict[str, PricingConfig]:
 
 
 async def seed_calls(db: AsyncSession) -> dict[str, int | Decimal]:
-    """Seed realistic call data with revenue.
+    """Seed realistic call data with revenue across 6 months.
 
-    Creates 50 users across pricing tiers with calls in January 2026.
-    Target: ~$35-40K total revenue.
+    Creates 50 users across pricing tiers with calls from Aug 2025 - Jan 2026.
+    Revenue grows month-over-month: ~$15K (Aug) → ~$40K (Jan)
     """
     # Check if already seeded (look for seeded users)
     result = await db.execute(
@@ -144,9 +144,18 @@ async def seed_calls(db: AsyncSession) -> dict[str, int | Decimal]:
     # Ensure pricing tiers exist
     pricing_tiers = await ensure_pricing_tiers(db)
 
-    # Generate dates for January 2026
+    # Generate 6 months of dates (Aug 2025 - Jan 2026)
     now = datetime.now(UTC)
-    month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    current_month = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+
+    # Create list of 6 months going back from current
+    from dateutil.relativedelta import relativedelta
+    months = []
+    for i in range(6):
+        month_date = current_month - relativedelta(months=(5 - i))
+        # Growth multiplier: 0.4 (oldest) → 1.0 (newest)
+        growth_multiplier = 0.4 + (i * 0.12)  # 0.4, 0.52, 0.64, 0.76, 0.88, 1.0
+        months.append((month_date, growth_multiplier))
 
     users_created = 0
     calls_created = 0
@@ -181,78 +190,84 @@ async def seed_calls(db: AsyncSession) -> dict[str, int | Decimal]:
             await db.flush()
             users_created += 1
 
-            # Generate calls for this user
-            num_calls = calls_per_user + random.randint(-20, 20)  # Add variance
+            # Generate calls for this user across all 6 months
+            for month_start, growth_mult in months:
+                # Scale calls by growth multiplier (fewer calls in older months)
+                month_calls = int((calls_per_user + random.randint(-20, 20)) * growth_mult)
 
-            for _ in range(num_calls):
-                # Random timestamp within the month
-                random_day = random.randint(1, min(28, now.day))  # Don't go past today
-                random_hour = random.randint(8, 20)  # Business hours-ish
-                random_minute = random.randint(0, 59)
+                # Determine max day for this month (28 for safety, or current day if current month)
+                is_current_month = month_start.month == now.month and month_start.year == now.year
+                max_day = min(28, now.day) if is_current_month else 28
 
-                call_time = month_start.replace(
-                    day=random_day,
-                    hour=random_hour,
-                    minute=random_minute,
-                )
+                for _ in range(month_calls):
+                    # Random timestamp within the month
+                    random_day = random.randint(1, max_day)
+                    random_hour = random.randint(8, 20)  # Business hours-ish
+                    random_minute = random.randint(0, 59)
 
-                # Generate call details
-                duration_secs = generate_call_duration(avg_duration)
-                duration_mins = Decimal(str(duration_secs)) / 60
+                    call_time = month_start.replace(
+                        day=random_day,
+                        hour=random_hour,
+                        minute=random_minute,
+                    )
 
-                # Calculate revenue using demo pricing (higher than actual to hit $35-40K target)
-                revenue = (duration_mins * demo_price).quantize(Decimal("0.0001"))
-                # Cost is ~40% of revenue for realistic profit margins
-                cost = (revenue * Decimal("0.40")).quantize(Decimal("0.0001"))
+                    # Generate call details
+                    duration_secs = generate_call_duration(avg_duration)
+                    duration_mins = Decimal(str(duration_secs)) / 60
 
-                # Determine call status (85% completed)
-                status_roll = random.random()
-                if status_roll < 0.85:
-                    status = CallStatus.COMPLETED.value
-                elif status_roll < 0.92:
-                    status = CallStatus.NO_ANSWER.value
-                    duration_secs = 0
-                    revenue = Decimal("0")
-                    cost = Decimal("0")
-                elif status_roll < 0.97:
-                    status = CallStatus.BUSY.value
-                    duration_secs = 0
-                    revenue = Decimal("0")
-                    cost = Decimal("0")
-                else:
-                    status = CallStatus.FAILED.value
-                    duration_secs = 0
-                    revenue = Decimal("0")
-                    cost = Decimal("0")
+                    # Calculate revenue using demo pricing
+                    revenue = (duration_mins * demo_price).quantize(Decimal("0.0001"))
+                    # Cost is ~40% of revenue for realistic profit margins
+                    cost = (revenue * Decimal("0.40")).quantize(Decimal("0.0001"))
 
-                # Direction (70% inbound, 30% outbound)
-                direction = (
-                    CallDirection.INBOUND.value
-                    if random.random() < 0.7
-                    else CallDirection.OUTBOUND.value
-                )
+                    # Determine call status (85% completed)
+                    status_roll = random.random()
+                    if status_roll < 0.85:
+                        status = CallStatus.COMPLETED.value
+                    elif status_roll < 0.92:
+                        status = CallStatus.NO_ANSWER.value
+                        duration_secs = 0
+                        revenue = Decimal("0")
+                        cost = Decimal("0")
+                    elif status_roll < 0.97:
+                        status = CallStatus.BUSY.value
+                        duration_secs = 0
+                        revenue = Decimal("0")
+                        cost = Decimal("0")
+                    else:
+                        status = CallStatus.FAILED.value
+                        duration_secs = 0
+                        revenue = Decimal("0")
+                        cost = Decimal("0")
 
-                call = CallRecord(
-                    id=uuid.uuid4(),
-                    user_id=user.id,
-                    provider=random.choice(["telnyx", "twilio"]),
-                    provider_call_id=f"call_{secrets.token_hex(16)}",
-                    direction=direction,
-                    status=status,
-                    from_number=generate_phone(),
-                    to_number=generate_phone(),
-                    duration_seconds=duration_secs,
-                    pricing_tier_id=tier_id,
-                    price_per_minute=demo_price,  # Demo pricing for $35-40K target
-                    revenue_usd=revenue,
-                    cost_usd=cost,
-                    started_at=call_time,
-                    answered_at=call_time if status == CallStatus.COMPLETED.value else None,
-                    ended_at=(call_time + timedelta(seconds=duration_secs)) if status == CallStatus.COMPLETED.value else call_time,
-                )
-                db.add(call)
+                    # Direction (70% inbound, 30% outbound)
+                    direction = (
+                        CallDirection.INBOUND.value
+                        if random.random() < 0.7
+                        else CallDirection.OUTBOUND.value
+                    )
 
-                calls_created += 1
+                    call = CallRecord(
+                        id=uuid.uuid4(),
+                        user_id=user.id,
+                        provider=random.choice(["telnyx", "twilio"]),
+                        provider_call_id=f"call_{secrets.token_hex(16)}",
+                        direction=direction,
+                        status=status,
+                        from_number=generate_phone(),
+                        to_number=generate_phone(),
+                        duration_seconds=duration_secs,
+                        pricing_tier_id=tier_id,
+                        price_per_minute=demo_price,
+                        revenue_usd=revenue,
+                        cost_usd=cost,
+                        started_at=call_time,
+                        answered_at=call_time if status == CallStatus.COMPLETED.value else None,
+                        ended_at=(call_time + timedelta(seconds=duration_secs)) if status == CallStatus.COMPLETED.value else call_time,
+                    )
+                    db.add(call)
+
+                    calls_created += 1
                 total_revenue += revenue
                 total_cost += cost
                 if duration_secs > 0:
