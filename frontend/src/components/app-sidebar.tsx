@@ -111,6 +111,12 @@ const navigation = [
 // Admin-only navigation items
 const adminNavigation = [
   {
+    name: "Income",
+    href: "/dashboard/income",
+    icon: DollarSign,
+    color: "text-green-400",
+  },
+  {
     name: "Clients",
     href: "/dashboard/clients",
     icon: UserPlus,
