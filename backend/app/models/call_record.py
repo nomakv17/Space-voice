@@ -2,10 +2,11 @@
 
 import uuid
 from datetime import UTC, datetime
+from decimal import Decimal
 from enum import Enum
 from typing import TYPE_CHECKING
 
-from sqlalchemy import BigInteger, DateTime, ForeignKey, Integer, String, Text, Uuid
+from sqlalchemy import BigInteger, DateTime, ForeignKey, Integer, Numeric, String, Text, Uuid
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
@@ -107,6 +108,20 @@ class CallRecord(Base):
     # Call metrics
     duration_seconds: Mapped[int] = mapped_column(
         Integer, nullable=False, default=0, comment="Call duration in seconds"
+    )
+
+    # Revenue tracking
+    pricing_tier_id: Mapped[str | None] = mapped_column(
+        String(50), nullable=True, comment="Pricing tier used for this call"
+    )
+    price_per_minute: Mapped[Decimal | None] = mapped_column(
+        Numeric(10, 4), nullable=True, comment="Price per minute at time of call"
+    )
+    revenue_usd: Mapped[Decimal | None] = mapped_column(
+        Numeric(10, 4), nullable=True, comment="Revenue generated from this call"
+    )
+    cost_usd: Mapped[Decimal | None] = mapped_column(
+        Numeric(10, 4), nullable=True, comment="Cost to SpaceVoice for this call"
     )
 
     # Recording and transcript

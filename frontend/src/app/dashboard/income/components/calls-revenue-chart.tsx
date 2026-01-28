@@ -10,15 +10,14 @@ import {
   ResponsiveContainer,
   Legend,
 } from "recharts";
-import type { IncomeHistoryItem } from "@/lib/api/income";
-import { formatShortMonthYear } from "@/lib/utils";
+import type { MonthlyRevenue } from "@/lib/api/revenue";
 
-interface RevenueChartProps {
-  data: IncomeHistoryItem[];
+interface CallsRevenueChartProps {
+  data: MonthlyRevenue[];
   isLoading: boolean;
 }
 
-export function RevenueChart({ data, isLoading }: RevenueChartProps) {
+export function CallsRevenueChart({ data, isLoading }: CallsRevenueChartProps) {
   if (isLoading) {
     return (
       <div className="flex h-[300px] items-center justify-center">
@@ -35,23 +34,28 @@ export function RevenueChart({ data, isLoading }: RevenueChartProps) {
     );
   }
 
-  // Sort by month ascending and format for chart
+  // Sort by date ascending and format for chart
   const chartData = [...data]
-    .sort((a, b) => a.month.localeCompare(b.month))
+    .sort((a, b) => {
+      if (a.year !== b.year) return a.year - b.year;
+      return a.month - b.month;
+    })
     .map((item) => ({
-      month: formatShortMonthYear(item.month),
-      revenue: item.total_revenue,
-      refunds: -item.total_refunds, // Negative to show as reduction
-      chargebacks: -item.total_chargebacks, // Negative to show as reduction
-      net: item.total_net_revenue,
+      month: `${item.month_name.slice(0, 3)} '${String(item.year).slice(-2)}`,
+      calls: item.total_calls,
+      completed: item.completed_calls,
+      profit: item.total_profit,
     }));
 
-  const formatCurrency = (value: number) => {
-    const absValue = Math.abs(value);
-    if (absValue >= 1000000) {
-      return `$${(value / 1000000).toFixed(1)}M`;
+  const formatNumber = (value: number) => {
+    if (value >= 1000) {
+      return `${(value / 1000).toFixed(1)}K`;
     }
-    if (absValue >= 1000) {
+    return String(value);
+  };
+
+  const formatCurrency = (value: number) => {
+    if (value >= 1000) {
       return `$${(value / 1000).toFixed(0)}K`;
     }
     return `$${value}`;
@@ -69,6 +73,16 @@ export function RevenueChart({ data, isLoading }: RevenueChartProps) {
             axisLine={false}
           />
           <YAxis
+            yAxisId="left"
+            tickFormatter={formatNumber}
+            tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }}
+            tickLine={false}
+            axisLine={false}
+            width={50}
+          />
+          <YAxis
+            yAxisId="right"
+            orientation="right"
             tickFormatter={formatCurrency}
             tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }}
             tickLine={false}
@@ -84,28 +98,30 @@ export function RevenueChart({ data, isLoading }: RevenueChartProps) {
             labelStyle={{ color: "hsl(var(--foreground))" }}
             formatter={(value, name) => {
               const labels: Record<string, string> = {
-                revenue: "Revenue",
-                refunds: "Refunds",
-                chargebacks: "Chargebacks",
-                net: "Net Revenue",
+                calls: "Total Calls",
+                completed: "Completed",
+                profit: "Profit",
               };
-              return [formatCurrency(Math.abs(Number(value ?? 0))), labels[String(name)] ?? String(name)];
+              const formatted = name === "profit"
+                ? formatCurrency(Number(value ?? 0))
+                : formatNumber(Number(value ?? 0));
+              return [formatted, labels[String(name)] ?? String(name)];
             }}
           />
           <Legend
             wrapperStyle={{ paddingTop: "10px" }}
             formatter={(value: string) => {
               const labels: Record<string, string> = {
-                revenue: "Revenue",
-                refunds: "Refunds",
-                chargebacks: "Chargebacks",
+                calls: "Total Calls",
+                completed: "Completed",
+                profit: "Profit",
               };
               return labels[value] ?? value;
             }}
           />
-          <Bar dataKey="revenue" fill="#10b981" radius={[4, 4, 0, 0]} />
-          <Bar dataKey="refunds" fill="#f59e0b" radius={[4, 4, 0, 0]} />
-          <Bar dataKey="chargebacks" fill="#ef4444" radius={[4, 4, 0, 0]} />
+          <Bar yAxisId="left" dataKey="calls" fill="#8b5cf6" radius={[4, 4, 0, 0]} />
+          <Bar yAxisId="left" dataKey="completed" fill="#10b981" radius={[4, 4, 0, 0]} />
+          <Bar yAxisId="right" dataKey="profit" fill="#3b82f6" radius={[4, 4, 0, 0]} />
         </BarChart>
       </ResponsiveContainer>
     </div>

@@ -1,23 +1,22 @@
 "use client";
 
 import {
-  BarChart,
-  Bar,
+  AreaChart,
+  Area,
   XAxis,
   YAxis,
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-  Legend,
 } from "recharts";
-import type { IncomeHistoryItem } from "@/lib/api/income";
+import type { MonthlyRevenue } from "@/lib/api/revenue";
 
-interface RevenueChartProps {
-  data: IncomeHistoryItem[];
+interface RevenueOverTimeChartProps {
+  data: MonthlyRevenue[];
   isLoading: boolean;
 }
 
-export function RevenueChart({ data, isLoading }: RevenueChartProps) {
+export function RevenueOverTimeChart({ data, isLoading }: RevenueOverTimeChartProps) {
   if (isLoading) {
     return (
       <div className="flex h-[300px] items-center justify-center">
@@ -34,26 +33,23 @@ export function RevenueChart({ data, isLoading }: RevenueChartProps) {
     );
   }
 
-  // Sort by month ascending and format for chart
+  // Sort by date ascending and format for chart
   const chartData = [...data]
-    .sort((a, b) => a.month.localeCompare(b.month))
+    .sort((a, b) => {
+      if (a.year !== b.year) return a.year - b.year;
+      return a.month - b.month;
+    })
     .map((item) => ({
-      month: new Date(item.month).toLocaleDateString("en-US", {
-        month: "short",
-        year: "2-digit",
-      }),
+      month: `${item.month_name.slice(0, 3)} '${String(item.year).slice(-2)}`,
       revenue: item.total_revenue,
-      refunds: -item.total_refunds, // Negative to show as reduction
-      chargebacks: -item.total_chargebacks, // Negative to show as reduction
-      net: item.total_net_revenue,
+      profit: item.total_profit,
     }));
 
   const formatCurrency = (value: number) => {
-    const absValue = Math.abs(value);
-    if (absValue >= 1000000) {
+    if (value >= 1000000) {
       return `$${(value / 1000000).toFixed(1)}M`;
     }
-    if (absValue >= 1000) {
+    if (value >= 1000) {
       return `$${(value / 1000).toFixed(0)}K`;
     }
     return `$${value}`;
@@ -62,7 +58,17 @@ export function RevenueChart({ data, isLoading }: RevenueChartProps) {
   return (
     <div className="h-[300px] w-full">
       <ResponsiveContainer width="100%" height="100%">
-        <BarChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+        <AreaChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+          <defs>
+            <linearGradient id="revenueGradient" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="5%" stopColor="#10b981" stopOpacity={0.3} />
+              <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
+            </linearGradient>
+            <linearGradient id="profitGradient" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3} />
+              <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
+            </linearGradient>
+          </defs>
           <CartesianGrid strokeDasharray="3 3" className="stroke-border/50" />
           <XAxis
             dataKey="month"
@@ -84,31 +90,29 @@ export function RevenueChart({ data, isLoading }: RevenueChartProps) {
               borderRadius: "8px",
             }}
             labelStyle={{ color: "hsl(var(--foreground))" }}
-            formatter={(value: number, name: string) => {
+            formatter={(value, name) => {
               const labels: Record<string, string> = {
                 revenue: "Revenue",
-                refunds: "Refunds",
-                chargebacks: "Chargebacks",
-                net: "Net Revenue",
+                profit: "Profit",
               };
-              return [formatCurrency(Math.abs(value)), labels[name] || name];
+              return [formatCurrency(Number(value ?? 0)), labels[String(name)] ?? String(name)];
             }}
           />
-          <Legend
-            wrapperStyle={{ paddingTop: "10px" }}
-            formatter={(value: string) => {
-              const labels: Record<string, string> = {
-                revenue: "Revenue",
-                refunds: "Refunds",
-                chargebacks: "Chargebacks",
-              };
-              return labels[value] || value;
-            }}
+          <Area
+            type="monotone"
+            dataKey="revenue"
+            stroke="#10b981"
+            strokeWidth={2}
+            fill="url(#revenueGradient)"
           />
-          <Bar dataKey="revenue" fill="#10b981" radius={[4, 4, 0, 0]} />
-          <Bar dataKey="refunds" fill="#f59e0b" radius={[4, 4, 0, 0]} />
-          <Bar dataKey="chargebacks" fill="#ef4444" radius={[4, 4, 0, 0]} />
-        </BarChart>
+          <Area
+            type="monotone"
+            dataKey="profit"
+            stroke="#3b82f6"
+            strokeWidth={2}
+            fill="url(#profitGradient)"
+          />
+        </AreaChart>
       </ResponsiveContainer>
     </div>
   );
