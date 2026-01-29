@@ -37,6 +37,7 @@ import {
 } from "@/components/ui/select";
 import { listCalls, type CallRecord } from "@/lib/api/calls";
 import { api } from "@/lib/api";
+import { useAuth } from "@/hooks/use-auth";
 import { FolderOpen } from "lucide-react";
 
 interface Workspace {
@@ -62,6 +63,8 @@ function formatPhoneNumber(number: string): string {
 
 export default function CallHistoryPage() {
   const router = useRouter();
+  const { user } = useAuth();
+  const isAdmin = user?.is_superuser ?? false;
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [playingCallId, setPlayingCallId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -81,8 +84,9 @@ export default function CallHistoryPage() {
   });
 
   // Fetch calls from API
+  // For admins with "All Workspaces" selected, fetch all users' calls
   const { data, isLoading, error } = useQuery({
-    queryKey: ["calls", page, statusFilter, selectedWorkspaceId],
+    queryKey: ["calls", page, statusFilter, selectedWorkspaceId, isAdmin],
     queryFn: () =>
       listCalls({
         page,
@@ -95,6 +99,7 @@ export default function CallHistoryPage() {
         direction: ["inbound", "outbound"].includes(statusFilter)
           ? (statusFilter as "inbound" | "outbound")
           : undefined,
+        all_users: isAdmin && selectedWorkspaceId === "all",
       }),
   });
 

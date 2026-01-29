@@ -76,6 +76,7 @@ async def list_calls(
         default=None, description="Filter by direction: inbound or outbound"
     ),
     status: str | None = Query(default=None, description="Filter by status"),
+    all_users: bool = Query(default=False, description="Admin only: show all users' calls"),
 ) -> CallRecordListResponse:
     """List call records for the current user.
 
@@ -87,23 +88,25 @@ async def list_calls(
         agent_id: Optional filter by agent ID
         direction: Optional filter by direction
         status: Optional filter by status
+        all_users: Admin only - if True, show calls from all users
 
     Returns:
         Paginated list of call records
     """
     log = logger.bind(user_id=current_user.id)
-    log.info("listing_calls", page=page, page_size=page_size)
+    log.info("listing_calls", page=page, page_size=page_size, all_users=all_users)
 
     # Build query with eager loading to prevent N+1 queries
-    query = (
-        select(CallRecord)
-        .where(CallRecord.user_id == current_user.id)
-        .options(
-            selectinload(CallRecord.agent),
-            selectinload(CallRecord.contact),
-            selectinload(CallRecord.workspace),
-        )
+    query = select(CallRecord).options(
+        selectinload(CallRecord.agent),
+        selectinload(CallRecord.contact),
+        selectinload(CallRecord.workspace),
     )
+
+    # Filter by user unless admin requests all users
+    show_all = all_users and current_user.is_superuser
+    if not show_all:
+        query = query.where(CallRecord.user_id == current_user.id)
 
     # Apply filters
     if agent_id:
@@ -116,7 +119,9 @@ async def list_calls(
         query = query.where(CallRecord.status == status)
 
     # Get total count
-    count_query = select(CallRecord.id).where(CallRecord.user_id == current_user.id)
+    count_query = select(CallRecord.id)
+    if not show_all:
+        count_query = count_query.where(CallRecord.user_id == current_user.id)
     if agent_id:
         count_query = count_query.where(CallRecord.agent_id == uuid.UUID(agent_id))
     if workspace_id:

@@ -47,6 +47,7 @@ export interface ListCallsParams {
   workspace_id?: string;
   direction?: "inbound" | "outbound";
   status?: string;
+  all_users?: boolean; // Admin only: show all users' calls
 }
 
 export interface CallStats {
@@ -69,6 +70,7 @@ export async function listCalls(params: ListCallsParams = {}): Promise<CallRecor
   if (params.workspace_id) searchParams.set("workspace_id", params.workspace_id);
   if (params.direction) searchParams.set("direction", params.direction);
   if (params.status) searchParams.set("status", params.status);
+  if (params.all_users) searchParams.set("all_users", "true");
 
   const response = await fetch(`${API_BASE}/api/v1/calls?${searchParams.toString()}`, {
     headers: getAuthHeaders(),
