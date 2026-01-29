@@ -122,11 +122,18 @@ export async function createAgent(request: CreateAgentRequest): Promise<Agent> {
   return response.json();
 }
 
+export interface FetchAgentsParams {
+  all_users?: boolean; // Admin only: show all users' agents
+}
+
 /**
  * List all agents
  */
-export async function fetchAgents(): Promise<Agent[]> {
-  const response = await fetchWithTimeout(`${API_BASE}/api/v1/agents`);
+export async function fetchAgents(params: FetchAgentsParams = {}): Promise<Agent[]> {
+  const searchParams = new URLSearchParams();
+  if (params.all_users) searchParams.set("all_users", "true");
+  const queryString = searchParams.toString() ? `?${searchParams.toString()}` : "";
+  const response = await fetchWithTimeout(`${API_BASE}/api/v1/agents${queryString}`);
   if (!response.ok) {
     throw new Error(`Failed to fetch agents: ${response.statusText}`);
   }

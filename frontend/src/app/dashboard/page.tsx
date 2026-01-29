@@ -44,7 +44,7 @@ export default function DashboardPage() {
   // Fetch agents
   const { data: agents = [] } = useQuery({
     queryKey: ["agents"],
-    queryFn: fetchAgents,
+    queryFn: () => fetchAgents(),
   });
 
   // Fetch recent calls (for non-admin or recent calls list)

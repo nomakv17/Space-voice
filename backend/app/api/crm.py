@@ -4,7 +4,7 @@ import logging
 import re
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, EmailStr, field_validator
 from sqlalchemy import func, select
 from sqlalchemy.exc import DBAPIError, IntegrityError
@@ -303,10 +303,12 @@ async def list_contacts(
     skip: int = 0,
     limit: int = 100,
     workspace_id: str | None = None,
+    all_users: bool = Query(default=False, description="Admin only: show all users' contacts"),
     db: AsyncSession = Depends(get_db),
 ) -> list[dict[str, object]]:
     """List all contacts for the current user, optionally filtered by workspace."""
     user_id = current_user.id
+    show_all = all_users and current_user.is_superuser
 
     # Validate pagination parameters to prevent DoS
     if skip < 0:
@@ -318,12 +320,17 @@ async def list_contacts(
     if skip > MAX_SKIP_OFFSET:  # Prevent massive table scans
         raise HTTPException(status_code=400, detail="Skip offset too large")
 
-    # Validate workspace_id if provided
+    # Validate workspace_id if provided (skip validation for admin viewing all)
     workspace_uuid = None
-    if workspace_id:
+    if workspace_id and not show_all:
         workspace_uuid = await _validate_workspace_ownership(workspace_id, user_id, db)
+    elif workspace_id:
+        try:
+            workspace_uuid = uuid.UUID(workspace_id)
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail="Invalid workspace_id format") from e
 
-    cache_key = f"crm:contacts:list:{user_id}:{workspace_id or 'all'}:{skip}:{limit}"
+    cache_key = f"crm:contacts:list:{user_id if not show_all else 'all'}:{workspace_id or 'all'}:{skip}:{limit}"
 
     # Try cache first
     cached = await cache_get(cache_key)
@@ -337,17 +344,20 @@ async def list_contacts(
         )
         return list(cached)
 
-    # Fetch from database - filtered by user_id to prevent data leaks
+    # Fetch from database - filtered by user_id unless admin viewing all
     logger.debug(
-        "Cache miss - fetching contacts from database: user_id=%d, workspace_id=%s, skip=%d, limit=%d",
+        "Cache miss - fetching contacts from database: user_id=%d, workspace_id=%s, skip=%d, limit=%d, all_users=%s",
         user_id,
         workspace_id,
         skip,
         limit,
+        show_all,
     )
 
     # Build query
-    query = select(Contact).where(Contact.user_id == user_id)
+    query = select(Contact)
+    if not show_all:
+        query = query.where(Contact.user_id == user_id)
     if workspace_uuid:
         query = query.where(Contact.workspace_id == workspace_uuid)
 
@@ -852,41 +862,48 @@ async def delete_contact(
 async def get_crm_stats(
     request: Request,
     current_user: CurrentUser,
+    all_users: bool = Query(default=False, description="Admin only: show platform-wide stats"),
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, int]:
     """Get CRM statistics with 60-second cache."""
     user_id = current_user.id
+    show_all = all_users and current_user.is_superuser
 
     # Try to get from cache first (include user_id in cache key)
-    cache_key = f"crm:stats:{user_id}"
+    cache_key = f"crm:stats:{user_id if not show_all else 'all'}"
     cached_stats = await cache_get(cache_key)
 
     if cached_stats is not None:
-        logger.debug("Returning cached CRM stats for user %d", user_id)
+        logger.debug("Returning cached CRM stats for user %d (all_users=%s)", user_id, show_all)
         return dict(cached_stats)
 
     # Cache miss - fetch from database with separate count queries
-    logger.debug("Cache miss - fetching CRM stats from database for user %d", user_id)
+    logger.debug("Cache miss - fetching CRM stats from database for user %d (all_users=%s)", user_id, show_all)
 
-    # Use separate count queries filtered by user_id to avoid data leaks
-    # Contacts are directly linked to user_id
-    total_contacts = await db.scalar(
-        select(func.count()).select_from(Contact).where(Contact.user_id == user_id)
-    )
-    # Appointments are linked through contacts
-    total_appointments = await db.scalar(
-        select(func.count())
-        .select_from(Appointment)
-        .join(Contact)
-        .where(Contact.user_id == user_id)
-    )
-    # CallInteractions are linked through contacts
-    total_calls = await db.scalar(
-        select(func.count())
-        .select_from(CallInteraction)
-        .join(Contact)
-        .where(Contact.user_id == user_id)
-    )
+    # Use separate count queries - filtered by user_id unless admin viewing all
+    if show_all:
+        total_contacts = await db.scalar(select(func.count()).select_from(Contact))
+        total_appointments = await db.scalar(select(func.count()).select_from(Appointment))
+        total_calls = await db.scalar(select(func.count()).select_from(CallInteraction))
+    else:
+        # Contacts are directly linked to user_id
+        total_contacts = await db.scalar(
+            select(func.count()).select_from(Contact).where(Contact.user_id == user_id)
+        )
+        # Appointments are linked through contacts
+        total_appointments = await db.scalar(
+            select(func.count())
+            .select_from(Appointment)
+            .join(Contact)
+            .where(Contact.user_id == user_id)
+        )
+        # CallInteractions are linked through contacts
+        total_calls = await db.scalar(
+            select(func.count())
+            .select_from(CallInteraction)
+            .join(Contact)
+            .where(Contact.user_id == user_id)
+        )
 
     stats = {
         "total_contacts": total_contacts or 0,
@@ -1024,6 +1041,7 @@ async def list_appointments(
     limit: int = 100,
     status: str | None = None,
     workspace_id: str | None = None,
+    all_users: bool = Query(default=False, description="Admin only: show all users' appointments"),
     db: AsyncSession = Depends(get_db),
 ) -> list[dict[str, object]]:
     """List all appointments for the current user's contacts, optionally filtered by workspace."""
@@ -1032,6 +1050,7 @@ async def list_appointments(
     from sqlalchemy.orm import selectinload
 
     user_id = current_user.id
+    show_all = all_users and current_user.is_superuser
 
     # Validate pagination
     if skip < 0:
@@ -1041,24 +1060,32 @@ async def list_appointments(
     if limit > MAX_CONTACTS_LIMIT:
         raise HTTPException(status_code=400, detail=f"Limit cannot exceed {MAX_CONTACTS_LIMIT}")
 
-    # Validate workspace_id if provided
+    # Validate workspace_id if provided (skip validation for admin viewing all)
     workspace_uuid = None
-    if workspace_id:
+    if workspace_id and not show_all:
         workspace_uuid = await _validate_workspace_ownership(workspace_id, user_id, db)
+    elif workspace_id:
+        try:
+            workspace_uuid = uuid.UUID(workspace_id)
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail="Invalid workspace_id format") from e
 
-    # Build query - join with contacts to filter by user_id
+    # Build query - join with contacts to filter by user_id (unless admin viewing all)
     # Use undefer to eagerly load the notes column which is deferred by default
     from sqlalchemy.orm import undefer
 
     query = (
         select(Appointment)
         .join(Contact)
-        .where(Contact.user_id == user_id)
         .options(selectinload(Appointment.contact), undefer(Appointment.notes))
         .offset(skip)
         .limit(limit)
         .order_by(Appointment.scheduled_at.desc())
     )
+
+    # Filter by user unless admin viewing all
+    if not show_all:
+        query = query.where(Contact.user_id == user_id)
 
     if status:
         query = query.where(Appointment.status == status)

@@ -152,17 +152,17 @@ async def list_workspaces(
     request: Request,
     current_user: CurrentUser,
     db: AsyncSession = Depends(get_db),
+    all_users: bool = False,
 ) -> list[dict[str, Any]]:
-    """List all workspaces for the current user."""
-    user_id = current_user.id
+    """List all workspaces for the current user (or all users if admin)."""
+    show_all = all_users and current_user.is_superuser
 
     try:
-        result = await db.execute(
-            select(Workspace)
-            .where(Workspace.user_id == user_id)
-            .options(selectinload(Workspace.agent_workspaces))
-            .order_by(Workspace.is_default.desc(), Workspace.created_at.desc()),
-        )
+        query = select(Workspace).options(selectinload(Workspace.agent_workspaces))
+        if not show_all:
+            query = query.where(Workspace.user_id == current_user.id)
+        query = query.order_by(Workspace.is_default.desc(), Workspace.created_at.desc())
+        result = await db.execute(query)
         workspaces = list(result.scalars().all())
     except DBAPIError as e:
         logger.exception("Database error listing workspaces")

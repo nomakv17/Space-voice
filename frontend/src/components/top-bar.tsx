@@ -66,7 +66,7 @@ export function TopBar() {
   // Fetch agents count
   const { data: agents, isLoading: agentsLoading } = useQuery({
     queryKey: ["agents-count"],
-    queryFn: fetchAgents,
+    queryFn: () => fetchAgents(),
     staleTime: 30000,
   });
 

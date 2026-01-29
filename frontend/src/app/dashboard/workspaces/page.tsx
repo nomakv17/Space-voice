@@ -36,6 +36,7 @@ import { Plus, Loader2, AlertCircle, FolderOpen, Users, Bot, Settings, Trash2 } 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { toast } from "sonner";
+import { useAuth } from "@/hooks/use-auth";
 import { Badge } from "@/components/ui/badge";
 import { InfoTooltip } from "@/components/ui/info-tooltip";
 
@@ -106,6 +107,8 @@ const emptyFormData: WorkspaceFormData = {
 
 export default function WorkspacesPage() {
   const queryClient = useQueryClient();
+  const { user } = useAuth();
+  const isAdmin = user?.is_superuser ?? false;
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isAgentsModalOpen, setIsAgentsModalOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
@@ -113,15 +116,16 @@ export default function WorkspacesPage() {
   const [selectedWorkspace, setSelectedWorkspace] = useState<Workspace | null>(null);
   const [formData, setFormData] = useState<WorkspaceFormData>(emptyFormData);
 
-  // Fetch workspaces
+  // Fetch workspaces (admin sees all users' workspaces)
   const {
     data: workspaces = [],
     isLoading,
     error,
   } = useQuery<Workspace[]>({
-    queryKey: ["workspaces"],
+    queryKey: ["workspaces", isAdmin],
     queryFn: async () => {
-      const response = await api.get("/api/v1/workspaces");
+      const url = isAdmin ? "/api/v1/workspaces?all_users=true" : "/api/v1/workspaces";
+      const response = await api.get(url);
       return response.data;
     },
   });

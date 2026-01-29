@@ -46,6 +46,7 @@ import { InfoTooltip } from "@/components/ui/info-tooltip";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { toast } from "sonner";
+import { useAuth } from "@/hooks/use-auth";
 import Link from "next/link";
 
 interface WorkspaceSettings {
@@ -107,6 +108,8 @@ const emptyFormData: AppointmentFormData = {
 
 export default function AppointmentsPage() {
   const queryClient = useQueryClient();
+  const { user } = useAuth();
+  const isAdmin = user?.is_superuser ?? false;
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalMode, setModalMode] = useState<"add" | "edit" | "view">("add");
   const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
@@ -129,11 +132,12 @@ export default function AppointmentsPage() {
     isLoading,
     error,
   } = useQuery<Appointment[]>({
-    queryKey: ["appointments", statusFilter, selectedWorkspaceId],
+    queryKey: ["appointments", statusFilter, selectedWorkspaceId, isAdmin],
     queryFn: async () => {
       const params = new URLSearchParams();
       if (statusFilter !== "all") params.append("status", statusFilter);
       if (selectedWorkspaceId !== "all") params.append("workspace_id", selectedWorkspaceId);
+      if (isAdmin && selectedWorkspaceId === "all") params.append("all_users", "true");
       const queryString = params.toString() ? `?${params.toString()}` : "";
       const response = await api.get(`/api/v1/crm/appointments${queryString}`);
       return response.data;
@@ -141,13 +145,17 @@ export default function AppointmentsPage() {
   });
 
   const { data: contacts = [] } = useQuery<Contact[]>({
-    queryKey: ["contacts", selectedWorkspaceId],
+    queryKey: ["contacts", selectedWorkspaceId, isAdmin],
     queryFn: async () => {
-      const url =
-        selectedWorkspaceId !== "all"
-          ? `/api/v1/crm/contacts?workspace_id=${selectedWorkspaceId}`
-          : "/api/v1/crm/contacts";
-      const response = await api.get(url);
+      const params = new URLSearchParams();
+      if (selectedWorkspaceId !== "all") {
+        params.set("workspace_id", selectedWorkspaceId);
+      }
+      if (isAdmin && selectedWorkspaceId === "all") {
+        params.set("all_users", "true");
+      }
+      const queryString = params.toString() ? `?${params.toString()}` : "";
+      const response = await api.get(`/api/v1/crm/contacts${queryString}`);
       return response.data;
     },
   });

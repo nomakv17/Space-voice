@@ -3,7 +3,7 @@
 import uuid
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -226,6 +226,7 @@ async def list_agents(
     current_user: CurrentUser,
     skip: int = 0,
     limit: int = 50,
+    all_users: bool = Query(default=False, description="Admin only: show all users' agents"),
     db: AsyncSession = Depends(get_db),
 ) -> list[AgentResponse]:
     """List all agents for current user with pagination.
@@ -234,6 +235,7 @@ async def list_agents(
         current_user: Authenticated user
         skip: Number of records to skip (default 0)
         limit: Maximum number of records to return (default 50, max 100)
+        all_users: Admin only - if True, show agents from all users
         db: Database session
 
     Returns:
@@ -250,13 +252,13 @@ async def list_agents(
     if limit > MAX_AGENTS_LIMIT:
         raise HTTPException(status_code=400, detail=f"Limit cannot exceed {MAX_AGENTS_LIMIT}")
 
-    result = await db.execute(
-        select(Agent)
-        .where(Agent.user_id == current_user.id)
-        .order_by(Agent.created_at.desc())
-        .offset(skip)
-        .limit(limit)
-    )
+    # Filter by user unless admin requests all users
+    show_all = all_users and current_user.is_superuser
+    query = select(Agent).order_by(Agent.created_at.desc()).offset(skip).limit(limit)
+    if not show_all:
+        query = query.where(Agent.user_id == current_user.id)
+
+    result = await db.execute(query)
     agents = result.scalars().all()
 
     # Fetch phone numbers for all agents

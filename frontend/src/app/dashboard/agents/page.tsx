@@ -19,6 +19,7 @@ import { useRouter } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { fetchAgents, deleteAgent, createAgent, getAgent, type Agent } from "@/lib/api/agents";
+import { useAuth } from "@/hooks/use-auth";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -69,6 +70,8 @@ function formatRelativeTime(dateString: string): string {
 export default function AgentsPage() {
   const queryClient = useQueryClient();
   const router = useRouter();
+  const { user } = useAuth();
+  const isAdmin = user?.is_superuser ?? false;
   const [callDialogOpen, setCallDialogOpen] = useState(false);
   const [embedDialogOpen, setEmbedDialogOpen] = useState(false);
   const [selectedAgent, setSelectedAgent] = useState<Agent | null>(null);
@@ -92,8 +95,8 @@ export default function AgentsPage() {
     isLoading: isLoadingAllAgents,
     error: allAgentsError,
   } = useQuery({
-    queryKey: ["agents"],
-    queryFn: fetchAgents,
+    queryKey: ["agents", isAdmin && selectedWorkspaceId === "all"],
+    queryFn: () => fetchAgents({ all_users: isAdmin && selectedWorkspaceId === "all" }),
     enabled: selectedWorkspaceId === "all",
   });
 
