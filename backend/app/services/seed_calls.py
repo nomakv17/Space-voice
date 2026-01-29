@@ -291,7 +291,7 @@ async def seed_calls(db: AsyncSession) -> dict[str, int | Decimal]:
                     voice=random.choice(["alloy", "shimmer", "echo", "nova"]),
                     is_active=True,
                     enable_recording=True,
-                    enable_transcription=True,
+                    enable_transcript=True,
                 )
                 agent.created_at = user_created_date + timedelta(days=random.randint(0, 7))  # type: ignore[assignment]
                 db.add(agent)
