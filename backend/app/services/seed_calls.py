@@ -1,4 +1,4 @@
-"""Service for seeding realistic call data with revenue calculations.
+"""Service for seeding realistic demo data with revenue calculations.
 
 Note: Uses standard random for demo data generation (not cryptographic).
 """
@@ -15,9 +15,13 @@ from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.auth import get_password_hash
+from app.models.agent import Agent
+from app.models.appointment import Appointment
 from app.models.call_record import CallDirection, CallRecord, CallStatus
+from app.models.contact import Contact
 from app.models.pricing_config import PricingConfig
 from app.models.user import User
+from app.models.workspace import Workspace
 
 logger = structlog.get_logger()
 
@@ -41,6 +45,36 @@ TIER_CALL_PARAMS = {
 # Phone number prefixes for realistic data
 AREA_CODES = ["212", "310", "415", "305", "312", "702", "602", "206", "617", "404"]
 
+# Realistic company/business names
+BUSINESS_TYPES = [
+    "HVAC Services", "Plumbing Co", "Electric Solutions", "Roofing Pros",
+    "Landscaping", "Pest Control", "Cleaning Services", "Auto Repair",
+    "Dental Office", "Law Firm", "Real Estate", "Insurance Agency",
+    "Medical Clinic", "Veterinary", "Restaurant", "Salon & Spa",
+]
+
+# First names for contacts
+FIRST_NAMES = [
+    "James", "Mary", "John", "Patricia", "Robert", "Jennifer", "Michael", "Linda",
+    "William", "Elizabeth", "David", "Barbara", "Richard", "Susan", "Joseph", "Jessica",
+    "Thomas", "Sarah", "Charles", "Karen", "Christopher", "Nancy", "Daniel", "Lisa",
+    "Matthew", "Betty", "Anthony", "Margaret", "Mark", "Sandra", "Donald", "Ashley",
+]
+
+# Last names for contacts
+LAST_NAMES = [
+    "Smith", "Johnson", "Williams", "Brown", "Jones", "Garcia", "Miller", "Davis",
+    "Rodriguez", "Martinez", "Hernandez", "Lopez", "Gonzalez", "Wilson", "Anderson",
+    "Thomas", "Taylor", "Moore", "Jackson", "Martin", "Lee", "Perez", "Thompson",
+    "White", "Harris", "Sanchez", "Clark", "Ramirez", "Lewis", "Robinson", "Walker",
+]
+
+# Service types for appointments
+SERVICE_TYPES = [
+    "Initial Consultation", "Follow-up Visit", "Estimate Request", "Service Call",
+    "Repair Appointment", "Maintenance Check", "Emergency Service", "Installation",
+]
+
 
 def generate_phone() -> str:
     """Generate a realistic phone number."""
@@ -48,9 +82,14 @@ def generate_phone() -> str:
     return f"+1{area}{random.randint(1000000, 9999999)}"
 
 
+def generate_email(first_name: str, last_name: str) -> str:
+    """Generate a realistic email address."""
+    domains = ["gmail.com", "yahoo.com", "outlook.com", "hotmail.com", "icloud.com"]
+    return f"{first_name.lower()}.{last_name.lower()}{random.randint(1, 99)}@{random.choice(domains)}"
+
+
 def generate_call_duration(avg_minutes: int) -> int:
     """Generate realistic call duration with variance."""
-    # Use triangular distribution weighted toward average
     min_dur = 30  # 30 seconds minimum
     max_dur = avg_minutes * 60 * 2.5  # Max ~2.5x average
     mode = avg_minutes * 60  # Peak at average
@@ -62,7 +101,6 @@ async def ensure_pricing_tiers(db: AsyncSession) -> dict[str, PricingConfig]:
     result = await db.execute(select(PricingConfig))
     existing = {p.tier_id: p for p in result.scalars().all()}
 
-    # Default tier configurations if not present
     default_tiers = {
         "premium": {
             "tier_name": "Premium",
@@ -126,70 +164,81 @@ async def ensure_pricing_tiers(db: AsyncSession) -> dict[str, PricingConfig]:
 
 
 async def seed_calls(db: AsyncSession) -> dict[str, int | Decimal]:
-    """Seed realistic call data with revenue across 6 months.
+    """Seed realistic demo data with revenue across 6 months.
 
-    Creates 50 users across pricing tiers with calls from Aug 2025 - Jan 2026.
-    Revenue grows month-over-month: ~$15K (Aug) → ~$40K (Jan)
+    Creates for each of 50 users:
+    - 1 workspace
+    - 1-2 agents
+    - 5-15 contacts
+    - 3-8 appointments
+    - Multiple calls (scaled by tier and month)
+
+    Revenue grows month-over-month: ~$37K (Aug) → ~$95K (Jan) = ~$400K total
     """
-    # Check if already seeded (look for seeded users)
+    # Check if already seeded
     result = await db.execute(
         select(func.count(User.id)).where(User.email.like("%@seeded.spacevoice.ai"))
     )
     existing_seeded = result.scalar() or 0
 
     if existing_seeded > 0:
-        logger.info("Call data already seeded", existing_users=existing_seeded)
+        logger.info("Data already seeded", existing_users=existing_seeded)
         return {"seeded": False, "message": "Data already exists"}
 
     # Ensure pricing tiers exist
     pricing_tiers = await ensure_pricing_tiers(db)
 
-    # Generate 6 months of dates (Aug 2025 - Jan 2026)
+    # Generate 6 months of dates
     now = datetime.now(UTC)
     current_month = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
 
-    # Create list of 6 months going back from current
     from dateutil.relativedelta import relativedelta
     months = []
     for i in range(6):
         month_date = current_month - relativedelta(months=(5 - i))
-        # Growth multiplier: 0.4 (oldest) → 1.0 (newest)
-        growth_multiplier = 0.4 + (i * 0.12)  # 0.4, 0.52, 0.64, 0.76, 0.88, 1.0
+        growth_multiplier = 0.4 + (i * 0.12)  # 0.4 → 1.0
         months.append((month_date, growth_multiplier))
 
+    # Counters
     users_created = 0
+    workspaces_created = 0
+    agents_created = 0
+    contacts_created = 0
+    appointments_created = 0
     calls_created = 0
     total_revenue = Decimal("0")
     total_cost = Decimal("0")
-    total_minutes = 0
 
     user_index = 0
 
     for tier_id, user_count in TIER_DISTRIBUTION:
         pricing = pricing_tiers.get(tier_id)
         if not pricing:
-            logger.warning("Pricing tier %s not found, skipping", tier_id)
             continue
 
-        calls_per_user, avg_duration, demo_price = TIER_CALL_PARAMS.get(tier_id, (80, 4, Decimal("0.50")))
+        calls_per_user, avg_duration, demo_price = TIER_CALL_PARAMS.get(
+            tier_id, (80, 4, Decimal("1.00"))
+        )
 
         for _ in range(user_count):
             user_index += 1
 
-            # Create seeded user with creation date spread across the 6 months
-            # Users are created in different months for realistic timeline
-            user_month_idx = user_index % 6  # Spread users across 6 months
+            # User creation date spread across 6 months
+            user_month_idx = user_index % 6
             user_created_date = months[user_month_idx][0].replace(
                 day=random.randint(1, 28),
                 hour=random.randint(9, 17),
                 minute=random.randint(0, 59),
             )
 
+            business_type = random.choice(BUSINESS_TYPES)
+
+            # Create user
             user = User(
                 email=f"user{user_index:03d}@seeded.spacevoice.ai",
                 hashed_password=get_password_hash(secrets.token_urlsafe(16)),
                 full_name=f"Seeded User {user_index}",
-                company_name=f"Company {user_index}",
+                company_name=f"{business_type} #{user_index}",
                 is_active=True,
                 is_superuser=False,
                 onboarding_completed=True,
@@ -199,37 +248,152 @@ async def seed_calls(db: AsyncSession) -> dict[str, int | Decimal]:
             await db.flush()
             users_created += 1
 
+            # Create workspace for this user
+            workspace = Workspace(
+                id=uuid.uuid4(),
+                user_id=user.id,
+                name=f"{business_type} Workspace",
+                description=f"Main workspace for {business_type}",
+                is_default=True,
+                settings={
+                    "timezone": random.choice([
+                        "America/New_York", "America/Chicago",
+                        "America/Denver", "America/Los_Angeles"
+                    ]),
+                    "business_hours": {
+                        "monday": {"start": "09:00", "end": "17:00"},
+                        "tuesday": {"start": "09:00", "end": "17:00"},
+                        "wednesday": {"start": "09:00", "end": "17:00"},
+                        "thursday": {"start": "09:00", "end": "17:00"},
+                        "friday": {"start": "09:00", "end": "17:00"},
+                    },
+                },
+            )
+            workspace.created_at = user_created_date  # type: ignore[assignment]
+            db.add(workspace)
+            await db.flush()
+            workspaces_created += 1
+
+            # Create 1-2 agents for this user
+            num_agents = random.randint(1, 2)
+            user_agents = []
+            for agent_num in range(num_agents):
+                agent_name = f"{business_type} Assistant" if agent_num == 0 else f"{business_type} Support"
+                agent = Agent(
+                    id=uuid.uuid4(),
+                    user_id=user.id,
+                    name=agent_name,
+                    description=f"Voice agent for {business_type}",
+                    pricing_tier=tier_id,
+                    voice_provider="openai_realtime",
+                    system_prompt=f"You are a helpful assistant for {business_type}. Help customers with inquiries, scheduling, and general questions.",
+                    language="en-US",
+                    voice=random.choice(["alloy", "shimmer", "echo", "nova"]),
+                    is_active=True,
+                    enable_recording=True,
+                    enable_transcription=True,
+                )
+                agent.created_at = user_created_date + timedelta(days=random.randint(0, 7))  # type: ignore[assignment]
+                db.add(agent)
+                await db.flush()
+                user_agents.append(agent)
+                agents_created += 1
+
+            # Create 5-15 contacts for this workspace
+            num_contacts = random.randint(5, 15)
+            user_contacts = []
+            contact_statuses = ["new", "contacted", "qualified", "converted", "lost"]
+
+            for _ in range(num_contacts):
+                first_name = random.choice(FIRST_NAMES)
+                last_name = random.choice(LAST_NAMES)
+
+                # Contact created sometime in the 6-month window
+                contact_month_idx = random.randint(0, 5)
+                contact_created = months[contact_month_idx][0].replace(
+                    day=random.randint(1, 28),
+                    hour=random.randint(9, 17),
+                )
+
+                contact = Contact(
+                    user_id=user.id,
+                    workspace_id=workspace.id,
+                    first_name=first_name,
+                    last_name=last_name,
+                    email=generate_email(first_name, last_name),
+                    phone_number=generate_phone(),
+                    company_name=random.choice([None, f"{first_name}'s Company", "Self"]),
+                    status=random.choice(contact_statuses),
+                    tags=random.choice([None, "lead", "customer", "vip", "follow-up"]),
+                )
+                contact.created_at = contact_created  # type: ignore[assignment]
+                db.add(contact)
+                await db.flush()
+                user_contacts.append(contact)
+                contacts_created += 1
+
+            # Create 3-8 appointments for some contacts
+            num_appointments = random.randint(3, 8)
+            appointment_statuses = ["scheduled", "completed", "cancelled", "no_show"]
+
+            for _ in range(num_appointments):
+                contact = random.choice(user_contacts)
+                agent = random.choice(user_agents)
+
+                # Appointment scheduled in the 6-month window
+                appt_month_idx = random.randint(0, 5)
+                appt_date = months[appt_month_idx][0].replace(
+                    day=random.randint(1, 28),
+                    hour=random.randint(9, 16),
+                    minute=random.choice([0, 15, 30, 45]),
+                )
+
+                # Older appointments more likely to be completed
+                if appt_month_idx < 4:
+                    status = random.choices(
+                        appointment_statuses,
+                        weights=[10, 60, 20, 10]
+                    )[0]
+                else:
+                    status = random.choices(
+                        appointment_statuses,
+                        weights=[60, 20, 15, 5]
+                    )[0]
+
+                appointment = Appointment(
+                    contact_id=contact.id,
+                    workspace_id=workspace.id,
+                    agent_id=agent.id,
+                    scheduled_at=appt_date,
+                    duration_minutes=random.choice([15, 30, 45, 60]),
+                    status=status,
+                    service_type=random.choice(SERVICE_TYPES),
+                    created_by_agent=agent.name,
+                )
+                appointment.created_at = appt_date - timedelta(days=random.randint(1, 7))  # type: ignore[assignment]
+                db.add(appointment)
+                appointments_created += 1
+
             # Generate calls for this user across all 6 months
             for month_start, growth_mult in months:
-                # Scale calls by growth multiplier (fewer calls in older months)
                 month_calls = int((calls_per_user + random.randint(-20, 20)) * growth_mult)
-
-                # Determine max day for this month (28 for safety, or current day if current month)
                 is_current_month = month_start.month == now.month and month_start.year == now.year
                 max_day = min(28, now.day) if is_current_month else 28
 
                 for _ in range(month_calls):
-                    # Random timestamp within the month
-                    random_day = random.randint(1, max_day)
-                    random_hour = random.randint(8, 20)  # Business hours-ish
-                    random_minute = random.randint(0, 59)
-
                     call_time = month_start.replace(
-                        day=random_day,
-                        hour=random_hour,
-                        minute=random_minute,
+                        day=random.randint(1, max_day),
+                        hour=random.randint(8, 20),
+                        minute=random.randint(0, 59),
                     )
 
-                    # Generate call details
                     duration_secs = generate_call_duration(avg_duration)
                     duration_mins = Decimal(str(duration_secs)) / 60
 
-                    # Calculate revenue using demo pricing
                     revenue = (duration_mins * demo_price).quantize(Decimal("0.0001"))
-                    # Cost is ~40% of revenue for realistic profit margins
                     cost = (revenue * Decimal("0.40")).quantize(Decimal("0.0001"))
 
-                    # Determine call status (85% completed)
+                    # Call status distribution
                     status_roll = random.random()
                     if status_roll < 0.85:
                         status = CallStatus.COMPLETED.value
@@ -249,22 +413,28 @@ async def seed_calls(db: AsyncSession) -> dict[str, int | Decimal]:
                         revenue = Decimal("0")
                         cost = Decimal("0")
 
-                    # Direction (70% inbound, 30% outbound)
                     direction = (
                         CallDirection.INBOUND.value
                         if random.random() < 0.7
                         else CallDirection.OUTBOUND.value
                     )
 
+                    # Link call to agent and optionally contact
+                    agent = random.choice(user_agents)
+                    contact = random.choice(user_contacts) if random.random() < 0.6 else None
+
                     call = CallRecord(
                         id=uuid.uuid4(),
                         user_id=user.id,
                         provider=random.choice(["telnyx", "twilio"]),
                         provider_call_id=f"call_{secrets.token_hex(16)}",
+                        agent_id=agent.id,
+                        contact_id=contact.id if contact else None,
+                        workspace_id=workspace.id,
                         direction=direction,
                         status=status,
-                        from_number=generate_phone(),
-                        to_number=generate_phone(),
+                        from_number=contact.phone_number if contact and direction == CallDirection.INBOUND.value else generate_phone(),
+                        to_number=contact.phone_number if contact and direction == CallDirection.OUTBOUND.value else generate_phone(),
                         duration_seconds=duration_secs,
                         pricing_tier_id=tier_id,
                         price_per_minute=demo_price,
@@ -275,55 +445,89 @@ async def seed_calls(db: AsyncSession) -> dict[str, int | Decimal]:
                         ended_at=(call_time + timedelta(seconds=duration_secs)) if status == CallStatus.COMPLETED.value else call_time,
                     )
                     db.add(call)
-
                     calls_created += 1
-                total_revenue += revenue
-                total_cost += cost
-                if duration_secs > 0:
-                    total_minutes += duration_secs // 60
+                    total_revenue += revenue
+                    total_cost += cost
 
     await db.commit()
 
     logger.info(
-        "seed_calls_completed",
-        users_created=users_created,
-        calls_created=calls_created,
-        total_revenue=float(total_revenue),
-        total_cost=float(total_cost),
-        total_minutes=total_minutes,
+        "seed_completed",
+        users=users_created,
+        workspaces=workspaces_created,
+        agents=agents_created,
+        contacts=contacts_created,
+        appointments=appointments_created,
+        calls=calls_created,
+        revenue=float(total_revenue),
     )
 
     return {
         "seeded": True,
         "users_created": users_created,
+        "workspaces_created": workspaces_created,
+        "agents_created": agents_created,
+        "contacts_created": contacts_created,
+        "appointments_created": appointments_created,
         "calls_created": calls_created,
         "total_revenue": total_revenue,
         "total_cost": total_cost,
-        "total_minutes": total_minutes,
-        "profit": total_revenue - total_cost,
     }
 
 
 async def reseed_calls(db: AsyncSession) -> dict[str, int | Decimal]:
-    """Clear seeded data and reseed fresh."""
+    """Clear all seeded data and reseed fresh."""
     logger.info("Clearing existing seeded data...")
 
-    # Delete seeded users' calls first
+    # Get seeded user IDs
     seeded_user_ids = await db.execute(
         select(User.id).where(User.email.like("%@seeded.spacevoice.ai"))
     )
     user_ids = [row[0] for row in seeded_user_ids.fetchall()]
 
     if user_ids:
+        # Get workspace IDs for these users
+        workspace_ids_result = await db.execute(
+            select(Workspace.id).where(Workspace.user_id.in_(user_ids))
+        )
+        workspace_ids = [row[0] for row in workspace_ids_result.fetchall()]
+
+        # Get agent IDs for these users
+        agent_ids_result = await db.execute(
+            select(Agent.id).where(Agent.user_id.in_(user_ids))
+        )
+        agent_ids = [row[0] for row in agent_ids_result.fetchall()]
+
+        # Delete in order (respecting foreign keys)
+        if workspace_ids:
+            await db.execute(
+                delete(Appointment).where(Appointment.workspace_id.in_(workspace_ids))
+            )
+            await db.execute(
+                delete(Contact).where(Contact.workspace_id.in_(workspace_ids))
+            )
+
         await db.execute(
             delete(CallRecord).where(CallRecord.user_id.in_(user_ids))
         )
+
+        if agent_ids:
+            await db.execute(
+                delete(Agent).where(Agent.id.in_(agent_ids))
+            )
+
+        if workspace_ids:
+            await db.execute(
+                delete(Workspace).where(Workspace.id.in_(workspace_ids))
+            )
+
         await db.execute(
             delete(User).where(User.id.in_(user_ids))
         )
+
         await db.commit()
 
     logger.info("Cleared seeded data", users_deleted=len(user_ids))
 
-    # Now seed fresh data
+    # Reseed
     return await seed_calls(db)
