@@ -19,18 +19,20 @@ from app.models.agent import Agent
 from app.models.appointment import Appointment
 from app.models.call_record import CallDirection, CallRecord, CallStatus
 from app.models.contact import Contact
+from app.models.phone_number import PhoneNumber, PhoneNumberStatus, TelephonyProvider
 from app.models.pricing_config import PricingConfig
 from app.models.user import User
 from app.models.workspace import AgentWorkspace, Workspace
 
 logger = structlog.get_logger()
 
-# Pricing tier distribution for seeded users
-TIER_DISTRIBUTION = [
-    ("premium", 10),       # 10 premium users
-    ("premium-mini", 15),  # 15 premium-mini users
-    ("balanced", 15),      # 15 balanced users
-    ("budget", 10),        # 10 budget users
+# Pricing tier distribution for seeded users (slightly randomized for realism)
+# Will be randomized at runtime to avoid round numbers
+TIER_DISTRIBUTION_BASE = [
+    ("premium", 9, 12),        # 9-12 premium users
+    ("premium-mini", 13, 17),  # 13-17 premium-mini users
+    ("balanced", 14, 18),      # 14-18 balanced users
+    ("budget", 8, 12),         # 8-12 budget users
 ]
 
 # Call parameters for each tier (calls_per_user, avg_duration_min, demo_price_per_min)
@@ -237,12 +239,19 @@ async def seed_calls(db: AsyncSession) -> dict[str, int | Decimal]:
     contacts_created = 0
     appointments_created = 0
     calls_created = 0
+    phone_numbers_created = 0
     total_revenue = Decimal("0")
     total_cost = Decimal("0")
 
     user_index = 0
 
-    for tier_id, user_count in TIER_DISTRIBUTION:
+    # Randomize tier distribution for realistic counts (not round numbers)
+    tier_distribution = [
+        (tier_id, random.randint(min_users, max_users))
+        for tier_id, min_users, max_users in TIER_DISTRIBUTION_BASE
+    ]
+
+    for tier_id, user_count in tier_distribution:
         pricing = pricing_tiers.get(tier_id)
         if not pricing:
             continue
@@ -341,6 +350,38 @@ async def seed_calls(db: AsyncSession) -> dict[str, int | Decimal]:
                     is_default=(agent_num == 0),  # First agent is default for this workspace
                 )
                 db.add(agent_workspace)
+                await db.flush()
+
+            # Create 1-2 phone numbers per user (some users may have none)
+            if random.random() < 0.7:  # 70% of users have phone numbers
+                num_phones = random.randint(1, 2)
+                for phone_idx in range(num_phones):
+                    phone_num = generate_phone()
+                    provider = random.choice([TelephonyProvider.TELNYX.value, TelephonyProvider.TWILIO.value])
+
+                    # Assign to first agent if available
+                    assigned_agent = user_agents[0] if user_agents and phone_idx == 0 else None
+
+                    phone = PhoneNumber(
+                        id=uuid.uuid4(),
+                        user_id=user.id,
+                        workspace_id=workspace.id,
+                        phone_number=phone_num,
+                        friendly_name=f"{business_type} Line {phone_idx + 1}",
+                        provider=provider,
+                        provider_id=f"{provider}_{secrets.token_hex(12)}",
+                        can_receive_calls=True,
+                        can_make_calls=True,
+                        can_receive_sms=random.choice([True, False]),
+                        can_send_sms=random.choice([True, False]),
+                        status=PhoneNumberStatus.ACTIVE.value,
+                        assigned_agent_id=assigned_agent.id if assigned_agent else None,
+                        purchased_at=user_created_date + timedelta(days=random.randint(0, 14)),
+                    )
+                    phone.created_at = user_created_date + timedelta(days=random.randint(0, 7))  # type: ignore[assignment]
+                    db.add(phone)
+                    phone_numbers_created += 1
+
                 await db.flush()
 
             # Create 5-15 contacts for this workspace with realistic emails
@@ -538,6 +579,7 @@ async def seed_calls(db: AsyncSession) -> dict[str, int | Decimal]:
         agents=agents_created,
         contacts=contacts_created,
         appointments=appointments_created,
+        phone_numbers=phone_numbers_created,
         calls=calls_created,
         revenue=float(total_revenue),
     )
@@ -549,6 +591,7 @@ async def seed_calls(db: AsyncSession) -> dict[str, int | Decimal]:
         "agents_created": agents_created,
         "contacts_created": contacts_created,
         "appointments_created": appointments_created,
+        "phone_numbers_created": phone_numbers_created,
         "calls_created": calls_created,
         "total_revenue": total_revenue,
         "total_cost": total_cost,
@@ -589,6 +632,11 @@ async def reseed_calls(db: AsyncSession) -> dict[str, int | Decimal]:
 
         await db.execute(
             delete(CallRecord).where(CallRecord.user_id.in_(user_ids))
+        )
+
+        # Delete phone numbers
+        await db.execute(
+            delete(PhoneNumber).where(PhoneNumber.user_id.in_(user_ids))
         )
 
         if agent_ids:
