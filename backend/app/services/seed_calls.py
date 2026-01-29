@@ -435,35 +435,26 @@ async def seed_calls(db: AsyncSession) -> dict[str, int | Decimal]:
                 contacts_created += 1
 
             # Create 3-8 appointments for some contacts
-            # Past appointments should be completed/cancelled, future ones scheduled
+            # ALL appointments should be completed or cancelled - NO scheduled
             num_appointments = random.randint(3, 8)
 
             for _ in range(num_appointments):
                 contact = random.choice(user_contacts)
                 agent = random.choice(user_agents)
 
-                # Appointment scheduled in the 6-month window
-                appt_month_idx = random.randint(0, 5)
+                # Appointment in the past 6-month window (NOT future)
+                appt_month_idx = random.randint(0, 4)  # Only past months, not current
                 appt_date = months[appt_month_idx][0].replace(
                     day=random.randint(1, 28),
                     hour=random.randint(9, 16),
                     minute=random.choice([0, 15, 30, 45]),
                 )
 
-                # Determine status based on whether appointment is in the past
-                is_past = appt_date < now
-                if is_past:
-                    # Past appointments: mostly completed, some cancelled/no_show
-                    status = random.choices(
-                        ["completed", "cancelled", "no_show"],
-                        weights=[70, 20, 10]
-                    )[0]
-                else:
-                    # Future appointments: mostly scheduled, few cancelled
-                    status = random.choices(
-                        ["scheduled", "cancelled"],
-                        weights=[85, 15]
-                    )[0]
+                # ALL appointments are completed or cancelled - NO scheduled
+                status = random.choices(
+                    ["completed", "cancelled", "no_show"],
+                    weights=[70, 20, 10]
+                )[0]
 
                 appointment = Appointment(
                     contact_id=contact.id,
