@@ -6,6 +6,7 @@ import { api } from "@/lib/api";
 import { fetchAgents } from "@/lib/api/agents";
 import { listPhoneNumbers } from "@/lib/api/phone-numbers";
 import { fetchComplianceStatus } from "@/lib/api/compliance";
+import { useAuth } from "@/hooks/use-auth";
 import { Bot, FolderOpen, Calendar, Phone, Users, Shield } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { CompliancePanel } from "@/components/compliance-panel";
@@ -62,29 +63,33 @@ function ComplianceBadge({ label, percentage, onClick }: ComplianceBadgeProps) {
 export function TopBar() {
   const [compliancePanelOpen, setCompliancePanelOpen] = useState(false);
   const [complianceTab, setComplianceTab] = useState<"gdpr" | "ccpa">("gdpr");
+  const { user } = useAuth();
+  const isAdmin = user?.is_superuser ?? false;
 
-  // Fetch agents count
+  // Fetch agents count (admin sees all users' agents)
   const { data: agents, isLoading: agentsLoading } = useQuery({
-    queryKey: ["agents-count"],
-    queryFn: () => fetchAgents(),
+    queryKey: ["agents-count", isAdmin],
+    queryFn: () => fetchAgents({ all_users: isAdmin }),
     staleTime: 30000,
   });
 
-  // Fetch workspaces count
+  // Fetch workspaces count (admin sees all users' workspaces)
   const { data: workspaces, isLoading: workspacesLoading } = useQuery({
-    queryKey: ["workspaces-count"],
+    queryKey: ["workspaces-count", isAdmin],
     queryFn: async () => {
-      const response = await api.get("/api/v1/workspaces");
+      const url = isAdmin ? "/api/v1/workspaces?all_users=true" : "/api/v1/workspaces";
+      const response = await api.get(url);
       return response.data;
     },
     staleTime: 30000,
   });
 
-  // Fetch appointments count
+  // Fetch appointments count (admin sees all users' appointments)
   const { data: appointments, isLoading: appointmentsLoading } = useQuery({
-    queryKey: ["appointments-count"],
+    queryKey: ["appointments-count", isAdmin],
     queryFn: async () => {
-      const response = await api.get("/api/v1/crm/appointments");
+      const url = isAdmin ? "/api/v1/crm/appointments?all_users=true" : "/api/v1/crm/appointments";
+      const response = await api.get(url);
       return response.data;
     },
     staleTime: 30000,
@@ -97,11 +102,12 @@ export function TopBar() {
     staleTime: 30000,
   });
 
-  // Fetch CRM contacts count
+  // Fetch CRM contacts count (admin sees all users' contacts)
   const { data: contacts, isLoading: contactsLoading } = useQuery({
-    queryKey: ["contacts-count"],
+    queryKey: ["contacts-count", isAdmin],
     queryFn: async () => {
-      const response = await api.get("/api/v1/crm/contacts");
+      const url = isAdmin ? "/api/v1/crm/contacts?all_users=true" : "/api/v1/crm/contacts";
+      const response = await api.get(url);
       return response.data;
     },
     staleTime: 30000,

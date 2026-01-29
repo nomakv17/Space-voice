@@ -21,7 +21,7 @@ from app.models.call_record import CallDirection, CallRecord, CallStatus
 from app.models.contact import Contact
 from app.models.pricing_config import PricingConfig
 from app.models.user import User
-from app.models.workspace import Workspace
+from app.models.workspace import AgentWorkspace, Workspace
 
 logger = structlog.get_logger()
 
@@ -82,10 +82,41 @@ def generate_phone() -> str:
     return f"+1{area}{random.randint(1000000, 9999999)}"
 
 
-def generate_email(first_name: str, last_name: str) -> str:
-    """Generate a realistic email address."""
-    domains = ["gmail.com", "yahoo.com", "outlook.com", "hotmail.com", "icloud.com"]
-    return f"{first_name.lower()}.{last_name.lower()}{random.randint(1, 99)}@{random.choice(domains)}"
+def generate_email(first_name: str, last_name: str, company_domain: str | None = None) -> str:
+    """Generate a realistic email address with optional company domain."""
+    if company_domain:
+        # Business email format
+        return f"{first_name.lower()}.{last_name.lower()[0]}@{company_domain}"
+    # Personal email with varied formats
+    personal_domains = ["gmail.com", "yahoo.com", "outlook.com", "hotmail.com", "icloud.com"]
+    formats = [
+        f"{first_name.lower()}.{last_name.lower()}{random.randint(1, 99)}",
+        f"{first_name.lower()}{last_name.lower()[0]}{random.randint(10, 99)}",
+        f"{first_name.lower()}_{last_name.lower()}",
+        f"{first_name.lower()[0]}{last_name.lower()}{random.randint(1, 99)}",
+    ]
+    return f"{random.choice(formats)}@{random.choice(personal_domains)}"
+
+
+# Company domain mapping for realistic business emails
+BUSINESS_DOMAINS = {
+    "HVAC Services": "hvacpro.com",
+    "Plumbing Co": "plumbingco.com",
+    "Electric Solutions": "electricsolutions.com",
+    "Roofing Pros": "roofingpros.com",
+    "Landscaping": "greenscapellc.com",
+    "Pest Control": "bugbusters.com",
+    "Cleaning Services": "sparkclean.com",
+    "Auto Repair": "autofix.com",
+    "Dental Office": "brightsmile.dental",
+    "Law Firm": "legalpros.law",
+    "Real Estate": "homefinders.realty",
+    "Insurance Agency": "shieldins.com",
+    "Medical Clinic": "carewellclinic.com",
+    "Veterinary": "petcare.vet",
+    "Restaurant": "tastybites.food",
+    "Salon & Spa": "beautyspot.salon",
+}
 
 
 def generate_call_duration(avg_minutes: int) -> int:
@@ -274,9 +305,11 @@ async def seed_calls(db: AsyncSession) -> dict[str, int | Decimal]:
             await db.flush()
             workspaces_created += 1
 
-            # Create 1-2 agents for this user
+            # Create 1-2 agents for this user and link to workspace
             num_agents = random.randint(1, 2)
             user_agents = []
+            agent_call_counts: dict[uuid.UUID, tuple[int, int]] = {}  # agent_id -> (calls, duration)
+
             for agent_num in range(num_agents):
                 agent_name = f"{business_type} Assistant" if agent_num == 0 else f"{business_type} Support"
                 agent = Agent(
@@ -297,12 +330,24 @@ async def seed_calls(db: AsyncSession) -> dict[str, int | Decimal]:
                 db.add(agent)
                 await db.flush()
                 user_agents.append(agent)
+                agent_call_counts[agent.id] = (0, 0)
                 agents_created += 1
 
-            # Create 5-15 contacts for this workspace
+                # Link agent to workspace via AgentWorkspace junction table
+                agent_workspace = AgentWorkspace(
+                    id=uuid.uuid4(),
+                    agent_id=agent.id,
+                    workspace_id=workspace.id,
+                    is_default=(agent_num == 0),  # First agent is default for this workspace
+                )
+                db.add(agent_workspace)
+                await db.flush()
+
+            # Create 5-15 contacts for this workspace with realistic emails
             num_contacts = random.randint(5, 15)
             user_contacts = []
             contact_statuses = ["new", "contacted", "qualified", "converted", "lost"]
+            company_domain = BUSINESS_DOMAINS.get(business_type, "company.com")
 
             for _ in range(num_contacts):
                 first_name = random.choice(FIRST_NAMES)
@@ -315,16 +360,32 @@ async def seed_calls(db: AsyncSession) -> dict[str, int | Decimal]:
                     hour=random.randint(9, 17),
                 )
 
+                # Use business email for ~30% of contacts, personal for the rest
+                use_company_email = random.random() < 0.3
+                email = generate_email(
+                    first_name, last_name,
+                    company_domain if use_company_email else None
+                )
+
+                # Realistic company names
+                company_options = [
+                    None,
+                    f"{last_name} {random.choice(['Enterprises', 'LLC', 'Inc', 'Co'])}",
+                    f"{first_name}'s {random.choice(['Shop', 'Business', 'Services'])}",
+                    random.choice(["Martinez Restaurant", "Johnson Construction", "Smith & Associates",
+                                   "Brown Consulting", "Davis Holdings", "Wilson Group"]),
+                ]
+
                 contact = Contact(
                     user_id=user.id,
                     workspace_id=workspace.id,
                     first_name=first_name,
                     last_name=last_name,
-                    email=generate_email(first_name, last_name),
+                    email=email,
                     phone_number=generate_phone(),
-                    company_name=random.choice([None, f"{first_name}'s Company", "Self"]),
+                    company_name=random.choice(company_options),
                     status=random.choice(contact_statuses),
-                    tags=random.choice([None, "lead", "customer", "vip", "follow-up"]),
+                    tags=random.choice([None, "lead", "customer", "vip", "hvac", "emergency", "commercial,kitchen"]),
                 )
                 contact.created_at = contact_created  # type: ignore[assignment]
                 db.add(contact)
@@ -333,8 +394,8 @@ async def seed_calls(db: AsyncSession) -> dict[str, int | Decimal]:
                 contacts_created += 1
 
             # Create 3-8 appointments for some contacts
+            # Past appointments should be completed/cancelled, future ones scheduled
             num_appointments = random.randint(3, 8)
-            appointment_statuses = ["scheduled", "completed", "cancelled", "no_show"]
 
             for _ in range(num_appointments):
                 contact = random.choice(user_contacts)
@@ -348,16 +409,19 @@ async def seed_calls(db: AsyncSession) -> dict[str, int | Decimal]:
                     minute=random.choice([0, 15, 30, 45]),
                 )
 
-                # Older appointments more likely to be completed
-                if appt_month_idx < 4:
+                # Determine status based on whether appointment is in the past
+                is_past = appt_date < now
+                if is_past:
+                    # Past appointments: mostly completed, some cancelled/no_show
                     status = random.choices(
-                        appointment_statuses,
-                        weights=[10, 60, 20, 10]
+                        ["completed", "cancelled", "no_show"],
+                        weights=[70, 20, 10]
                     )[0]
                 else:
+                    # Future appointments: mostly scheduled, few cancelled
                     status = random.choices(
-                        appointment_statuses,
-                        weights=[60, 20, 15, 5]
+                        ["scheduled", "cancelled"],
+                        weights=[85, 15]
                     )[0]
 
                 appointment = Appointment(
@@ -365,7 +429,7 @@ async def seed_calls(db: AsyncSession) -> dict[str, int | Decimal]:
                     workspace_id=workspace.id,
                     agent_id=agent.id,
                     scheduled_at=appt_date,
-                    duration_minutes=random.choice([15, 30, 45, 60]),
+                    duration_minutes=random.choice([15, 30, 45, 60, 90, 120, 240]),
                     status=status,
                     service_type=random.choice(SERVICE_TYPES),
                     created_by_agent=agent.name,
@@ -423,6 +487,13 @@ async def seed_calls(db: AsyncSession) -> dict[str, int | Decimal]:
                     agent = random.choice(user_agents)
                     contact = random.choice(user_contacts) if random.random() < 0.6 else None
 
+                    # Track calls per agent for updating total_calls later
+                    prev_calls, prev_dur = agent_call_counts.get(agent.id, (0, 0))
+                    if status == CallStatus.COMPLETED.value:
+                        agent_call_counts[agent.id] = (prev_calls + 1, prev_dur + duration_secs)
+                    else:
+                        agent_call_counts[agent.id] = (prev_calls + 1, prev_dur)
+
                     call = CallRecord(
                         id=uuid.uuid4(),
                         user_id=user.id,
@@ -448,6 +519,15 @@ async def seed_calls(db: AsyncSession) -> dict[str, int | Decimal]:
                     calls_created += 1
                     total_revenue += revenue
                     total_cost += cost
+
+            # Update agent total_calls and total_duration_seconds
+            for agent in user_agents:
+                call_count, total_dur = agent_call_counts.get(agent.id, (0, 0))
+                agent.total_calls = call_count
+                agent.total_duration_seconds = total_dur
+                if call_count > 0:
+                    # Set last_call_at to a recent time
+                    agent.last_call_at = now - timedelta(hours=random.randint(1, 48))
 
     await db.commit()
 
@@ -512,6 +592,10 @@ async def reseed_calls(db: AsyncSession) -> dict[str, int | Decimal]:
         )
 
         if agent_ids:
+            # Delete agent-workspace links first
+            await db.execute(
+                delete(AgentWorkspace).where(AgentWorkspace.agent_id.in_(agent_ids))
+            )
             await db.execute(
                 delete(Agent).where(Agent.id.in_(agent_ids))
             )

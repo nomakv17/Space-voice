@@ -41,10 +41,10 @@ export default function DashboardPage() {
   const { user } = useAuth();
   const isAdmin = user?.is_superuser ?? false;
 
-  // Fetch agents
+  // Fetch agents (admin sees all users' agents)
   const { data: agents = [] } = useQuery({
-    queryKey: ["agents"],
-    queryFn: () => fetchAgents(),
+    queryKey: ["agents", isAdmin],
+    queryFn: () => fetchAgents({ all_users: isAdmin }),
   });
 
   // Fetch recent calls (for non-admin or recent calls list)
