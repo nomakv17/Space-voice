@@ -17,6 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.auth import get_password_hash
 from app.models.agent import Agent
 from app.models.appointment import Appointment
+from app.models.call_interaction import CallInteraction
 from app.models.call_record import CallDirection, CallRecord, CallStatus
 from app.models.contact import Contact
 from app.models.phone_number import PhoneNumber, PhoneNumberStatus, TelephonyProvider
@@ -238,6 +239,7 @@ async def seed_calls(db: AsyncSession) -> dict[str, int | Decimal]:
     agents_created = 0
     contacts_created = 0
     appointments_created = 0
+    call_interactions_created = 0
     calls_created = 0
     phone_numbers_created = 0
     total_revenue = Decimal("0")
@@ -470,6 +472,44 @@ async def seed_calls(db: AsyncSession) -> dict[str, int | Decimal]:
                 db.add(appointment)
                 appointments_created += 1
 
+            # Create 5-15 call interactions for contacts (CRM call history)
+            call_outcomes = ["answered", "voicemail", "no_answer", "callback_requested", "busy"]
+            num_interactions = random.randint(5, 15)
+
+            for _ in range(num_interactions):
+                contact = random.choice(user_contacts)
+                agent = random.choice(user_agents)
+
+                # Call interaction in the past 6 months
+                interaction_month_idx = random.randint(0, 4)
+                call_time = months[interaction_month_idx][0].replace(
+                    day=random.randint(1, 28),
+                    hour=random.randint(8, 18),
+                    minute=random.randint(0, 59),
+                )
+                duration = random.randint(30, 600)  # 30 seconds to 10 minutes
+
+                interaction = CallInteraction(
+                    contact_id=contact.id,
+                    workspace_id=workspace.id,
+                    call_started_at=call_time,
+                    call_ended_at=call_time + timedelta(seconds=duration),
+                    duration_seconds=duration,
+                    agent_name=agent.name,
+                    agent_id=str(agent.id),
+                    outcome=random.choices(
+                        call_outcomes,
+                        weights=[60, 15, 10, 10, 5]
+                    )[0],
+                    ai_summary=f"Customer inquiry about {random.choice(['service', 'pricing', 'appointment', 'follow-up', 'support'])}",
+                    sentiment_score=round(random.uniform(-0.3, 1.0), 2),
+                )
+                interaction.created_at = call_time  # type: ignore[assignment]
+                db.add(interaction)
+                call_interactions_created += 1
+
+            await db.flush()
+
             # Generate calls for this user across all 6 months
             for month_start, growth_mult in months:
                 month_calls = int((calls_per_user + random.randint(-20, 20)) * growth_mult)
@@ -570,6 +610,7 @@ async def seed_calls(db: AsyncSession) -> dict[str, int | Decimal]:
         agents=agents_created,
         contacts=contacts_created,
         appointments=appointments_created,
+        call_interactions=call_interactions_created,
         phone_numbers=phone_numbers_created,
         calls=calls_created,
         revenue=float(total_revenue),
@@ -582,6 +623,7 @@ async def seed_calls(db: AsyncSession) -> dict[str, int | Decimal]:
         "agents_created": agents_created,
         "contacts_created": contacts_created,
         "appointments_created": appointments_created,
+        "call_interactions_created": call_interactions_created,
         "phone_numbers_created": phone_numbers_created,
         "calls_created": calls_created,
         "total_revenue": total_revenue,
@@ -614,6 +656,10 @@ async def reseed_calls(db: AsyncSession) -> dict[str, int | Decimal]:
 
         # Delete in order (respecting foreign keys)
         if workspace_ids:
+            # Delete call interactions first (references contacts)
+            await db.execute(
+                delete(CallInteraction).where(CallInteraction.workspace_id.in_(workspace_ids))
+            )
             await db.execute(
                 delete(Appointment).where(Appointment.workspace_id.in_(workspace_ids))
             )

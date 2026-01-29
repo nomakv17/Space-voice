@@ -106,17 +106,6 @@ export function TopBar() {
     staleTime: 30000,
   });
 
-  // Fetch CRM contacts count (admin sees all users' contacts)
-  const { data: contacts, isLoading: contactsLoading } = useQuery({
-    queryKey: ["contacts-count", isAdmin],
-    queryFn: async () => {
-      const url = isAdmin ? "/api/v1/crm/contacts?all_users=true" : "/api/v1/crm/contacts";
-      const response = await api.get(url);
-      return response.data;
-    },
-    staleTime: 30000,
-  });
-
   // Fetch compliance status
   const { data: complianceStatus } = useQuery({
     queryKey: ["compliance-status"],
@@ -175,8 +164,8 @@ export function TopBar() {
           <StatItem
             icon={Users}
             label="Contacts"
-            value={contacts?.length}
-            isLoading={contactsLoading}
+            value={crmStats?.total_contacts}
+            isLoading={appointmentsLoading}
           />
         </div>
       </div>
