@@ -127,6 +127,7 @@ async def list_phone_numbers(
     page_size: int = Query(default=20, ge=1, le=100),
     workspace_id: str | None = Query(default=None, description="Filter by workspace ID"),
     status: str | None = Query(default=None, description="Filter by status"),
+    all_users: bool = Query(default=False, description="Admin only: show all users' phone numbers"),
 ) -> PhoneNumberListResponse:
     """List phone numbers for the current user.
 
@@ -137,15 +138,21 @@ async def list_phone_numbers(
         page_size: Number of records per page
         workspace_id: Optional filter by workspace ID
         status: Optional filter by status
+        all_users: Admin only - if True, show phone numbers from all users
 
     Returns:
         Paginated list of phone numbers
     """
     log = logger.bind(user_id=current_user.id)
-    log.info("listing_phone_numbers", page=page, page_size=page_size)
+    log.info("listing_phone_numbers", page=page, page_size=page_size, all_users=all_users)
+
+    # Filter by user unless admin requests all users
+    show_all = all_users and current_user.is_superuser
 
     # Build query
-    query = select(PhoneNumber).where(PhoneNumber.user_id == current_user.id)
+    query = select(PhoneNumber)
+    if not show_all:
+        query = query.where(PhoneNumber.user_id == current_user.id)
 
     # Apply filters
     if workspace_id:
@@ -154,7 +161,9 @@ async def list_phone_numbers(
         query = query.where(PhoneNumber.status == status)
 
     # Get total count
-    count_query = select(PhoneNumber.id).where(PhoneNumber.user_id == current_user.id)
+    count_query = select(PhoneNumber.id)
+    if not show_all:
+        count_query = count_query.where(PhoneNumber.user_id == current_user.id)
     if workspace_id:
         count_query = count_query.where(PhoneNumber.workspace_id == uuid.UUID(workspace_id))
     if status:

@@ -84,21 +84,25 @@ export function TopBar() {
     staleTime: 30000,
   });
 
-  // Fetch appointments count (admin sees all users' appointments)
-  const { data: appointments, isLoading: appointmentsLoading } = useQuery({
-    queryKey: ["appointments-count", isAdmin],
+  // Fetch CRM stats for appointments count (uses total_appointments, not array length)
+  const { data: crmStats, isLoading: appointmentsLoading } = useQuery<{
+    total_contacts: number;
+    total_appointments: number;
+    total_calls: number;
+  }>({
+    queryKey: ["crm-stats-topbar", isAdmin],
     queryFn: async () => {
-      const url = isAdmin ? "/api/v1/crm/appointments?all_users=true" : "/api/v1/crm/appointments";
+      const url = isAdmin ? "/api/v1/crm/stats?all_users=true" : "/api/v1/crm/stats";
       const response = await api.get(url);
       return response.data;
     },
     staleTime: 30000,
   });
 
-  // Fetch phone numbers count
+  // Fetch phone numbers count (admin sees all users' phone numbers)
   const { data: phoneNumbersData, isLoading: phoneNumbersLoading } = useQuery({
-    queryKey: ["phone-numbers-count"],
-    queryFn: () => listPhoneNumbers(),
+    queryKey: ["phone-numbers-count", isAdmin],
+    queryFn: () => listPhoneNumbers({ all_users: isAdmin }),
     staleTime: 30000,
   });
 
@@ -159,7 +163,7 @@ export function TopBar() {
           <StatItem
             icon={Calendar}
             label="Appointments"
-            value={appointments?.length}
+            value={crmStats?.total_appointments}
             isLoading={appointmentsLoading}
           />
           <StatItem

@@ -43,6 +43,7 @@ export interface ListPhoneNumbersParams {
   page_size?: number;
   workspace_id?: string;
   status?: string;
+  all_users?: boolean; // Admin only: show all users' phone numbers
 }
 
 export interface CreatePhoneNumberRequest {
@@ -77,6 +78,7 @@ export async function listPhoneNumbers(
   if (params.page_size) searchParams.set("page_size", params.page_size.toString());
   if (params.workspace_id) searchParams.set("workspace_id", params.workspace_id);
   if (params.status) searchParams.set("status", params.status);
+  if (params.all_users) searchParams.set("all_users", "true");
 
   const response = await fetch(`${API_BASE}/api/v1/phone-numbers?${searchParams.toString()}`, {
     headers: getAuthHeaders(),
